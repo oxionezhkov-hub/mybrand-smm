@@ -431,7 +431,13 @@ const state = {
   fittedOnce: false,
   pendingRender: false,
   mobileActiveProjectId: null,
+  desktopFocusedProjectId: null,
 };
+
+function contextualDefaultProjectId(){
+  const id = isMobile() ? state.mobileActiveProjectId : state.desktopFocusedProjectId;
+  return id && projectById(id) ? id : null;
+}
 
 const GENERAL_ID = 'general';
 const MONTHS_GEN = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
@@ -823,6 +829,7 @@ function fitBoundsToView(bounds, opts){
 }
 
 function fitAll(animate){
+  state.desktopFocusedProjectId = null;
   const keys = Object.keys(state.projectLayout);
   if (!keys.length) return;
   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
@@ -837,6 +844,7 @@ function fitAll(animate){
 function zoomToProject(id){
   const l = state.projectLayout[id];
   if (!l) return;
+  state.desktopFocusedProjectId = id;
   fitBoundsToView(l, { animate: true, maxZoom: 1.6, bottomClearance: BOTTOM_BAR_CLEARANCE });
 }
 
@@ -1255,6 +1263,7 @@ async function deleteProjectNow(projectId){
   state.projects = state.projects.filter(p => p.id !== projectId);
   for (const t of state.tasks) if (t.projectId === projectId) t.projectId = GENERAL_ID;
   if (state.mobileActiveProjectId === projectId) state.mobileActiveProjectId = null;
+  if (state.desktopFocusedProjectId === projectId) state.desktopFocusedProjectId = null;
   renderCanvas();
   const { projects } = await api.deleteProject(projectId);
   if (projects) state.projects = projects;
@@ -1405,7 +1414,7 @@ async function submitComposer(){
   if (selectedProject && selectedProject.pending){
     payload.newProjectName = selectedProject.name;
   } else {
-    payload.projectId = state.composer.projectId || GENERAL_ID;
+    payload.projectId = state.composer.projectId || contextualDefaultProjectId() || GENERAL_ID;
   }
 
   composerInput.innerHTML = '';
@@ -1449,7 +1458,8 @@ function openProjectPopover(){
   const list = el('div', 'popover-list');
   const sorted = [...state.projects].sort((a,b) => a.order - b.order);
   for (const project of sorted){
-    const row = el('div', 'popover-item' + (state.composer.projectId === project.id || (!state.composer.projectId && project.id === GENERAL_ID) ? ' selected' : ''));
+    const isImplicitDefault = !state.composer.projectId && project.id === (contextualDefaultProjectId() || GENERAL_ID);
+    const row = el('div', 'popover-item' + (state.composer.projectId === project.id || isImplicitDefault ? ' selected' : ''));
     row.appendChild(el('span', 'p-name', escapeHtml(project.name)));
     row.addEventListener('click', () => {
       state.composer.projectId = project.id;
