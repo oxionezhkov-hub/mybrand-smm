@@ -6,3 +6,15 @@ preview_urls = false
 [[kv_namespaces]]
 binding = "KV"
 id = "5ffa6fc542054098b122fb4f4c254076"
+
+[ai]
+binding = "AI"
+
+# Static presentation deck (public/vebinar-slides/index.html) served at /vebinar-slides.
+# Matched assets are served directly by Cloudflare; everything else (webhook, /debug/morning, /)
+# falls through to the Worker script below.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+html_handling = "auto-trailing-slash"
+not_found_handling = "none"

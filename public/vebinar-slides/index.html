@@ -1,0 +1,1771 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="generator" content="html-slides v0.9.4">
+<title>7 шагов к 1.000.000 просмотров в месяц на ваших Reels — вебинар</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME — "Content Farm Green"
+   =========================================== */
+:root {
+  --font-body: 'Manrope', -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Manrope', monospace;
+
+  --bg: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f3faf0;
+  --surface-container: #f7f8f7;
+
+  --text: #111827;
+  --text-muted: #4b5563;
+  --text-dim: #6b7280;
+
+  --accent-blue: #4ea82e;
+  --accent-blue-container: #8fdc6a;
+  --accent-green: #2f8f1c;
+  --accent-orange: #e8590c;
+  --accent-red: #dc2626;
+  --accent-purple: #9aa1ab;
+  --accent-purple-container: #c3c9d1;
+  --accent-yellow: #d97706;
+
+  --green-soft: #eaf7e4;
+  --green-soft-border: #b9e6a6;
+
+  --border: rgba(79, 168, 46, 0.16);
+  --border-hover: rgba(79, 168, 46, 0.36);
+  --outline-variant: #cfead0;
+}
+
+html, body {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+  font-family: var(--font-body);
+}
+
+.slide { cursor: pointer; }
+.slide a, .slide button { cursor: pointer; }
+
+.particle { background: rgba(79, 168, 46, 0.10) !important; }
+
+.progress-bar { background: linear-gradient(90deg, var(--accent-blue), var(--accent-blue-container)) !important; height: 4px !important; }
+.slide-counter { color: var(--text-dim) !important; font-family: var(--font-mono); position: static !important; }
+.nav-hints { color: var(--text-dim) !important; }
+.nav-hints kbd {
+  background: rgba(79, 168, 46, 0.06) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 6px !important;
+  color: var(--text-dim) !important;
+}
+
+.glow-blob { opacity: 0.07 !important; }
+.glow-blue, .glow-purple { background: var(--accent-blue-container) !important; }
+.glow-green { background: var(--accent-green) !important; }
+
+.rainbow-line { background: linear-gradient(90deg, var(--accent-blue), var(--accent-blue-container)) !important; }
+.gradient-text {
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-green)) !important;
+  -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; background-clip: text !important;
+}
+.rainbow-text {
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-green)) !important;
+  -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; background-clip: text !important;
+}
+.subtitle { color: var(--text-muted) !important; }
+
+/* ====== CARD SURFACES ====== */
+.card-v2, .stat-card, .arch-box, .vs-card, .status-item, .chart-container, .table-wrap, .cta-box, .cb-card, .case-stat {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 2px 28px rgba(17, 24, 39, 0.05) !important;
+}
+.card-v2:hover, .stat-card:hover, .arch-box:hover, .vs-card:hover, .chart-container:hover, .table-wrap:hover {
+  border-color: var(--border-hover) !important;
+  box-shadow: 0 10px 40px rgba(17, 24, 39, 0.08) !important;
+  transform: translateY(-3px);
+}
+.card-v2::before { display: none !important; }
+.card-v2 { cursor: default !important; }
+.card-v2 .card-title { color: var(--text) !important; }
+.card-v2 .card-desc { color: var(--text-muted) !important; }
+.card-v2.glow-orange { border-color: rgba(232, 89, 12, 0.22) !important; }
+.card-v2.glow-orange:hover { border-color: rgba(232, 89, 12, 0.4) !important; box-shadow: 0 10px 40px rgba(232, 89, 12, 0.08) !important; }
+.card-v2.glow-blue, .card-v2.glow-green { border-color: rgba(79, 168, 46, 0.22) !important; }
+.card-v2.glow-blue:hover, .card-v2.glow-green:hover { border-color: rgba(79, 168, 46, 0.42) !important; box-shadow: 0 10px 40px rgba(79, 168, 46, 0.08) !important; }
+.card-v2.glow-purple { border-color: rgba(154, 161, 171, 0.3) !important; }
+.card-v2.glow-purple:hover { border-color: rgba(154, 161, 171, 0.5) !important; }
+
+/* ====== ARCH FLOW ====== */
+.arch-box.box-blue, .arch-box.box-green { border-color: rgba(79, 168, 46, 0.28) !important; }
+.arch-box.box-yellow { border-color: rgba(217, 119, 6, 0.28) !important; }
+.arch-box:hover.box-blue, .arch-box:hover.box-green { border-color: rgba(79, 168, 46, 0.55) !important; box-shadow: 0 10px 40px rgba(79, 168, 46, 0.08) !important; }
+.arch-box:hover.box-yellow { border-color: rgba(217, 119, 6, 0.55) !important; box-shadow: 0 10px 40px rgba(217, 119, 6, 0.08) !important; }
+.arch-detail { background: var(--bg-card-hover) !important; color: var(--text-dim) !important; }
+.arch-arrow, .arrow-line { color: var(--text-dim) !important; }
+.arrow-line { background: var(--text-dim) !important; }
+.arrow-line::after { border-left-color: var(--text-dim) !important; }
+.arch-label.text-blue, .arch-label.text-green { color: var(--accent-blue) !important; }
+.arch-label.text-yellow { color: var(--accent-yellow) !important; }
+
+/* ====== STATS ====== */
+.stat-number.blue, .stat-number.green { color: var(--accent-blue) !important; }
+.stat-number.orange { color: var(--accent-orange) !important; }
+
+/* ====== VS / COMPARISON ====== */
+.vs-card.card-left { border-color: rgba(154, 161, 171, 0.35) !important; }
+.vs-card.card-right { border-color: rgba(79, 168, 46, 0.35) !important; }
+.vs-card.card-left:hover { border-color: rgba(154, 161, 171, 0.6) !important; }
+.vs-card.card-right:hover { border-color: rgba(79, 168, 46, 0.6) !important; box-shadow: 0 10px 40px rgba(79, 168, 46, 0.08) !important; }
+.vs-badge { background: var(--bg-card-hover) !important; color: var(--text-dim) !important; }
+.vs-plus {
+  background: linear-gradient(135deg, rgba(79, 168, 46, 0.14), rgba(79, 168, 46, 0.06)) !important;
+  border: 1px solid var(--border) !important; color: var(--accent-blue) !important;
+}
+@keyframes pulseGlow { 0%, 100% { box-shadow: 0 0 0 rgba(79,168,46,0); } 50% { box-shadow: 0 0 20px rgba(79,168,46,0.14); } }
+
+/* ====== STATUS TIMELINE ====== */
+.status-item:hover { background: var(--bg-card-hover) !important; border-color: var(--border-hover) !important; }
+.status-dot.green { background: var(--accent-blue) !important; box-shadow: 0 0 8px rgba(79,168,46,0.35) !important; }
+.status-dot.yellow { background: var(--accent-yellow) !important; box-shadow: 0 0 8px rgba(217,119,6,0.35) !important; }
+.status-dot.orange { background: var(--accent-orange) !important; box-shadow: 0 0 8px rgba(232,89,12,0.35) !important; }
+.status-dot.red { background: var(--accent-red) !important; box-shadow: 0 0 8px rgba(220,38,38,0.35) !important; }
+.status-text strong { color: var(--text) !important; }
+.slide.active .stag-6 { animation: bounceInSoft 0.5s ease 0.65s both; }
+.slide.active .stag-7 { animation: bounceInSoft 0.5s ease 0.75s both; }
+
+/* ====== CTA BOX ====== */
+.cta-box { background: linear-gradient(135deg, rgba(79,168,46,0.06), rgba(79,168,46,0.02)) !important; border: 1px solid rgba(79,168,46,0.18) !important; }
+.cta-box:hover { border-color: rgba(79,168,46,0.32) !important; box-shadow: 0 10px 40px rgba(79,168,46,0.08) !important; }
+
+/* ====== TABLE ====== */
+.table-wrap thead th { background: var(--bg-card-hover) !important; color: var(--text-muted) !important; border-bottom: 1px solid var(--border) !important; }
+.table-wrap tbody td { color: var(--text) !important; border-bottom: 1px solid var(--border) !important; }
+.table-wrap tbody tr:hover { background: var(--bg-card-hover) !important; }
+.table-wrap .cell-highlight { color: var(--accent-blue) !important; }
+
+/* ====== CONTENT BLOCK ====== */
+.cb-heading, .cb-keyquote { color: var(--text) !important; }
+.cb-body, .cb-detail, .cb-card-text { color: var(--text-muted) !important; }
+.cb-body .cb-accent { color: var(--text) !important; }
+.cb-card.problem { background: rgba(232, 89, 12, 0.03) !important; border-color: rgba(232, 89, 12, 0.2) !important; }
+.cb-card.fix { border-color: rgba(79, 168, 46, 0.22) !important; }
+.cb-card-label.problem-label { color: var(--accent-orange) !important; }
+.cb-card-label.fix-label { color: var(--accent-blue) !important; }
+.cb-keyquote { border-left-color: var(--accent-blue) !important; }
+.highlight-blue, .highlight-green { color: var(--accent-blue) !important; }
+.highlight-orange { color: var(--accent-orange) !important; }
+.highlight-red { color: var(--accent-red) !important; }
+.highlight-purple { color: var(--text-dim) !important; }
+.highlight-yellow { color: var(--accent-yellow) !important; }
+
+/* ====== IMAGE FRAME ====== */
+.image-frame .slide-image { border-radius: 12px; }
+.image-frame.image-screenshot .slide-image { border: 1px solid var(--border) !important; box-shadow: 0 10px 36px rgba(17,24,39,0.10) !important; }
+
+/* ====== EDITORIAL BACKGROUND ====== */
+.deck::before {
+  content: ''; position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse at 82% 8%, rgba(79,168,46,0.05) 0%, transparent 42%),
+    radial-gradient(ellipse at 8% 92%, rgba(79,168,46,0.04) 0%, transparent 42%);
+  pointer-events: none; z-index: 0;
+}
+
+/* ===========================================
+   CUSTOM COMPONENTS
+   =========================================== */
+.pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: clamp(8px,1vh,12px) clamp(16px,2vw,26px); border-radius: 999px;
+  background: var(--green-soft); color: var(--accent-green);
+  font-weight: 700; font-size: clamp(13px, 1.2vw, 17px);
+  border: 1px solid var(--green-soft-border);
+}
+
+.shot-frame {
+  position: relative; width: 100%; max-width: 980px; aspect-ratio: 16 / 10;
+  max-height: min(58vh, 560px);
+  margin-top: clamp(14px, 2.4vh, 26px); border-radius: 18px; overflow: hidden;
+  border: 2px dashed var(--green-soft-border); background: var(--green-soft);
+}
+.shot-frame img.shot-real {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  opacity: 0; transition: opacity 0.35s ease;
+}
+.shot-frame img.shot-real.shot-loaded { opacity: 1; }
+.shot-placeholder {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; text-align: center; gap: clamp(4px,1vh,8px);
+  padding: clamp(16px, 3vh, 32px);
+}
+.shot-placeholder .shot-file {
+  font-family: var(--font-mono); font-size: clamp(12px, 1.1vw, 15px); font-weight: 700; color: var(--accent-green);
+}
+.shot-placeholder .shot-size {
+  font-family: var(--font-mono); font-size: clamp(11px, 1vw, 13px); color: var(--text-dim);
+}
+.shot-placeholder .shot-desc {
+  font-size: clamp(12px, 1.15vw, 16px); color: var(--text-muted); max-width: 560px; line-height: 1.45;
+}
+
+/* -- Compact variant for small logo/photo slots (about-me block) -- */
+.shot-frame.shot-mini .shot-placeholder { padding: 6px; gap: 2px; }
+.shot-frame.shot-mini .shot-file { font-size: 10px; line-height: 1.15; word-break: break-word; }
+.shot-frame.shot-mini .shot-size { display: none; }
+.shot-frame.shot-mini .shot-desc { font-size: 11px; line-height: 1.2; }
+
+.stat-flow { display: flex; align-items: center; justify-content: center; gap: clamp(18px,3.5vw,48px); margin-top: clamp(20px,3vh,36px); flex-wrap: wrap; }
+.stat-flow-item { text-align: center; }
+.stat-flow-num { font-size: clamp(38px, 6.5vw, 84px); font-weight: 800; line-height: 1; color: var(--text); }
+.stat-flow-num.is-accent { color: var(--accent-blue); }
+.stat-flow-label { font-size: clamp(14px, 1.3vw, 19px); color: var(--text-muted); margin-top: clamp(6px,1vh,10px); font-weight: 600; }
+.stat-flow-arrow { font-size: clamp(26px, 3vw, 44px); color: var(--accent-blue); }
+
+.chain-flow { display: flex; align-items: center; justify-content: center; gap: clamp(4px,0.8vw,12px); margin-top: clamp(18px,3vh,32px); max-width: 1500px; flex-wrap: wrap; }
+.chain-node {
+  background: var(--bg-card); border: 1.5px solid var(--border); border-radius: 16px;
+  padding: clamp(10px,1.6vh,18px) clamp(10px,1.2vw,18px); text-align: center; min-width: clamp(100px, 10vw, 150px);
+  box-shadow: 0 2px 20px rgba(17,24,39,0.04);
+}
+.chain-node-label { font-weight: 800; font-size: clamp(14px, 1.3vw, 19px); color: var(--text); }
+.chain-node-sub { font-size: clamp(11px, 1vw, 13px); color: var(--text-dim); margin-top: 4px; }
+.chain-sep { font-size: clamp(16px,1.6vw,24px); color: var(--accent-blue); flex-shrink: 0; }
+
+.facts-list { list-style: none; display: flex; flex-direction: column; gap: clamp(8px,1.3vh,14px); width: 100%; max-width: 820px; }
+.facts-list li {
+  display: flex; align-items: center; gap: 14px;
+  font-size: clamp(14px, 1.35vw, 18px); color: var(--text); line-height: 1.3;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+  padding: clamp(8px,1.3vh,13px) clamp(14px,1.8vw,22px);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.facts-list li .facts-dot { color: var(--accent-blue); font-weight: 800; flex-shrink: 0; }
+
+.about-media { display: flex; align-items: center; justify-content: center; gap: clamp(12px,1.6vw,20px); flex-wrap: wrap; margin-top: clamp(6px,1.4vh,14px); margin-bottom: clamp(6px,1.4vh,14px); }
+
+.case-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: clamp(10px,1.4vw,18px); width: 100%; max-width: 900px; margin-top: clamp(16px,2.2vh,26px); }
+.case-stat { padding: clamp(12px,1.6vh,18px) clamp(14px,1.6vw,20px); }
+.case-stat-label { font-size: clamp(11px,1vw,13px); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent-blue); margin-bottom: 6px; }
+.case-stat-val { font-size: clamp(14px,1.25vw,17px); font-weight: 600; color: var(--text); line-height: 1.35; }
+
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: clamp(14px,2vw,28px); width: 100%; max-width: 920px; margin-top: clamp(16px,2.4vh,28px); }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(12px,1.6vw,22px); width: 100%; max-width: 1080px; margin-top: clamp(16px,2.4vh,28px); }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(10px,1.4vw,18px); width: 100%; max-width: 1180px; margin-top: clamp(16px,2.4vh,28px); }
+
+.table-wrap tr.row-accent td {
+  background: var(--green-soft) !important;
+  color: var(--accent-blue) !important;
+  font-weight: 800 !important;
+  font-size: 1.12em;
+}
+
+/* ====== Hover-reveal bottom chrome + TOC menu ====== */
+.chrome-fade { opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+.chrome-fade.chrome-visible { opacity: 1; pointer-events: auto; }
+
+.bottom-right-cluster { position: fixed; bottom: 20px; right: 32px; z-index: 100; display: flex; align-items: center; gap: 16px; }
+.toc-btn {
+  font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--text-dim);
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 999px;
+  padding: 6px 16px; cursor: pointer; transition: all .2s ease;
+}
+.toc-btn:hover { border-color: var(--border-hover); color: var(--accent-blue); }
+
+.toc-panel {
+  position: fixed; inset: 0; z-index: 200; background: rgba(255,255,255,0.98);
+  display: none; overflow-y: auto; padding: 64px 10vw 40px;
+}
+.toc-panel.toc-open { display: block; }
+.toc-panel-title { font-size: 20px; font-weight: 800; margin-bottom: 20px; max-width: 900px; margin-left: auto; margin-right: auto; }
+.toc-panel-inner { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 4px; }
+.toc-item {
+  display: flex; gap: 14px; align-items: baseline; padding: 10px 16px; border-radius: 10px;
+  cursor: pointer; font-size: 15px; color: var(--text); transition: background .15s ease;
+}
+.toc-item:hover { background: var(--bg-card-hover); }
+.toc-item .toc-num { font-family: var(--font-mono); color: var(--accent-blue); font-weight: 700; min-width: 34px; flex-shrink: 0; }
+.toc-section {
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-dim); margin: 22px 0 6px; padding: 0 16px;
+}
+.toc-section:first-child { margin-top: 4px; }
+
+@media (max-width: 900px) {
+  .grid-2, .grid-3, .grid-4, .case-stats { grid-template-columns: 1fr 1fr; }
+  .stat-flow-arrow { transform: rotate(90deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0s !important; transition-duration: 0.01ms !important; }
+}
+</style>
+
+<!-- ===========================================
+     components.css (html-slides skill) — copied
+     verbatim from .claude/skills/html-slides/assets/components.css
+     =========================================== -->
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: var(--font-body, 'Inter, -apple-system, sans-serif');
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.deck { position: relative; width: 100vw; height: 100vh; }
+
+.slide {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  padding: 36px 48px;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.45s cubic-bezier(.4,0,.2,1);
+  overflow: hidden;
+}
+.slide.active { opacity: 1; pointer-events: auto; }
+
+.particles { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.particle {
+  position: absolute; width: 2px; height: 2px; border-radius: 50%;
+  background: rgba(255,255,255,0.12); animation: floatP linear infinite;
+}
+@keyframes floatP {
+  0% { transform: translateY(100vh) translateX(0); opacity: 0; }
+  10% { opacity: 0.8; } 90% { opacity: 0.8; }
+  100% { transform: translateY(-10vh) translateX(25px); opacity: 0; }
+}
+
+.progress-bar {
+  position: fixed; bottom: 0; left: 0; height: 3px; z-index: 100;
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple), var(--accent-green));
+  transition: width 0.4s ease;
+}
+.slide-counter {
+  font-size: 13px;
+  font-weight: 500; color: var(--text-dim); font-variant-numeric: tabular-nums;
+}
+.nav-hints {
+  position: fixed; bottom: 20px; left: 32px; font-size: 12px;
+  color: var(--text-dim); z-index: 100;
+}
+.nav-hints kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px; height: 22px; padding: 0 6px;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+  border-radius: 4px; font-size: 11px; margin: 0 2px;
+}
+
+.slide-tag {
+  font-size: clamp(13px, 1.2vw, 15px); font-weight: 600; letter-spacing: 2.5px;
+  text-transform: uppercase; color: var(--accent-blue); margin-bottom: 16px;
+}
+h1 { font-size: clamp(36px,5vw,64px); font-weight: 900; line-height: 1.1; letter-spacing: -1px; margin-bottom: 20px; text-align: center; }
+h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; letter-spacing: -0.5px; margin-bottom: 12px; text-align: center; }
+.subtitle { font-size: clamp(17px, 1.8vw, 24px); color: var(--text-muted); font-weight: 400; line-height: 1.5; text-align: center; max-width: 800px; }
+
+.highlight-orange { color: var(--accent-orange); }
+.highlight-blue { color: var(--accent-blue); }
+.highlight-green { color: var(--accent-green); }
+.highlight-purple { color: var(--accent-purple); }
+.highlight-red { color: var(--accent-red); }
+.highlight-yellow { color: var(--accent-yellow); }
+.gradient-text { background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.rainbow-text { background: linear-gradient(90deg, #58a6ff, #a371f7, #3fb950, #d29922, #f0883e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.rainbow-line { width: 200px; height: 2px; background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple), var(--accent-green), var(--accent-yellow), var(--accent-orange)); border-radius: 2px; margin: 20px 0; }
+
+.mt-16 { margin-top: 16px; }
+.mt-24 { margin-top: 24px; }
+
+.glow-blob { position: absolute; width: 400px; height: 400px; border-radius: 50%; filter: blur(120px); opacity: 0.12; pointer-events: none; }
+.glow-blue { background: var(--accent-blue); }
+.glow-purple { background: var(--accent-purple); }
+.glow-green { background: var(--accent-green); }
+
+@keyframes fadeInUp { from { opacity:0; transform:translateY(28px); } to { opacity:1; transform:translateY(0); } }
+@keyframes bounceIn {
+  0% { opacity:0; transform: scale(0.3) translateY(40px); }
+  50% { opacity:1; transform: scale(1.05) translateY(-8px); }
+  70% { transform: scale(0.95) translateY(4px); }
+  100% { opacity:1; transform: scale(1) translateY(0); }
+}
+@keyframes bounceInSoft {
+  0% { opacity:0; transform: translateY(30px); }
+  60% { opacity:1; transform: translateY(-6px); }
+  80% { transform: translateY(3px); }
+  100% { opacity:1; transform: translateY(0); }
+}
+@keyframes scaleReveal { 0% { opacity:0; transform: scale(0.85); } 100% { opacity:1; transform: scale(1); } }
+@keyframes slideInLeft { from { opacity:0; transform:translateX(-50px); } to { opacity:1; transform:translateX(0); } }
+@keyframes slideInRight { from { opacity:0; transform:translateX(50px); } to { opacity:1; transform:translateX(0); } }
+@keyframes countPop { 0% { opacity:0; transform: scale(0.5); } 60% { transform: scale(1.1); } 100% { opacity:1; transform: scale(1); } }
+@keyframes floatBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes driftOrb {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(15px, -20px); }
+  50% { transform: translate(-10px, -35px); }
+  75% { transform: translate(-20px, -15px); }
+}
+
+.slide.active .anim-1 { animation: fadeInUp 0.5s ease 0.1s both; }
+.slide.active .anim-2 { animation: fadeInUp 0.5s ease 0.25s both; }
+.slide.active .anim-3 { animation: bounceInSoft 0.6s ease 0.35s both; }
+.slide.active .anim-4 { animation: fadeInUp 0.5s ease 0.55s both; }
+.slide.active .anim-5 { animation: fadeInUp 0.5s ease 0.7s both; }
+.slide.active .bounce-1 { animation: bounceIn 0.7s ease 0.2s both; }
+.slide.active .bounce-2 { animation: bounceIn 0.7s ease 0.35s both; }
+.slide.active .bounce-3 { animation: bounceIn 0.7s ease 0.5s both; }
+.slide.active .bounce-4 { animation: bounceIn 0.7s ease 0.65s both; }
+.slide.active .slide-l { animation: slideInLeft 0.6s ease 0.3s both; }
+.slide.active .slide-r { animation: slideInRight 0.6s ease 0.3s both; }
+.slide.active .pop-1 { animation: countPop 0.6s ease 0.3s both; }
+.slide.active .pop-2 { animation: countPop 0.6s ease 0.45s both; }
+.slide.active .pop-3 { animation: countPop 0.6s ease 0.6s both; }
+
+.card-v2 {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 14px; padding: 24px; position: relative;
+  transition: all 0.35s cubic-bezier(.4,0,.2,1); overflow: hidden;
+}
+.card-v2 .card-icon { font-size: 28px; margin-bottom: 12px; }
+.card-v2 .card-title { font-size: clamp(16px, 1.4vw, 19px); font-weight: 700; margin-bottom: 3px; }
+.card-v2 .card-desc { font-size: clamp(14px, 1.2vw, 16px); color: var(--text-muted); line-height: 1.4; }
+
+.arch-flow { display: flex; align-items: center; gap: 16px; width: 100%; max-width: 1080px; margin-top: 32px; }
+.arch-box {
+  flex: 1; min-width: 0; background: var(--bg-card);
+  border: 1.5px solid var(--border); border-radius: 14px;
+  padding: 28px 16px; text-align: center;
+  transition: all 0.35s cubic-bezier(.4,0,.2,1);
+}
+.arch-icon { font-size: 36px; margin-bottom: 12px; }
+.arch-label { font-size: clamp(18px, 1.6vw, 22px); font-weight: 800; }
+.arch-role { font-size: clamp(13px, 1.1vw, 15px); color: var(--text-muted); margin-top: 4px; font-weight: 500; }
+.arch-detail {
+  font-size: clamp(12px, 1vw, 14px); color: var(--text-dim); margin-top: 10px;
+  font-family: var(--font-mono, 'JetBrains Mono, monospace');
+  background: rgba(0,0,0,0.03); padding: 6px 10px; border-radius: 6px;
+}
+.arch-arrow { font-size: 14px; color: var(--text-dim); display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; min-width: 50px; }
+.arch-arrow span { font-size: clamp(11px, 1vw, 13px); white-space: nowrap; }
+.arrow-line { width: 34px; height: 2px; background: var(--text-dim); position: relative; }
+.arrow-line::after { content: ''; position: absolute; right: -1px; top: -4px; border: 5px solid transparent; border-left: 6px solid var(--text-dim); }
+
+.stats-row { display: flex; gap: 24px; margin-top: 32px; width: 100%; max-width: 1000px; }
+.stat-card { flex: 1; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 32px 24px; transition: all 0.35s ease; text-align: left; }
+.stat-number { font-size: clamp(48px,6.5vw,76px); font-weight: 900; line-height: 1; margin-bottom: 8px; }
+.stat-label { font-size: clamp(16px, 1.5vw, 20px); font-weight: 700; margin-bottom: 4px; }
+.stat-desc { font-size: clamp(14px, 1.2vw, 16px); color: var(--text-muted); }
+
+.vs-container { display: flex; align-items: center; gap: 28px; margin-top: 32px; width: 100%; max-width: 980px; }
+.vs-card { flex: 1; background: var(--bg-card); border-radius: 14px; padding: 32px 24px; text-align: center; border: 1.5px solid var(--border); transition: all 0.35s ease; }
+.vs-label-top { font-size: clamp(12px, 1vw, 14px); font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+.vs-name { font-size: clamp(28px, 2.6vw, 36px); font-weight: 900; margin-bottom: 12px; }
+.vs-desc { font-size: clamp(14px, 1.3vw, 17px); color: var(--text-muted); margin-bottom: 8px; }
+.vs-badge { display: inline-block; font-size: clamp(12px, 1.1vw, 14px); font-family: var(--font-mono, 'JetBrains Mono, monospace'); padding: 4px 12px; border-radius: 20px; background: rgba(0,0,0,0.04); color: var(--text-dim); }
+.vs-plus { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; flex-shrink: 0; animation: pulseGlow 3s ease infinite; }
+
+.status-timeline { width: 100%; max-width: 840px; margin-top: 24px; display: flex; flex-direction: column; gap: 10px; }
+.status-item { display: flex; align-items: center; gap: 16px; padding: 13px 20px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; transition: all 0.3s ease; }
+.status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.status-text { font-size: clamp(14px, 1.25vw, 17px); font-weight: 500; }
+.status-text strong { font-weight: 700; }
+.slide.active .stag-1 { animation: bounceInSoft 0.5s ease 0.15s both; }
+.slide.active .stag-2 { animation: bounceInSoft 0.5s ease 0.25s both; }
+.slide.active .stag-3 { animation: bounceInSoft 0.5s ease 0.35s both; }
+.slide.active .stag-4 { animation: bounceInSoft 0.5s ease 0.45s both; }
+.slide.active .stag-5 { animation: bounceInSoft 0.5s ease 0.55s both; }
+
+.cta-box { margin-top: 28px; padding: 28px 40px; border-radius: 18px; text-align: center; max-width: 760px; transition: all 0.3s ease; }
+
+.table-wrap { width: 100%; max-width: 1080px; margin-top: 20px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; transition: all 0.35s ease; }
+.table-wrap table { width: 100%; border-collapse: collapse; font-size: clamp(12px, 1.1vw, 15px); }
+.table-wrap thead th { padding: clamp(8px,1.2vh,14px) clamp(10px,1.2vw,20px); text-align: left; font-weight: 700; font-size: clamp(11px, 1vw, 13px); text-transform: uppercase; letter-spacing: 0.05em; background: rgba(0,0,0,0.02); border-bottom: 1px solid var(--border); }
+.table-wrap tbody td { padding: clamp(6px,1vh,11px) clamp(10px,1.2vw,20px); border-bottom: 1px solid var(--border); }
+.table-wrap tbody tr:last-child td { border-bottom: none; }
+.table-wrap tbody tr { transition: background 0.2s ease; }
+.table-wrap .cell-highlight { font-weight: 700; }
+.table-wrap .cell-muted { color: var(--text-muted); }
+
+.image-frame { margin-top: 20px; display: flex; flex-direction: column; align-items: center; max-width: 980px; width: 100%; }
+.image-frame .slide-image { max-width: 100%; max-height: min(50vh, 420px); object-fit: contain; transition: transform 0.3s ease, box-shadow 0.3s ease; }
+
+.cb-wrap { width: 100%; max-width: 840px; text-align: left; display: flex; flex-direction: column; gap: clamp(8px, 1.5vh, 16px); }
+.cb-number { font-family: var(--font-mono, 'JetBrains Mono', monospace); font-size: clamp(13px, 1.2vw, 16px); font-weight: 700; letter-spacing: 0.1em; opacity: 0.6; }
+.cb-heading { font-size: clamp(28px, 3.5vw, 48px); font-weight: 800; line-height: 1.15; letter-spacing: -0.5px; }
+.cb-body { font-size: clamp(15px, 1.5vw, 20px); line-height: 1.6; max-width: 720px; }
+.cb-body .cb-accent { font-weight: 700; }
+.cb-pair { display: flex; gap: clamp(10px, 1.5vw, 20px); width: 100%; margin-top: clamp(4px, 1vh, 8px); }
+@media (max-width: 700px) { .cb-pair { flex-direction: column; } }
+.cb-card { flex: 1; padding: clamp(14px, 2vw, 24px); background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; transition: all 0.3s ease; }
+.cb-card-label { font-family: var(--font-mono, 'JetBrains Mono', monospace); font-size: clamp(10px, 0.9vw, 12px); font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: clamp(6px, 1vh, 10px); display: flex; align-items: center; gap: 0.5em; }
+.cb-card-text { font-size: clamp(13px, 1.2vw, 16px); line-height: 1.55; }
+.cb-keyquote { font-size: clamp(24px, 3vw, 40px); font-weight: 700; line-height: 1.25; border-left: 3px solid var(--accent-blue); padding-left: clamp(12px, 2vw, 24px); }
+.cb-detail { font-size: clamp(14px, 1.3vw, 18px); line-height: 1.6; max-width: 680px; margin-top: clamp(6px, 1vh, 12px); }
+</style>
+</head>
+<body>
+
+<div class="particles" id="particles"></div>
+<div class="progress-bar" id="progress"></div>
+
+<div class="bottom-right-cluster chrome-fade" id="bottomCluster">
+  <button class="toc-btn" id="tocBtn">Содержание</button>
+  <span class="slide-counter" id="counter"></span>
+</div>
+<div class="nav-hints chrome-fade" id="navHints"><span><kbd>&larr;</kbd><kbd>&rarr;</kbd> навигация · клик по слайду — дальше</span></div>
+
+<div class="toc-panel" id="tocPanel">
+  <div class="toc-panel-title">Содержание</div>
+  <div class="toc-panel-inner" id="tocList"></div>
+</div>
+
+<div class="deck" id="deck">
+
+<!-- Слайд — Титульный -->
+<div class="slide active" data-slide="0" data-section="Открытие">
+  <div class="glow-blob glow-blue" style="top:-120px;left:-100px;"></div>
+  <div class="glow-blob glow-green" style="bottom:-140px;right:-80px;"></div>
+  <h1 class="anim-2">7 шагов к <span class="highlight-blue">1.000.000</span><br>просмотров в месяц<br>на ваших Reels</h1>
+  <p class="subtitle anim-3">Как получать миллионы органических просмотров без рекламного бюджета</p>
+  <div class="rainbow-line anim-4"></div>
+  <p class="subtitle anim-5" style="font-size:16px;margin-top:4px;">Кирилл Попов, основатель <strong>Content Hunter</strong></p>
+  <script type="application/json" class="slide-notes">
+  {"title":"7 шагов к 1.000.000 просмотров","script":"Привет! Сегодня разберём по шагам, как я получаю миллионы просмотров на Reels без рекламного бюджета — от идеи до системы, которая делает это стабильно.","notes":["Тема: 7 шагов к 1 000 000 просмотров в месяц","Без рекламного бюджета, органика","Ведёт Кирилл Попов, основатель Content Hunter"]}
+  </script>
+</div>
+
+<!-- Слайд — Боль 1/4 -->
+<div class="slide" data-slide="1">
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Ведёте контент, платите смм-щику — а лидов вроде нет</blockquote>
+    <p class="cb-detail anim-3">Публикации выходят по плану, страница выглядит красиво — а посчитать, сколько из этого превратилось в деньги, не получается.</p>
+    <p class="cb-detail anim-4">Контент как будто есть, а монетизировать его не выходит.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Боль 1: контент есть, а лидов и монетизации нет","script":"Знакомо? Ведёте контент, платите смм-щику, публикации выходят регулярно — а лидов вроде нет, и монетизировать это не получается.","notes":["Контент ведётся регулярно, но не считается в деньгах","Смм-специалист не даёт измеримого результата"]}
+  </script>
+</div>
+
+<!-- Слайд — Боль 2/4 -->
+<div class="slide" data-slide="2">
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Только таргет и работает</blockquote>
+    <p class="cb-detail anim-3">Реклама даёт результат, а органика — нет. Непонятно, как вообще управлять контентом: что снимать, зачем и когда.</p>
+    <p class="cb-detail anim-4">Всё держится на нестабильном ручье трафика, который в любой момент может подорожать или отключиться.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Боль 2: только таргет работает","script":"Только таргет и работает. Непонятно, как управлять контентом — всё нестабильно и держится на рекламном бюджете.","notes":["Органика не даёт результата, только платный трафик","Непонятно, как системно управлять контентом"]}
+  </script>
+</div>
+
+<!-- Слайд — Боль 3/4 -->
+<div class="slide" data-slide="3">
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Кажется, что у конкурентов всё лучше</blockquote>
+    <p class="cb-detail anim-3">У них охваты, у них комментарии, у них будто бы всё получается само собой.</p>
+    <p class="cb-detail anim-4">А ты смотришь на свою страницу и не понимаешь, что делаешь не так.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Боль 3: кажется, что у конкурентов всё лучше","script":"Кажется, что у конкурентов всё лучше — охваты, вовлечённость, рост. А у себя не понимаешь, в чём проблема.","notes":["Ощущение, что у конкурентов всё получается легче"]}
+  </script>
+</div>
+
+<!-- Слайд — Боль 4/4 -->
+<div class="slide" data-slide="4">
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Вроде всё делаете — но не получается</blockquote>
+    <p class="cb-detail anim-3">Снимаете, публикуете, стараетесь по всем правилам — а результата, которого ждали, всё нет.</p>
+    <p class="cb-detail anim-4">Дальше расскажу, в чём на самом деле разница.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Боль 4: вроде всё делаете, но не получается","script":"Вроде всё делаете правильно — а не получается. Дальше расскажу, в чём разница на самом деле.","notes":["Все формальные действия выполнены, а результата нет"]}
+  </script>
+</div>
+
+<!-- Слайд — У меня тоже так было -->
+<div class="slide" data-slide="5">
+  <div class="glow-blob glow-blue" style="top:30%;left:-10%;"></div>
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">У меня тоже так было</blockquote>
+    <p class="cb-detail anim-3">Поделюсь своим опытом — что я сделал, чтобы начать получать классные результаты с рилсов.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"У меня тоже так было","script":"У меня тоже так было. Дальше поделюсь своим опытом — что я сделал, чтобы начать получать классные результаты с рилсов.","notes":["Личная эмпатия: прошёл через те же боли","Переход к личной истории и практике"]}
+  </script>
+</div>
+
+<!-- Слайд — Этот вебинар вам поможет, если... -->
+<div class="slide" data-slide="6">
+  <h2 class="anim-2">Этот вебинар вам <span class="highlight-blue">поможет</span>, если...</h2>
+  <ul class="facts-list anim-3">
+    <li><span class="facts-dot">—</span><span>Ваш продукт массовый и разрешённый</span></li>
+    <li><span class="facts-dot">—</span><span>Ваш продукт не привязан к гео</span></li>
+    <li><span class="facts-dot">—</span><span>У вас уже есть рилсы</span></li>
+  </ul>
+  <p class="cb-detail anim-4" style="color:var(--accent-red);font-weight:700;text-align:center;max-width:760px;margin-top:24px;">Но если контента нет или у вас локальный бизнес — вам этот вебинар не поможет, можете его не смотреть.</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Кому поможет этот вебинар","script":"Этот вебинар поможет, если продукт массовый и разрешённый, не привязан к гео и у вас уже есть рилсы. Если контента нет или бизнес локальный — вебинар вам не поможет, можно не смотреть дальше.","notes":["Подходит: массовый разрешённый продукт, не привязан к гео, есть рилсы","Не подходит: нет контента или локальный бизнес"]}
+  </script>
+</div>
+
+<!-- Слайд — План: роад-мапа 7 шагов -->
+<div class="slide" data-slide="7" data-section="План и о ведущем">
+  <h2 class="anim-2">7 шагов, которые мы <span class="highlight-blue">пройдём</span></h2>
+  <div class="status-timeline anim-3">
+    <div class="status-item stag-1"><div class="status-dot green"></div><div class="status-text"><strong>1. Быстрый анализ трендов в соцсетях</strong></div></div>
+    <div class="status-item stag-2"><div class="status-dot green"></div><div class="status-text"><strong>2. Как написать сценарии цепляющих рилсов</strong></div></div>
+    <div class="status-item stag-3"><div class="status-dot green"></div><div class="status-text"><strong>3. Съёмка и монтаж видео без продакшена</strong></div></div>
+    <div class="status-item stag-4"><div class="status-dot green"></div><div class="status-text"><strong>4. Внедрение идеальной воронки продаж</strong></div></div>
+    <div class="status-item stag-5"><div class="status-dot green"></div><div class="status-text"><strong>5. Методы для прокачки аккаунтов, чтобы быстрее набирать просмотры</strong></div></div>
+    <div class="status-item stag-6"><div class="status-dot green"></div><div class="status-text"><strong>6. Как из каждого ролика делать по 30–50 публикаций</strong></div></div>
+    <div class="status-item stag-7"><div class="status-dot green"></div><div class="status-text"><strong>7. Как автоматически выкладывать рилсы сразу в 100 аккаунтов</strong></div></div>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"План вебинара — роадмап","script":"Вот план на сегодня — семь шагов, по порядку. Пройдём каждый на своих примерах.","notes":["7 шагов от идеи до масштабирования","Каждый шаг — на реальных примерах"]}
+  </script>
+</div>
+
+<!-- Слайд — Обо мне -->
+<div class="slide" data-slide="8">
+  <h2 class="anim-2">Кирилл <span class="highlight-blue">Попов</span></h2>
+  <p class="subtitle anim-2" style="font-size:15px;margin-bottom:4px;">39 лет · живу между Дубаем и Россией, сейчас — Таиланд, Хуахин · предприниматель и управленец с 20-летним опытом в бизнесе</p>
+  <div class="about-media anim-3">
+    <div class="shot-frame shot-mini" style="width:170px;aspect-ratio:1/1;max-height:170px;">
+      <img class="shot-real" alt="Фото Кирилла" src="assets/screenshots/screenshot-11-kirill-photo.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+      <div class="shot-placeholder"><div class="shot-desc">Фото Кирилла</div></div>
+    </div>
+    <div class="shot-frame shot-mini" style="width:120px;aspect-ratio:1/1;max-height:120px;">
+      <img class="shot-real" alt="Логотип Систематика" src="assets/screenshots/screenshot-15-logo-sistematika.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+      <div class="shot-placeholder"><div class="shot-desc">Логотип<br>Систематика</div></div>
+    </div>
+    <div class="shot-frame shot-mini" style="width:120px;aspect-ratio:1/1;max-height:120px;">
+      <img class="shot-real" alt="Логотип Content Hunter" src="assets/screenshots/screenshot-14-logo-contenthunter.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+      <div class="shot-placeholder"><div class="shot-desc">Логотип<br>Content Hunter</div></div>
+    </div>
+  </div>
+  <ul class="facts-list anim-4">
+    <li><span class="facts-dot">—</span><span>CEO проектов с выручкой от 1 млрд ₽ в год и экзитами</span></li>
+    <li><span class="facts-dot">—</span><span>Ключевые: Coffee Like, Laser Pro, Lifehacker Coffee</span></li>
+    <li><span class="facts-dot">—</span><span>Из 22 проектов: 10 закрыл, 8 работают, 4 продал</span></li>
+    <li><span class="facts-dot">—</span><span>Систематика — AI бизнес-навигатор для собственников</span></li>
+    <li><span class="facts-dot">—</span><span>Content Hunter — контент-ферма в аренду</span></li>
+    <li><span class="facts-dot">—</span><span>Telegram: t.me/baristasss — «Дело не в кофе»</span></li>
+  </ul>
+  <script type="application/json" class="slide-notes">
+  {"title":"Кто ведёт вебинар","script":"Пару слов о себе. Мне 39, живу между Дубаем и Россией, сейчас — Таиланд. Предприниматель с 20-летним опытом, CEO проектов с выручкой от миллиарда рублей в год. Сейчас развиваю Систематику — AI бизнес-навигатор — и Content Hunter, контент-ферму в аренду, о которой сегодня и поговорим.","notes":["39 лет, 20 лет опыта в бизнесе","CEO проектов с выручкой от 1 млрд ₽, есть экзиты","Из 22 проектов: 10 закрыл, 8 работают, 4 продал","Сейчас — Систематика (AI бизнес-навигатор) и Content Hunter (контент-ферма в аренду)"]}
+  </script>
+</div>
+
+<!-- Слайд — Заголовок шага 1 -->
+<div class="slide" data-slide="9" data-section="Шаг 1. Анализ трендов">
+  <h1 class="anim-2" style="font-size:clamp(32px,4.3vw,54px);">Быстрый анализ трендов<br>в <span class="highlight-blue">соцсетях</span></h1>
+  <script type="application/json" class="slide-notes">
+  {"title":"Шаг 1. Быстрый анализ трендов в соцсетях","script":"Первый шаг — быстрый анализ трендов. С него начинается вообще любой ролик, который потом набирает охваты.","notes":["Открываем блок про Шаг 1"]}
+  </script>
+</div>
+
+<!-- Слайд — Почему это первый шаг -->
+<div class="slide" data-slide="10">
+  <div class="glow-blob glow-blue" style="top:40%;left:50%;transform:translate(-50%,-50%);"></div>
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Без тренда даже хороший ролик не наберёт охват.</blockquote>
+    <p class="cb-detail anim-3">Алгоритм любит то, что уже «заходит» у аудитории прямо сейчас. Он не оценивает качество съёмки — он оценивает, досматривают ли ролик, комментируют ли, пересылают ли. А это чаще случается с темами, которые уже в тренде.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Почему трендвотчинг — первый шаг","script":"Алгоритм не оценивает, насколько красиво снят ролик — он оценивает поведение зрителей: досмотры, комментарии, репосты. А это чаще случается с темами, которые уже резонируют с аудиторией.","notes":["Алгоритм продвигает то, что уже вовлекает аудиторию","Даже качественный контент без тренда не наберёт охват","Тема первична, съёмка вторична"]}
+  </script>
+</div>
+
+<!-- Слайд — Способ 1: ИИ-промпт и скиллы -->
+<div class="slide" data-slide="11">
+  <h2 class="anim-2">Способ 1: <span class="highlight-blue">ИИ-промпт и скиллы</span></h2>
+  <div class="cb-wrap anim-3" style="text-align:center;align-items:center;">
+    <p class="cb-body anim-3" style="text-align:center;">Использую ИИ с промптами и скиллами для трендвотчинга — прошу проанализировать топовые ролики в нише и выделить закономерности.</p>
+    <p class="cb-body anim-4" style="text-align:center;">Это экономит часы ручного анализа и сразу даёт готовые гипотезы для сценария.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Способ 1: ИИ-промпт и скиллы","script":"Первый способ — использую ИИ с промптами и скиллами для трендвотчинга. Прошу проанализировать топовые ролики в нише и выделить закономерности.","notes":["ИИ-промпты и скиллы для анализа трендов","Экономит часы ручного анализа"]}
+  </script>
+</div>
+
+<!-- Слайд — Способ 2: специальные сервисы -->
+<div class="slide" data-slide="12">
+  <h2 class="anim-2">Способ 2: <span class="highlight-blue">специальные сервисы</span></h2>
+  <div class="shot-frame anim-3" style="max-height:min(38vh,320px);">
+    <img class="shot-real" alt="Сервис трендовой аналитики" src="assets/screenshots/screenshot-16-trend-service.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+    <div class="shot-placeholder">
+      <div class="shot-file">screenshot-16-trend-service.png</div>
+      <div class="shot-size">1600×1000</div>
+      <div class="shot-desc">Скрин сервиса трендовой аналитики с названием и интерфейсом</div>
+    </div>
+  </div>
+  <p class="subtitle anim-4" style="font-size:15px;margin-top:14px;">Сервисы трендовой аналитики показывают, какие темы и форматы растут быстрее остальных прямо сейчас</p>
+  <!-- TODO Кирилл: укажи названия конкретных сервисов, которые используешь -->
+  <script type="application/json" class="slide-notes">
+  {"title":"Способ 2: специальные сервисы","script":"Второй способ — сервисы трендовой аналитики. Они показывают, какие темы и форматы растут быстрее остальных прямо сейчас, и экономят часы ручного мониторинга.","notes":["Сервисы трендовой аналитики","Экономят часы ручного мониторинга"]}
+  </script>
+</div>
+
+<!-- Слайд — Способ 3: ручной метод -->
+<div class="slide" data-slide="13">
+  <h2 class="anim-2">Способ 3: <span class="highlight-blue">ручной метод</span></h2>
+  <div class="cb-wrap anim-3" style="text-align:center;align-items:center;">
+    <p class="cb-body anim-3" style="text-align:center;">Раз в неделю смотрю топ-аккаунты в своей нише и отмечаю, что стабильно набирает охваты.</p>
+    <p class="cb-body anim-4" style="text-align:center;">Слежу за 5–10 конкурентами постоянно — это даёт понимание, какие темы «в моменте».</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Способ 3: ручной метод","script":"Третий способ — вручную слежу за конкурентами в нише. Раз в неделю смотрю топ-аккаунты и отмечаю, что стабильно набирает охваты.","notes":["Ручной мониторинг 5-10 конкурентов в нише","Раз в неделю — просмотр топ-аккаунтов"]}
+  </script>
+</div>
+
+<!-- Слайд — Рекомендация -->
+<div class="slide" data-slide="14">
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Не бойтесь снимать — просто берите и делайте</blockquote>
+    <p class="cb-detail anim-3">Не нужно оценивать заранее, «сработает» тема или нет, по тому, что зашло у всех остальных. Берём и делаем — а дальше уже смотрим на результат.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Рекомендация: не бояться снимать","script":"Не бойтесь снимать какие-то ролики и не пытайтесь заранее оценить, сработает тема или нет. Берём и делаем.","notes":["Не оценивать заранее — тестировать на практике","Берём и делаем"]}
+  </script>
+</div>
+
+<!-- Слайд — Контент-план 30/30/40 -->
+<div class="slide" data-slide="15">
+  <h2 class="anim-2">Контент-план: <span class="highlight-blue">30 / 30 / 40</span></h2>
+  <div class="grid-3 anim-3">
+    <div class="card-v2 glow-blue bounce-1"><div class="card-title" style="font-size:36px;">30%</div><div class="card-desc"><strong>Продающий</strong><br>Эффективность мерим по лидам и подписчикам</div></div>
+    <div class="card-v2 glow-blue bounce-2"><div class="card-title" style="font-size:36px;">30%</div><div class="card-desc"><strong>Охватный / виральный</strong><br>Эффективность мерим по количеству просмотров</div></div>
+    <div class="card-v2 glow-blue bounce-3"><div class="card-title" style="font-size:36px;">40%</div><div class="card-desc"><strong>Полезный</strong><br>Эффективность мерим по сохранениям и пересылкам</div></div>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Контент-план 30/30/40","script":"В контент-план беру 30% продающего контента, 30% охватного и виральных роликов, 40% полезного. У каждого типа своя метрика эффективности.","notes":["30% продающий — метрика: лиды, подписчики","30% охватный/виральный — метрика: просмотры","40% полезный — метрика: сохранения, пересылки"]}
+  </script>
+</div>
+
+<!-- Слайд — Пример разбора конкурента -->
+<div class="slide" data-slide="16">
+  <h2 class="anim-2">Разбор <span class="highlight-blue">конкурента</span></h2>
+  <div class="shot-frame anim-3">
+    <img class="shot-real" alt="Профиль конкурента с топ-роликами" src="assets/screenshots/screenshot-01-competitor-analysis.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+    <div class="shot-placeholder">
+      <div class="shot-file">screenshot-01-competitor-analysis.png</div>
+      <div class="shot-size">1600×1000</div>
+      <div class="shot-desc">Пример трендового рилса конкурента в нише онлайн-образования / SaaS с выделенными топ-роликами по просмотрам</div>
+    </div>
+  </div>
+  <p class="subtitle anim-4" style="font-size:15px;margin-top:14px;">Смотрим не на цифры, а на то, что именно сработало: тема, хук, формат</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Пример разбора конкурента","script":"Вот как выглядит такой разбор на практике — беру топ-ролик конкурента и раскладываю, что именно в нём сработало: тема, хук, формат подачи.","notes":["Смотрим на тему, хук и формат, а не только на цифры просмотров","Разбор конкурента — источник рабочих гипотез для своих роликов"]}
+  </script>
+</div>
+
+<!-- Слайд — Заголовок шага 2 -->
+<div class="slide" data-slide="17" data-section="Шаг 2. Сценарии рилсов">
+  <h1 class="anim-2" style="font-size:clamp(32px,4.3vw,52px);">Как написать сценарии<br><span class="highlight-blue">цепляющих рилсов</span></h1>
+  <script type="application/json" class="slide-notes">
+  {"title":"Шаг 2. Сценарии цепляющих рилсов","script":"Нашли тему — теперь нужен сценарий, который удержит человека до конца ролика.","notes":["Открываем блок про Шаг 2"]}
+  </script>
+</div>
+
+<!-- Слайд — Хук -->
+<div class="slide" data-slide="18">
+  <div class="cb-wrap">
+    <blockquote class="cb-keyquote anim-2">Хук — первые 0–3 секунды</blockquote>
+    <p class="cb-detail anim-3">Без сильного хука в первые три секунды всё остальное просто не досмотрят.</p>
+    <div class="cb-pair anim-4">
+      <div class="cb-card problem bounce-1"><div class="cb-card-label problem-label">Плохо</div><p class="cb-card-text">«Сегодня хочу рассказать о маркетинге»</p></div>
+      <div class="cb-card fix bounce-2"><div class="cb-card-label fix-label">Хорошо</div><p class="cb-card-text">«Я потратил 3000 долларов на рекламу и получил 2 лида — вот что сделал вместо этого»</p></div>
+    </div>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Структура сценария: Хук","script":"Первый блок сценария — хук. 0-3 секунды, которые решают, досмотрят ли вообще. Плохой хук — общая фраза. Хороший — конкретика и интрига.","notes":["Хук 0-3 сек — решает, досмотрят ли вообще","Плохо: общая фраза без конкретики","Хорошо: конкретная цифра и интрига"]}
+  </script>
+</div>
+
+<!-- Слайд — Конфликт -->
+<div class="slide" data-slide="19">
+  <div class="cb-wrap">
+    <blockquote class="cb-keyquote anim-2">Конфликт — обозначаем проблему</blockquote>
+    <p class="cb-detail anim-3">Зритель должен узнать в этой проблеме себя — тогда он остаётся смотреть дальше.</p>
+    <div class="cb-pair anim-4">
+      <div class="cb-card problem bounce-1"><div class="cb-card-label problem-label">Плохо</div><p class="cb-card-text">«У всех разные проблемы с продвижением»</p></div>
+      <div class="cb-card fix bounce-2"><div class="cb-card-label fix-label">Хорошо</div><p class="cb-card-text">«Ты снимаешь ролик за роликом, а просмотров всё те же 300»</p></div>
+    </div>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Структура сценария: Конфликт","script":"Второй блок — конфликт. Обозначаем проблему зрителя так, чтобы он узнал в ней себя, а не общими словами.","notes":["Конфликт — обозначаем проблему зрителя","Плохо: обще, никто не узнаёт себя","Хорошо: конкретная узнаваемая ситуация"]}
+  </script>
+</div>
+
+<!-- Слайд — Решение -->
+<div class="slide" data-slide="20">
+  <div class="cb-wrap">
+    <blockquote class="cb-keyquote anim-2">Решение — суть, которую вы даёте</blockquote>
+    <p class="cb-detail anim-3">Конкретная польза, а не общие слова — то, ради чего ролик вообще досматривают.</p>
+    <div class="cb-pair anim-4">
+      <div class="cb-card problem bounce-1"><div class="cb-card-label problem-label">Плохо</div><p class="cb-card-text">«Просто нужно делать хороший контент»</p></div>
+      <div class="cb-card fix bounce-2"><div class="cb-card-label fix-label">Хорошо</div><p class="cb-card-text">«Я публикую один и тот же ролик на 50 аккаунтов — и получаю 500 000 просмотров»</p></div>
+    </div>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Структура сценария: Решение","script":"Третий блок — решение. Конкретная польза, ради которой ролик вообще досматривают, а не вода без конкретики.","notes":["Решение — суть, которую вы даёте","Плохо: вода, нет конкретики","Хорошо: конкретный механизм и результат"]}
+  </script>
+</div>
+
+<!-- Слайд — Призыв -->
+<div class="slide" data-slide="21">
+  <div class="cb-wrap">
+    <blockquote class="cb-keyquote anim-2">Призыв — что сделать зрителю дальше</blockquote>
+    <p class="cb-detail anim-3">Комментарий, переход в профиль, кодовое слово — любое чёткое действие.</p>
+    <div class="cb-pair anim-4">
+      <div class="cb-card problem bounce-1"><div class="cb-card-label problem-label">Плохо</div><p class="cb-card-text">«Подписывайтесь, если понравилось»</p></div>
+      <div class="cb-card fix bounce-2"><div class="cb-card-label fix-label">Хорошо</div><p class="cb-card-text">«Напиши слово ФЕРМА в комментариях — пришлю подробный гайд»</p></div>
+    </div>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Структура сценария: Призыв","script":"Четвёртый блок — призыв к действию. Что именно должен сделать зритель дальше — чёткое действие, а не шаблонная фраза.","notes":["CTA — что сделать зрителю дальше","Плохо: шаблонная фраза, не работает","Хорошо: чёткое действие с понятной выгодой"]}
+  </script>
+</div>
+
+<!-- Слайд — Примеры хуков -->
+<div class="slide" data-slide="22">
+  <h2 class="anim-2">Примеры <span class="highlight-blue">хуков</span></h2>
+  <div class="grid-3 anim-3">
+    <div class="card-v2 glow-blue bounce-1"><div class="card-desc" style="font-size:clamp(15px,1.4vw,18px);color:var(--text);">«Я потратил 3000 долларов на рекламу и получил 2 лида. Вот что сделал вместо этого»</div></div>
+    <div class="card-v2 glow-blue bounce-2"><div class="card-desc" style="font-size:clamp(15px,1.4vw,18px);color:var(--text);">«Никогда не покупайте недвижимость в Дубае, пока не увидите это»</div></div>
+    <div class="card-v2 glow-blue bounce-3"><div class="card-desc" style="font-size:clamp(15px,1.4vw,18px);color:var(--text);">«90% основателей SaaS не знают этой метрики»</div></div>
+  </div>
+  <p class="subtitle anim-4 mt-24" style="font-size:16px;">Хук должен обещать конкретную пользу или интригу — а не быть общими словами</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Примеры хуков","script":"Вот примеры хуков под разные ниши — заметьте, каждый обещает конкретную пользу или интригу, а не общую фразу типа «сегодня расскажу интересное».","notes":["Хук про рекламный бюджет и лиды","Хук про недвижимость в Дубае","Хук про метрику для SaaS-основателей","Общее правило: конкретика вместо общих фраз"]}
+  </script>
+</div>
+
+<!-- Слайд — Мой пример сценария -->
+<div class="slide" data-slide="23">
+  <h2 class="anim-2">Мой пример <span class="highlight-blue">сценария</span></h2>
+  <div class="shot-frame anim-3">
+    <img class="shot-real" alt="Текстовый сценарий рилса с разметкой блоков" src="assets/screenshots/screenshot-02-script-example.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+    <div class="shot-placeholder">
+      <div class="shot-file">screenshot-02-script-example.png</div>
+      <div class="shot-size">1600×1000</div>
+      <div class="shot-desc">Реальный текстовый сценарий рилса Кирилла (документ/заметки) с разметкой по блокам хук / конфликт / решение / CTA</div>
+    </div>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Мой пример сценария","script":"Вот как выглядит мой реальный сценарий перед съёмкой — каждый блок структуры расписан отдельно, чтобы на площадке не импровизировать.","notes":["Сценарий пишется заранее, по структуре хук/конфликт/решение/CTA","Так проще держать темп и не растягивать ролик"]}
+  </script>
+</div>
+
+<!-- Слайд — Заголовок шага 3 -->
+<div class="slide" data-slide="24" data-section="Шаг 3. Съёмка и монтаж">
+  <h1 class="anim-2" style="font-size:clamp(30px,4.1vw,50px);">Съёмка и монтаж видео<br><span class="highlight-blue">без продакшена</span></h1>
+  <script type="application/json" class="slide-notes">
+  {"title":"Шаг 3. Съёмка и монтаж без продакшена","script":"Сценарий готов — переходим к съёмке и монтажу. Здесь решает не техника, а несколько простых правил.","notes":["Открываем блок про Шаг 3"]}
+  </script>
+</div>
+
+<!-- Слайд — Съёмка за 0 рублей -->
+<div class="slide" data-slide="25">
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Съёмка — 0 рублей, просто на телефон</blockquote>
+    <p class="cb-detail anim-3">Нативность и простота выигрывают у продакшена. Максимально просто и естественно снять видео, наложить субтитры, картинки, музыку.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Съёмка на телефон — 0 рублей","script":"Съёмка стоит 0 рублей — просто телефон. Нативность и простота выигрывают у продакшена: снимаем просто и естественно, накладываем субтитры, картинки, музыку.","notes":["Съёмка на телефон, без затрат","Нативность выигрывает у продакшена"]}
+  </script>
+</div>
+
+<!-- Слайд — Длина ролика -->
+<div class="slide" data-slide="26">
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Чем короче — тем лучше, до 30 секунд</blockquote>
+    <p class="cb-detail anim-3">Чем выше процент досмотра ролика, тем лучше алгоритм его продвигает. Короткое видео легче досмотреть до конца — отсюда и высокий процент.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Длина ролика — до 30 секунд","script":"По продолжительности — чем короче, тем лучше, до 30 секунд. Потому что чем выше процент досмотра, тем лучше продвижение.","notes":["До 30 секунд по длине","Процент досмотра важнее абсолютной длины"]}
+  </script>
+</div>
+
+<!-- Слайд — Динамика -->
+<div class="slide" data-slide="27">
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Динамика</blockquote>
+    <p class="cb-detail anim-3">Смена планов и кадров каждые 2–4 секунды — глаз не устаёт, внимание не рассеивается.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Что влияет на удержание: Динамика","script":"Первое — динамика. Смена планов и кадров каждые 2-4 секунды не даёт глазу устать.","notes":["Смена планов каждые 2-4 секунды"]}
+  </script>
+</div>
+
+<!-- Слайд — Субтитры -->
+<div class="slide" data-slide="28">
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Субтитры</blockquote>
+    <p class="cb-detail anim-3">Обязательно — большинство смотрит без звука, и без субтитров половина сути теряется.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Что влияет на удержание: Субтитры","script":"Второе — субтитры. Обязательны, потому что большинство смотрит без звука.","notes":["Субтитры обязательны — большинство смотрит без звука"]}
+  </script>
+</div>
+
+<!-- Слайд — Следование сценарию -->
+<div class="slide" data-slide="29">
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Следование сценарию</blockquote>
+    <p class="cb-detail anim-3">Не отклоняться от структуры хук → конфликт → решение → призыв — это решает удержание больше, чем техника съёмки.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Что влияет на удержание: Следование сценарию","script":"Третье — дисциплина по структуре сценария. Это решает удержание больше, чем техника съёмки.","notes":["Держаться структуры сценария без отклонений","Техника съёмки вторична"]}
+  </script>
+</div>
+
+<!-- Слайд — До/После монтажа -->
+<div class="slide" data-slide="30">
+  <h2 class="anim-2">До <span class="highlight-orange">/</span> После <span class="highlight-blue">монтажа</span></h2>
+  <div class="shot-frame anim-3">
+    <img class="shot-real" alt="Сравнение сырого и смонтированного видео" src="assets/screenshots/screenshot-03-editing-before-after.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+    <div class="shot-placeholder">
+      <div class="shot-file">screenshot-03-editing-before-after.png</div>
+      <div class="shot-size">1600×1000</div>
+      <div class="shot-desc">Сравнение: сырое видео без субтитров и динамики vs финальный смонтированный ролик с субтитрами и разными планами</div>
+    </div>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"До и после монтажа","script":"Разница видна сразу — тот же самый дубль, но после монтажа с субтитрами и сменой планов удержание совсем другое.","notes":["Одно и то же сырьё, разный результат после монтажа","Субтитры и динамика планов — главные различия"]}
+  </script>
+</div>
+
+<!-- Слайд — Заголовок шага 4 -->
+<div class="slide" data-slide="31" data-section="Шаг 4. Воронка продаж">
+  <h1 class="anim-2" style="font-size:clamp(32px,4.3vw,54px);">Внедрение идеальной<br><span class="highlight-blue">воронки продаж</span></h1>
+  <script type="application/json" class="slide-notes">
+  {"title":"Шаг 4. Внедрение идеальной воронки продаж","script":"Ролики набирают охват — но сами по себе просмотры не продают. Нужен мостик от ролика к заявке.","notes":["Открываем блок про Шаг 4"]}
+  </script>
+</div>
+
+<!-- Слайд — Воронка 1: кодовое слово -->
+<div class="slide" data-slide="32">
+  <h2 class="anim-2">Воронка 1: <span class="highlight-blue">кодовое слово</span></h2>
+  <div class="shot-frame anim-3" style="max-height:min(42vh,360px);">
+    <img class="shot-real" alt="QR-код с инструкцией" src="assets/screenshots/screenshot-08-funnel-bot.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+    <div class="shot-placeholder">
+      <div class="shot-file">screenshot-08-funnel-bot.png</div>
+      <div class="shot-size">1600×1000</div>
+      <div class="shot-desc">QR-код с инструкцией по воронке через кодовое слово</div>
+    </div>
+  </div>
+  <p class="subtitle anim-4" style="font-size:15px;margin-top:14px;">Уже подробно разобрали это раньше — здесь просто QR с инструкцией</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Воронка 1: кодовое слово","script":"Первый тип воронки — кодовое слово в комментариях. Мы это уже подробно разбирали, здесь просто QR с инструкцией.","notes":["Кодовое слово — уже разобрали подробно","QR-код с инструкцией на слайде"]}
+  </script>
+</div>
+
+<!-- Слайд — Воронка 2: ссылка в шапке -->
+<div class="slide" data-slide="33">
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Воронка 2: призыв «переходите по ссылке в шапке»</blockquote>
+    <p class="cb-detail anim-3">В конце ролика — прямой призыв перейти в шапку профиля, где ссылка на бота, сайт или канал.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Воронка 2: ссылка в шапке","script":"Второй тип воронки — призыв в ролике перейти по ссылке в шапке профиля.","notes":["Прямой призыв в конце ролика","Ссылка в шапке ведёт на бота, сайт или канал"]}
+  </script>
+</div>
+
+<!-- Слайд — Воронка 3: хайлайты и сторис -->
+<div class="slide" data-slide="34">
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Воронка 3: призыв через хайлайты и сторис</blockquote>
+    <p class="cb-detail anim-3">Закреплённый хайлайт с инструкцией, к которому отправляем зрителя из сторис или из самого ролика.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Воронка 3: хайлайты и сторис","script":"Третий тип воронки — призыв через хайлайты и сторис. Закреплённый хайлайт с инструкцией.","notes":["Закреплённый хайлайт с инструкцией","Зритель попадает туда из сторис"]}
+  </script>
+</div>
+
+<!-- Слайд — Воронка 4: артикул / промокод -->
+<div class="slide" data-slide="35">
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Воронка 4: артикул или промокод в описании</blockquote>
+    <p class="cb-detail anim-3">Указываем код в описании видео — зритель находит его сам, без прямого призыва в кадре.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Воронка 4: артикул или промокод","script":"Четвёртый тип воронки — артикул или промокод в описании видео. Зритель находит его сам.","notes":["Код в описании видео","Без прямого призыва в кадре"]}
+  </script>
+</div>
+
+<!-- Слайд — Заголовок шага 5 -->
+<div class="slide" data-slide="36" data-section="Шаг 5. Прокачка аккаунтов">
+  <h1 class="anim-2" style="font-size:clamp(28px,3.8vw,46px);">Методы для прокачки аккаунтов,<br>чтобы быстрее набирать <span class="highlight-blue">просмотры</span></h1>
+  <script type="application/json" class="slide-notes">
+  {"title":"Шаг 5. Прокачка аккаунтов","script":"Пятый шаг — методы, которые помогают быстрее набирать просмотры на личном аккаунте, ещё до подключения масштабирования.","notes":["Открываем блок про Шаг 5"]}
+  </script>
+</div>
+
+<!-- Слайд — Провоцируй комментарии -->
+<div class="slide" data-slide="37">
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Провоцируй комментарии</blockquote>
+    <p class="cb-detail anim-3">Снимай ролики и крючки так, чтобы люди хотели ответить, записать голосовое или поспорить в комментариях.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Прокачка аккаунта: провоцируй комментарии","script":"Первое — делай ролики и крючки так, чтобы люди хотели писать комментарии: отвечать, записывать голосовые, спорить.","notes":["Комментарии — ответы, голосовые, споры"]}
+  </script>
+</div>
+
+<!-- Слайд — Провоцируй пересылки -->
+<div class="slide" data-slide="38">
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Провоцируй пересылки</blockquote>
+    <p class="cb-detail anim-3">Делай видео, которым хочется поделиться со знакомыми — это самый сильный бесплатный охват.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Прокачка аккаунта: провоцируй пересылки","script":"Второе — делай видео, которым хочется поделиться со знакомыми.","notes":["Пересылки знакомым — сильный бесплатный охват"]}
+  </script>
+</div>
+
+<!-- Слайд — Провоцируй кодовое слово -->
+<div class="slide" data-slide="39">
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Провоцируй кодовое слово</blockquote>
+    <p class="cb-detail anim-3">Прямая связка с воронкой: чем больше людей пишут кодовое слово в комментариях, тем выше и охват, и заявки.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Прокачка аккаунта: провоцируй кодовое слово","script":"Третье — провоцируй кодовое слово в комментариях, это прямая связка с воронкой.","notes":["Кодовое слово в комментариях — связка с воронкой"]}
+  </script>
+</div>
+
+<!-- Слайд — Коллаборации и эфиры -->
+<div class="slide" data-slide="40">
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Коллаборации и эфиры</blockquote>
+    <p class="cb-detail anim-3">Делай совместные публикации с другими аккаунтами и проводи эфиры — это даёт доступ к чужой аудитории и доверие.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Прокачка аккаунта: коллаборации и эфиры","script":"Четвёртое — совместные публикации с другими аккаунтами и эфиры.","notes":["Совместные публикации с другими аккаунтами","Эфиры"]}
+  </script>
+</div>
+
+<!-- Слайд — Ещё 2 приёма -->
+<div class="slide" data-slide="41">
+  <h2 class="anim-2">Ещё <span class="highlight-blue">2 приёма</span></h2>
+  <div class="grid-2 anim-3">
+    <div class="card-v2 glow-blue bounce-1"><div class="card-title">Отвечай быстро</div><div class="card-desc">Отвечай на комментарии в первый час после публикации — это поднимает ролик в алгоритме</div></div>
+    <div class="card-v2 glow-blue bounce-2"><div class="card-title">Держись рубрики</div><div class="card-desc">Несколько роликов подряд на одну тему, пока она не «выстрелит»</div></div>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Ещё 2 приёма для прокачки аккаунта","script":"И ещё два приёма: отвечай на комментарии в первый час, и держись одной рубрики несколько роликов подряд, пока не выстрелит.","notes":["Ответы на комментарии в первый час","Серия роликов на одну тему"]}
+  </script>
+</div>
+
+<!-- Слайд — Даже с этим есть потолок -->
+<div class="slide" data-slide="42">
+  <div class="glow-blob glow-orange" style="top:50%;left:50%;transform:translate(-50%,-50%);"></div>
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Даже с этим — один аккаунт упирается в потолок.</blockquote>
+    <p class="cb-detail anim-3">Дело не в усилиях — дело в том, что один аккаунт физически ограничен своей аудиторией.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Проблема одного аккаунта","script":"Но даже при идеальной дисциплине один аккаунт упирается в потолок. Дело не в усилиях, а в ограничении одного аккаунта.","notes":["Проблема не в усилиях, а в ограничении одного аккаунта"]}
+  </script>
+</div>
+
+<!-- Слайд — Мой личный опыт с этим потолком -->
+<div class="slide" data-slide="43">
+  <div class="glow-blob glow-orange" style="bottom:20%;right:-10%;"></div>
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">У меня самого ролики стабильно давали 300–500 просмотров</blockquote>
+    <p class="cb-detail anim-3">Сколько бы я ни старался — снимал каждый день, держался тем, отвечал на все комментарии. Дальше нужен не ещё больше стараний, а масштаб.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Мой личный опыт с потолком","script":"У меня самого ролики стабильно давали 300-500 просмотров, сколько бы я ни старался. Дальше нужен масштаб, а не ещё больше усилий.","notes":["Личный опыт: потолок в 300-500 просмотров при любых стараниях","Вывод — нужен масштаб, переходим к контент-ферме"]}
+  </script>
+</div>
+
+<!-- Слайд — Заголовок шага 6 -->
+<div class="slide" data-slide="44" data-section="Шаг 6. Уникализация роликов">
+  <h1 class="anim-2" style="font-size:clamp(30px,4.1vw,50px);">Как из каждого ролика<br>делать по <span class="highlight-blue">30–50 публикаций</span></h1>
+  <script type="application/json" class="slide-notes">
+  {"title":"Шаг 6. Как из каждого ролика делать по 30-50 публикаций","script":"Шестой шаг — уникализация. Расскажу, как я вышел за пределы одного ролика и одного аккаунта — это то, что превратило мой потолок в 300-500 просмотров в миллионы.","notes":["Открываем блок про Шаг 6","Рассказываю от первого лица, как это работает у меня"]}
+  </script>
+</div>
+
+<!-- Слайд — Простая математика 1/2 -->
+<div class="slide" data-slide="45">
+  <div class="stat-flow anim-3">
+    <div class="stat-flow-item pop-1">
+      <div class="stat-flow-num">30 000</div>
+      <div class="stat-flow-label">Сейчас: 30 роликов / мес на одном аккаунте</div>
+    </div>
+  </div>
+  <p class="subtitle anim-4 mt-24" style="font-size:16px;">Это моя точка отсчёта — тот самый потолок одного аккаунта</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Простая математика: сейчас","script":"30 роликов в месяц на одном аккаунте дают 30 000 просмотров. Это моя точка отсчёта.","notes":["30 роликов / мес на одном аккаунте = 30 000 просмотров"]}
+  </script>
+</div>
+
+<!-- Слайд — Простая математика 2/2 -->
+<div class="slide" data-slide="46">
+  <div class="stat-flow anim-3">
+    <div class="stat-flow-item pop-2">
+      <div class="stat-flow-num is-accent">1 000 000+</div>
+      <div class="stat-flow-label">С системой: те же 30 роликов × сеть аккаунтов</div>
+    </div>
+  </div>
+  <p class="subtitle anim-4 mt-24" style="font-size:16px;">Тот же контент, размноженный на десятки аккаунтов — никакой магии, просто арифметика охвата</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Простая математика: с системой","script":"Те же 30 роликов, размноженные на сеть аккаунтов, дают у меня от миллиона просмотров. Это чистая арифметика, а не удача.","notes":["Та же база роликов через сеть аккаунтов = от 1 000 000 просмотров","Это арифметика охвата, а не удача"]}
+  </script>
+</div>
+
+<!-- Слайд — Что такое контент-ферма для меня -->
+<div class="slide" data-slide="47">
+  <div class="glow-blob glow-blue" style="top:50%;left:50%;transform:translate(-50%,-50%);"></div>
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Для меня контент-ферма — система массового распространения моего контента.</blockquote>
+    <p class="cb-detail anim-3">Я перестал думать «зайдёт или нет», потому что результат теперь гарантирует система, а не удача. Один мой ролик автоматически превращается в десятки версий на десятках аккаунтов.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Что такое контент-ферма","script":"Для меня контент-ферма — это система автоматического и массового распространения моего контента. Я перестал думать «зайдёт или нет».","notes":["Контент-ферма = автоматизация + массовое распространение","Результат перестаёт зависеть от удачи одного ролика"]}
+  </script>
+</div>
+
+<!-- Слайд — Как было / как стало -->
+<div class="slide" data-slide="48">
+  <h2 class="anim-2">Как было <span class="highlight-purple">/</span> как <span class="highlight-blue">стало</span></h2>
+  <div class="vs-container anim-3">
+    <div class="vs-card card-left slide-l">
+      <div class="vs-label-top highlight-purple">Как было</div>
+      <div class="vs-name" style="color:var(--text-dim);">Один аккаунт</div>
+      <div class="vs-desc">Я сам публиковал каждый ролик вручную</div>
+      <div class="vs-badge">300–500 просмотров с ролика</div>
+    </div>
+    <div class="vs-plus">&ne;</div>
+    <div class="vs-card card-right slide-r">
+      <div class="vs-label-top highlight-blue">Как стало</div>
+      <div class="vs-name gradient-text">Сеть аккаунтов</div>
+      <div class="vs-desc">Автоматическая выкладка на десятки аккаунтов</div>
+      <div class="vs-badge">Десятки–сотни тысяч просмотров с того же ролика</div>
+    </div>
+  </div>
+  <p class="subtitle anim-4 mt-24" style="font-size:15px;">Создавать контент без массового распространения — бессмысленно</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Как было и как стало","script":"Раньше — один аккаунт, ручная публикация, 300-500 просмотров. Теперь — сеть аккаунтов и автоматическая выкладка, десятки-сотни тысяч просмотров с того же ролика.","notes":["Было: ручная работа, один аккаунт, ограниченный охват","Стало: автоматизация, сеть аккаунтов, кратный охват"]}
+  </script>
+</div>
+
+<!-- Слайд — Мои аккаунты = филиалы -->
+<div class="slide" data-slide="49">
+  <h2 class="anim-2">Мои аккаунты = <span class="highlight-blue">филиалы</span></h2>
+  <div class="shot-frame anim-3">
+    <img class="shot-real" alt="Сетка аккаунтов моей фермы" src="assets/screenshots/screenshot-04-accounts-network.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+    <div class="shot-placeholder">
+      <div class="shot-file">screenshot-04-accounts-network.png</div>
+      <div class="shot-size">1600×1000</div>
+      <div class="shot-desc">Сетка из нескольких моих аккаунтов Instagram / TikTok одной ниши</div>
+    </div>
+  </div>
+  <p class="subtitle anim-4" style="font-size:15px;margin-top:14px;">Мой основной аккаунт — главный офис. Сеть аккаунтов работает по его стандартам</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Аккаунты как филиалы","script":"Мой основной аккаунт — как главный офис бренда, а сеть моих аккаунтов — как филиалы, которые работают строго по его стандартам.","notes":["Основной аккаунт задаёт стандарт бренда","Сеть аккаунтов работает по этому стандарту"]}
+  </script>
+</div>
+
+<!-- Слайд — Из 1 ролика — 30 -->
+<div class="slide" data-slide="50">
+  <h2 class="anim-2">Из 1 ролика — <span class="highlight-blue">30</span></h2>
+  <div class="chain-flow anim-3" style="margin-top:10px;">
+    <div class="chain-node bounce-1"><div class="chain-node-label">1 ролик</div></div>
+    <div class="chain-sep">&rarr;</div>
+    <div class="chain-node bounce-2"><div class="chain-node-label">Уникализация</div><div class="chain-node-sub">звук, цвет, скорость</div></div>
+    <div class="chain-sep">&rarr;</div>
+    <div class="chain-node bounce-3"><div class="chain-node-label">30 версий</div></div>
+    <div class="chain-sep">&rarr;</div>
+    <div class="chain-node bounce-4"><div class="chain-node-label">Моя сеть аккаунтов</div></div>
+  </div>
+  <div class="shot-frame anim-4" style="max-height:min(34vh,280px);margin-top:16px;">
+    <img class="shot-real" alt="Процесс уникализации моего ролика" src="assets/screenshots/screenshot-05-uniqualization-example.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+    <div class="shot-placeholder">
+      <div class="shot-file">screenshot-05-uniqualization-example.png</div>
+      <div class="shot-size">1600×1000</div>
+      <div class="shot-desc">Скрин из платформы Content Hunter — процесс уникализации одного моего ролика в 30 вариантов</div>
+    </div>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Уникализация 1 в 30","script":"Просто продублировать ролик нельзя — алгоритм распознаёт дубли и обнуляет охват. Поэтому программа уникализации меняет звук, цвет, лого, скорость — и из одного моего ролика получается тридцать действительно разных версий.","notes":["Дубликаты алгоритм распознаёт и режет охват","Уникализация меняет звук, цвет, лого, скорость"]}
+  </script>
+</div>
+
+<!-- Слайд — Уникализация способ 1: перемонтаж у фрилансера -->
+<div class="slide" data-slide="51">
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Способ 1: перемонтаж у фрилансера</blockquote>
+    <p class="cb-detail anim-3">За 2 доллара фрилансер меняет 30% видео — кадры, концовку и другие детали. Получаем новую версию, которую можно публиковать повторно.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Уникализация: перемонтаж у фрилансера","script":"Первый способ уникализации — перемонтаж у фрилансера за 2 доллара, который меняет 30% видео: кадры, концовку и так далее.","notes":["Фрилансер за $2 меняет 30% видео","Кадры, концовка и другие детали"]}
+  </script>
+</div>
+
+<!-- Слайд — Уникализация способ 2: сервисы и боты -->
+<div class="slide" data-slide="52">
+  <h2 class="anim-2">Способ 2: <span class="highlight-blue">сервисы и боты</span></h2>
+  <div class="shot-frame anim-3" style="max-height:min(38vh,320px);">
+    <img class="shot-real" alt="Сервис уникализации видео" src="assets/screenshots/screenshot-17-uniqualization-service.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+    <div class="shot-placeholder">
+      <div class="shot-file">screenshot-17-uniqualization-service.png</div>
+      <div class="shot-size">1600×1000</div>
+      <div class="shot-desc">Скрин сервиса или бота для автоматической уникализации видео</div>
+    </div>
+  </div>
+  <p class="subtitle anim-4" style="font-size:15px;margin-top:14px;">Специальные сервисы и боты уникализации меняют видео автоматически, без ручной работы</p>
+  <!-- TODO Кирилл: укажи названия конкретных сервисов/ботов уникализации -->
+  <script type="application/json" class="slide-notes">
+  {"title":"Уникализация: сервисы и боты","script":"Второй способ — сервисы уникализации и боты, которые меняют видео автоматически.","notes":["Автоматическая уникализация через сервисы и боты"]}
+  </script>
+</div>
+
+<!-- Слайд — Уникализация способ 3: наша платформа -->
+<div class="slide" data-slide="53">
+  <h2 class="anim-2">Способ 3: <span class="highlight-blue">наша платформа</span></h2>
+  <div class="shot-frame anim-3">
+    <img class="shot-real" alt="Уникализация на платформе Content Hunter" src="assets/screenshots/screenshot-05-uniqualization-example.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+    <div class="shot-placeholder">
+      <div class="shot-file">screenshot-05-uniqualization-example.png</div>
+      <div class="shot-size">1600×1000</div>
+      <div class="shot-desc">Скрин из платформы Content Hunter — автоматическая уникализация ролика</div>
+    </div>
+  </div>
+  <p class="subtitle anim-4" style="font-size:15px;margin-top:14px;">Подробнее можно узнать у специалиста по ссылке под этим видео</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Уникализация: наша платформа","script":"Третий способ — наша платформа, которая уникализирует ролики автоматически. Подробнее можно узнать у специалиста по ссылке под видео.","notes":["Наша платформа делает уникализацию автоматически","Подробности — у специалиста по ссылке под видео"]}
+  </script>
+</div>
+
+<!-- Слайд — Заголовок шага 7 -->
+<div class="slide" data-slide="54" data-section="Шаг 7. Автопубликация в 100 аккаунтов">
+  <h1 class="anim-2" style="font-size:clamp(28px,3.9vw,48px);">Как автоматически выкладывать<br>рилсы сразу в <span class="highlight-blue">100 аккаунтов</span></h1>
+  <script type="application/json" class="slide-notes">
+  {"title":"Шаг 7. Автопубликация в 100 аккаунтов","script":"Седьмой шаг — как автоматически выкладывать рилсы сразу в сто аккаунтов. Сначала покажу, как это сделать самому.","notes":["Открываем блок про Шаг 7"]}
+  </script>
+</div>
+
+<!-- Слайд — Если делать самому -->
+<div class="slide" data-slide="55">
+  <h2 class="anim-2">Если делать <span class="highlight-blue">самому</span></h2>
+  <div class="status-timeline anim-3">
+    <div class="status-item stag-1"><div class="status-dot green"></div><div class="status-text"><strong>1. Купить смартфоны</strong> — iPhone или Samsung</div></div>
+    <div class="status-item stag-2"><div class="status-dot green"></div><div class="status-text"><strong>2. Зарегистрировать аккаунты</strong> и пройти верификации</div></div>
+    <div class="status-item stag-3"><div class="status-dot green"></div><div class="status-text"><strong>3. Прогреть аккаунты</strong> — листать ленту, сделать первые публикации</div></div>
+    <div class="status-item stag-4"><div class="status-dot green"></div><div class="status-text"><strong>4. Подключить телефоны к алгоритмам</strong> для автоматического управления</div></div>
+    <div class="status-item stag-5"><div class="status-dot green"></div><div class="status-text"><strong>5. Выкладывать уникализированные ролики</strong> в прогретые аккаунты</div></div>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Если делать самому","script":"Сначала покажу, как сделать это самому: купить смартфоны, зарегистрировать аккаунты и пройти верификации, прогреть их, подключить к алгоритмам автоматического управления и выкладывать уникализированные ролики.","notes":["Купить iPhone или Samsung","Зарегистрировать и верифицировать аккаунты","Прогреть — листать ленту, первые публикации","Подключить к алгоритмам автоматизации","Выкладывать уникализированные ролики"]}
+  </script>
+</div>
+
+<!-- Слайд — Почему самому сложно -->
+<div class="slide" data-slide="56">
+  <h2 class="anim-2">Почему самому <span class="highlight-orange">сложно</span></h2>
+  <div class="grid-2 anim-3">
+    <div class="card-v2 glow-orange bounce-1"><div class="card-title">Любая мелочь — и блок</div><div class="card-desc">Один неверный шаг — блокировка аккаунта или 0 просмотров</div></div>
+    <div class="card-v2 glow-orange bounce-2"><div class="card-title">Дорогое оборудование</div><div class="card-desc">Смартфоны на каждый аккаунт стоят денег</div></div>
+    <div class="card-v2 glow-orange bounce-3"><div class="card-title">Сложно автоматизировать</div><div class="card-desc">Без опыта настройка алгоритмов управления занимает недели</div></div>
+    <div class="card-v2 glow-orange bounce-4"><div class="card-title">Нужно постоянно чинить</div><div class="card-desc">Аккаунты требуют обслуживания и регулярного вмешательства</div></div>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Почему самому сложно","script":"Почему делать это самому сложно: любая мелочь — блокировка или 0 просмотров, дорогое оборудование, сложно автоматизировать, и всё это нужно постоянно обслуживать и чинить.","notes":["Блокировка или 0 просмотров от любой мелкой ошибки","Дорогое оборудование","Сложно автоматизировать","Нужно постоянно обслуживать и чинить"]}
+  </script>
+</div>
+
+<!-- Слайд — Мы сделаем это бесплатно -->
+<div class="slide" data-slide="57">
+  <div class="glow-blob glow-blue" style="top:50%;left:50%;transform:translate(-50%,-50%);"></div>
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Мы сделаем это бесплатно, с удобной платформой</blockquote>
+    <p class="cb-detail anim-3">Вместо того чтобы разбираться со всем этим самому, вы получаете готовую ферму и платформу для управления ей.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Мы сделаем это бесплатно","script":"Самому это сложно и долго. Мы сделаем это бесплатно и дадим удобную платформу для управления фермой.","notes":["Переход от «сложно самому» к предложению Content Hunter"]}
+  </script>
+</div>
+
+<!-- Слайд — Откуда берутся мои аккаунты -->
+<div class="slide" data-slide="58">
+  <div class="glow-blob glow-blue" style="top:30%;left:-10%;"></div>
+  <div class="cb-wrap anim-3">
+    <h2 class="cb-heading anim-2">Откуда берутся <span class="highlight-blue">мои аккаунты</span></h2>
+    <p class="cb-body anim-3">Аккаунты создаются под <span class="cb-accent">мой бренд</span>, каждый — на отдельном устройстве с уникальным IP.</p>
+    <p class="cb-body anim-4">Алгоритмы видят живого пользователя, а не ферму — поэтому риск для основного аккаунта минимален.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Откуда берутся аккаунты","script":"Частый вопрос — а не забанят ли? Аккаунты создаются под мой бренд, каждый на отдельном устройстве с уникальным IP, так что для соцсетей это выглядит как живой пользователь, а не ферма.","notes":["Аккаунты создаются под бренд","Отдельное устройство и уникальный IP на каждый аккаунт"]}
+  </script>
+</div>
+
+<!-- Слайд — Прогрев аккаунтов -->
+<div class="slide" data-slide="59">
+  <div class="glow-blob glow-green" style="bottom:20%;right:-10%;"></div>
+  <div class="cb-wrap anim-3">
+    <h2 class="cb-heading anim-2">Прогрев <span class="highlight-blue">аккаунтов</span></h2>
+    <p class="cb-body anim-3">Новый аккаунт — как <span class="cb-accent">незнакомец на улице</span>: алгоритм ему не доверяет.</p>
+    <p class="cb-body anim-4">Прогрев имитирует поведение живого пользователя, чтобы соцсети начали показывать аккаунт в рекомендациях.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Прогрев аккаунтов","script":"Новый аккаунт для алгоритма — как незнакомец на улице, доверия к нему нет. Прогрев имитирует поведение живого пользователя.","notes":["Новому аккаунту алгоритм не доверяет по умолчанию","Прогрев имитирует живое поведение пользователя"]}
+  </script>
+</div>
+
+<!-- Слайд — Как я выкладываю ролики -->
+<div class="slide" data-slide="60">
+  <h2 class="anim-2">Как я выкладываю <span class="highlight-blue">ролики</span></h2>
+  <div class="shot-frame anim-3">
+    <img class="shot-real" alt="Интерфейс платформы с журналом публикаций" src="assets/screenshots/screenshot-06-platform-upload.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+    <div class="shot-placeholder">
+      <div class="shot-file">screenshot-06-platform-upload.png</div>
+      <div class="shot-size">1600×1000</div>
+      <div class="shot-desc">Интерфейс платформы Content Hunter с журналом загруженных роликов и статусами публикации</div>
+    </div>
+  </div>
+  <p class="subtitle anim-4" style="font-size:15px;margin-top:14px;">Я загружаю ролик — дальше всё происходит на автомате</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Как я выкладываю ролики","script":"Со своей стороны всё просто: я загружаю ролик, а дальше всё происходит на автомате — уникализация, распределение по аккаунтам, выкладка по расписанию.","notes":["Я загружаю только исходный ролик","Уникализация, распределение и выкладка — автоматически"]}
+  </script>
+</div>
+
+<!-- Слайд — Мой личный кейс -->
+<div class="slide" data-slide="61">
+  <h2 class="anim-2">Мой <span class="highlight-blue">личный кейс</span></h2>
+  <div class="case-stats anim-3">
+    <div class="case-stat"><div class="case-stat-label">Точка А</div><div class="case-stat-val">30 000 просмотров / мес · 1 аккаунт</div></div>
+    <div class="case-stat"><div class="case-stat-label">Точка Б</div><div class="case-stat-val">1 400 000 просмотров / мес · сеть аккаунтов</div></div>
+    <div class="case-stat"><div class="case-stat-label">Заявки</div><div class="case-stat-val">С 6 до 210 заявок в месяц</div></div>
+    <div class="case-stat"><div class="case-stat-label">Форматы роликов</div><div class="case-stat-val">Личные истории, разборы кейсов, ответы на вопросы</div></div>
+  </div>
+  <div class="shot-frame anim-4" style="max-height:min(30vh,240px);">
+    <img class="shot-real" alt="Дашборд моей личной аналитики" src="assets/screenshots/screenshot-09-my-case-dashboard.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+    <div class="shot-placeholder">
+      <div class="shot-file">screenshot-09-my-case-dashboard.png</div>
+      <div class="shot-size">1600×1000</div>
+      <div class="shot-desc">Дашборд личной аналитики Кирилла в Content Hunter</div>
+    </div>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Мой личный кейс","script":"Вот мои собственные цифры: с 30 000 до 1 400 000 просмотров в месяц, с 6 до 210 заявок. Это не абстракция — это моя система.","notes":["Точка А: 30 000 просмотров/мес","Точка Б: 1 400 000 просмотров/мес","Заявки выросли с 6 до 210 в месяц"]}
+  </script>
+</div>
+
+<!-- Слайд — Ферма работает не только у меня -->
+<div class="slide" data-slide="62">
+  <div class="glow-blob glow-blue" style="top:50%;left:50%;transform:translate(-50%,-50%);"></div>
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">И ферма работает не только у меня.</blockquote>
+    <p class="cb-detail anim-3">Тот же подход я внедрил для нескольких проектов в разных нишах — вот несколько примеров.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Не только у меня","script":"Система работает не только у меня. Тот же подход я внедрил для нескольких проектов в разных нишах.","notes":["Переход к кейсам других проектов"]}
+  </script>
+</div>
+
+<!-- Слайд — Кейс 1/4: онлайн-школа английского -->
+<div class="slide" data-slide="63" data-section="Кейсы">
+  <h2 class="anim-2">Онлайн-школа <span class="highlight-blue">английского</span></h2>
+  <div class="case-stats anim-3">
+    <div class="case-stat"><div class="case-stat-label">Точка А</div><div class="case-stat-val">40 000 просмотров / мес · 5 лидов / мес</div></div>
+    <div class="case-stat"><div class="case-stat-label">Точка Б</div><div class="case-stat-val">620 000 просмотров / мес · 95 лидов / мес</div></div>
+    <div class="case-stat"><div class="case-stat-label">Продажи</div><div class="case-stat-val">+18 новых учеников / мес</div></div>
+    <div class="case-stat"><div class="case-stat-label">Форматы роликов</div><div class="case-stat-val">Разборы ошибок, «угадай перевод», отзывы учеников</div></div>
+  </div>
+  <p class="subtitle anim-4 mt-24" style="font-size:15px;">Рост в 15 раз за 6 недель — без увеличения рекламного бюджета</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Кейс: онлайн-школа английского","script":"Первый кейс — онлайн-школа английского языка. С 40 000 до 620 000 просмотров в месяц за 6 недель, лиды выросли с 5 до 95, плюс 18 новых учеников в месяц.","notes":["Точка А: 40 000 просмотров, 5 лидов/мес","Точка Б: 620 000 просмотров, 95 лидов/мес","+18 новых учеников в месяц"]}
+  </script>
+</div>
+
+<!-- Слайд — Кейс 2/4: SaaS для фрилансеров -->
+<div class="slide" data-slide="64">
+  <h2 class="anim-2">SaaS для <span class="highlight-blue">фрилансеров</span></h2>
+  <div class="case-stats anim-3">
+    <div class="case-stat"><div class="case-stat-label">Точка А</div><div class="case-stat-val">12 000 просмотров / мес · 20 регистраций / мес</div></div>
+    <div class="case-stat"><div class="case-stat-label">Точка Б</div><div class="case-stat-val">340 000 просмотров / мес · 200 регистраций / мес</div></div>
+    <div class="case-stat"><div class="case-stat-label">Продажи</div><div class="case-stat-val">+45 платных подписок / мес</div></div>
+    <div class="case-stat"><div class="case-stat-label">Форматы роликов</div><div class="case-stat-val">Демо фич, «до/после» продуктивности, отзывы фрилансеров</div></div>
+  </div>
+  <p class="subtitle anim-4 mt-24" style="font-size:15px;">Органический контент заменил платный трафик как основной канал регистраций</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Кейс: SaaS для фрилансеров","script":"Второй кейс — SaaS-платформа для фрилансеров: с 20 до 200 регистраций в месяц, плюс 45 платных подписок в месяц.","notes":["Точка А: 12 000 просмотров, 20 регистраций/мес","Точка Б: 340 000 просмотров, 200 регистраций/мес","+45 платных подписок в месяц"]}
+  </script>
+</div>
+
+<!-- Слайд — Кейс 3/4: эксперт по недвижимости (Дубай) -->
+<div class="slide" data-slide="65">
+  <h2 class="anim-2">Эксперт по недвижимости <span class="highlight-blue">в Дубае</span></h2>
+  <div class="case-stats anim-3">
+    <div class="case-stat"><div class="case-stat-label">Точка А</div><div class="case-stat-val">60 000 просмотров / мес · лид 80 долларов</div></div>
+    <div class="case-stat"><div class="case-stat-label">Точка Б</div><div class="case-stat-val">900 000 просмотров / мес · лид 20 долларов</div></div>
+    <div class="case-stat"><div class="case-stat-label">Продажи</div><div class="case-stat-val">+12 сделок за квартал</div></div>
+    <div class="case-stat"><div class="case-stat-label">Форматы роликов</div><div class="case-stat-val">Обзоры объектов, разбор районов Дубая, «сколько стоит жизнь в Дубае»</div></div>
+  </div>
+  <p class="subtitle anim-4 mt-24" style="font-size:15px;">Больше охвата — и одновременно в 4 раза дешевле лид</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Кейс: эксперт по недвижимости в Дубае","script":"Третий кейс — эксперт по недвижимости в Дубае: 900 000 просмотров в месяц, цена лида упала с 80 до 20 долларов, плюс 12 сделок за квартал.","notes":["Точка А: 60 000 просмотров, лид $80","Точка Б: 900 000 просмотров, лид $20","+12 сделок за квартал"]}
+  </script>
+</div>
+
+<!-- Слайд — Кейс 4/4: приложение для медитаций -->
+<div class="slide" data-slide="66">
+  <h2 class="anim-2">Приложение для <span class="highlight-blue">медитаций</span></h2>
+  <div class="case-stats anim-3">
+    <div class="case-stat"><div class="case-stat-label">Точка А</div><div class="case-stat-val">250 000 просмотров / мес · 2 200 установок / мес</div></div>
+    <div class="case-stat"><div class="case-stat-label">Точка Б</div><div class="case-stat-val">1 200 000 просмотров / мес · +35% органических установок</div></div>
+    <div class="case-stat"><div class="case-stat-label">Продажи</div><div class="case-stat-val">+900 платных подписок / мес</div></div>
+    <div class="case-stat"><div class="case-stat-label">Форматы роликов</div><div class="case-stat-val">Короткие практики, «звук для сна», отзывы пользователей</div></div>
+  </div>
+  <p class="subtitle anim-4 mt-24" style="font-size:15px;">Подход одинаково хорошо ложится и на образование, и на IT, и на недвижимость, и на мобильные приложения</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Кейс: приложение для медитаций","script":"Четвёртый кейс — мобильное приложение для медитаций: 1 200 000 просмотров в месяц, рост органических установок на 35%, плюс 900 платных подписок в месяц.","notes":["Точка А: 250 000 просмотров, 2 200 установок/мес","Точка Б: 1 200 000 просмотров, +35% органических установок","+900 платных подписок в месяц"]}
+  </script>
+</div>
+
+<!-- Слайд — Переход к предложению -->
+<div class="slide" data-slide="67" data-section="Предложение и тарифы">
+  <div class="glow-blob glow-blue" style="top:30%;left:20%;"></div>
+  <h1 class="anim-2" style="font-size:clamp(32px,4.2vw,54px);">Хотите те же результаты<br>для <span class="highlight-blue">своего проекта?</span></h1>
+  <p class="subtitle anim-3">Я показал, как это работает у меня и в этих кейсах. Дальше — как внедрить это себе, без стройки фермы с нуля</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Переход к предложению","script":"Я показал, как всё это работает у меня и в этих кейсах. Дальше расскажу, как можно внедрить это себе — без стройки фермы с нуля.","notes":["Переход от кейсов к предложению"]}
+  </script>
+</div>
+
+<!-- Слайд — Специальное предложение -->
+<div class="slide" data-slide="68">
+  <div class="glow-blob glow-blue" style="bottom:-100px;right:-80px;"></div>
+  <h2 class="anim-2">Для участников <span class="highlight-blue">вебинара</span></h2>
+  <p class="cb-body anim-3" style="text-align:center;max-width:760px;font-size:clamp(16px,1.6vw,21px);">Мы бесплатно построим для вас контент-ферму — <span class="cb-accent">с любым количеством смартфонов и аккаунтов</span>, под ваш масштаб. Платите только за пакет публикаций, на который мы даём гарантию просмотров.</p>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin-top:20px;" class="anim-4">
+    <span class="pill">Настройка — бесплатно</span>
+    <span class="pill">Гарантия просмотров по договору</span>
+  </div>
+  <p class="subtitle anim-5" style="font-size:14px;margin-top:20px;">Ссылка на контакты специалиста по контент-фермам — под этим видео</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Специальное предложение","script":"Для участников вебинара — мы бесплатно построим ферму с любым количеством смартфонов и аккаунтов под ваш масштаб. Платите только за пакет публикаций, на который даём гарантию просмотров.","notes":["Настройка фермы — бесплатно, любое количество смартфонов и аккаунтов","Оплата только за пакет публикаций","Гарантия просмотров закреплена договором"]}
+  </script>
+</div>
+
+<!-- Слайд — Платформа для управления фермой -->
+<div class="slide" data-slide="69">
+  <h2 class="anim-2">Платформа для <span class="highlight-blue">управления фермой</span></h2>
+  <div class="shot-frame anim-3">
+    <img class="shot-real" alt="Платформа управления фермой" src="assets/screenshots/screenshot-10-farm-platform.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+    <div class="shot-placeholder">
+      <div class="shot-file">screenshot-10-farm-platform.png</div>
+      <div class="shot-size">1600×1000</div>
+      <div class="shot-desc">Платформа Content Hunter — все аккаунты, все публикации и статус каждой в одном окне</div>
+    </div>
+  </div>
+  <p class="subtitle anim-4" style="font-size:15px;margin-top:14px;">Здесь видно все аккаунты, все публикации и статус каждой — в одном окне</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Платформа для управления фермой","script":"Вот как выглядит платформа: все аккаунты, все публикации и статус каждой — в одном окне.","notes":["Единая платформа для управления всей фермой"]}
+  </script>
+</div>
+
+<!-- Слайд — Тарифы 1/2: конфигурация -->
+<div class="slide" data-slide="70">
+  <h2 class="anim-2">Выберите <span class="highlight-blue">свой масштаб</span></h2>
+  <div class="table-wrap anim-3">
+    <table>
+      <thead>
+        <tr><th>Параметр</th><th>Мини блог</th><th>Бизнес</th><th>Оптимус прайм</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="cell-highlight">Телефонов</td><td>3</td><td>5</td><td>10</td></tr>
+        <tr><td class="cell-highlight">Аккаунтов в соцсетях</td><td>30</td><td>50</td><td>100</td></tr>
+        <tr><td class="cell-highlight">Создание фермы</td><td>0 долларов</td><td>0 долларов</td><td>0 долларов</td></tr>
+        <tr><td class="cell-highlight">Дней на подготовку</td><td>10</td><td>10</td><td>10</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="subtitle anim-4 mt-16" style="font-size:15px;">Это ориентировочные конфигурации — количество телефонов и аккаунтов адаптируем под ваш масштаб</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Тарифы: конфигурация","script":"Три ориентировочные конфигурации — Мини блог, Бизнес и Оптимус прайм. Настройка фермы бесплатна и занимает 10 дней на любом масштабе.","notes":["Конфигурации адаптируются под масштаб клиента","Настройка фермы бесплатна на любом масштабе","10 дней на подготовку"]}
+  </script>
+</div>
+
+<!-- Слайд — Тарифы 2/2: публикации и стоимость -->
+<div class="slide" data-slide="71">
+  <h2 class="anim-2">Публикации <span class="highlight-blue">и стоимость</span></h2>
+  <p class="cb-body anim-3" style="text-align:center;max-width:780px;font-size:clamp(15px,1.4vw,19px);">В зависимости от размера фермы, на ней можно делать разное количество публикаций. Вы платите за пакет публикаций, а мы даём гарантию-минимум по просмотрам.</p>
+  <div class="table-wrap anim-3">
+    <table>
+      <thead>
+        <tr><th>Параметр</th><th>Мини блог</th><th>Бизнес</th><th>Оптимус прайм</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="cell-highlight">Пакет публикаций</td><td>400</td><td>600</td><td>1 000</td></tr>
+        <tr class="row-accent"><td class="cell-highlight">Стоимость пакета</td><td>655 долларов</td><td>855 долларов</td><td>1 285 долларов</td></tr>
+        <tr><td class="cell-highlight">Гарантия просмотров</td><td>120 000</td><td>180 000</td><td>300 000</td></tr>
+        <tr><td class="cell-highlight cell-muted">Прогноз просмотров</td><td class="cell-muted">600 000</td><td class="cell-muted">900 000</td><td class="cell-muted">1 500 000</td></tr>
+        <tr><td class="cell-highlight">Стоимость 1 публикации</td><td>1,64 доллара</td><td>1,42 доллара</td><td>1,28 доллара</td></tr>
+        <tr><td class="cell-highlight">Стоимость 1 просмотра</td><td>0,0010 доллара</td><td>0,0009 доллара</td><td>0,0008 доллара</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="subtitle anim-4 mt-16" style="font-size:13px;color:var(--text-dim);">Гарантия по договору-оферте</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Тарифы: публикации и стоимость","script":"В зависимости от размера фермы — разное количество публикаций. Вы платите за пакет, а мы даём гарантию-минимум по просмотрам. Чем больше тариф, тем ниже стоимость одной публикации и одного просмотра.","notes":["Пакет публикаций и стоимость пакета — ключевые цифры","Гарантия-минимум по просмотрам зафиксирована в договоре","Чем крупнее тариф, тем ниже цена за просмотр"]}
+  </script>
+</div>
+
+<!-- Слайд — CTA 1: после тарифов -->
+<div class="slide" data-slide="72">
+  <div class="glow-blob glow-blue" style="top:30%;left:30%;"></div>
+  <div class="glow-blob glow-green" style="bottom:20%;right:20%;"></div>
+  <h2 class="anim-1" style="font-size:clamp(30px,3.8vw,46px);">Готовы <span class="gradient-text">внедрить это себе?</span></h2>
+  <p class="subtitle anim-2 mt-16">Напишите менеджеру кодовое слово</p>
+  <div class="cta-box anim-3">
+    <p style="font-size:clamp(24px,3vw,38px);font-weight:800;color:var(--accent-blue);">«хочу ферму»</p>
+    <p style="font-size:clamp(14px,1.3vw,17px);color:var(--text-muted);margin-top:10px;">чтобы забронировать условия из этого вебинара</p>
+    <p style="font-size:clamp(15px,1.4vw,19px);font-weight:700;margin-top:16px;">Условия ограничены 3 днями</p>
+  </div>
+  <div class="rainbow-line anim-4 mt-24"></div>
+  <p class="subtitle anim-5" style="font-size:14px;margin-top:8px;">Ссылка на контакты специалиста — под этим видео</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Призыв к действию после тарифов","script":"Напишите менеджеру кодовое слово «хочу ферму», чтобы забронировать условия из этого вебинара. Условия ограничены 3 днями.","notes":["Кодовое слово: «хочу ферму»","Лимит — 3 дня","Контакты специалиста — под видео"]}
+  </script>
+</div>
+
+<!-- Слайд — Вопрос: гарантия просмотров -->
+<div class="slide" data-slide="73" data-section="Вопросы и ответы">
+  <div class="cb-wrap anim-3">
+    <h2 class="cb-heading anim-2">Что если не наберутся <span class="highlight-blue">гарантированные просмотры?</span></h2>
+    <p class="cb-body anim-3">Добираем за свой счёт дополнительными публикациями — без доплат с вашей стороны.</p>
+    <p class="cb-body anim-4">Гарантия зафиксирована в договоре-оферте, так что это не обещание на словах, а обязательство.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Вопрос: гарантия просмотров","script":"Что если не наберутся гарантированные просмотры? Добираем за свой счёт дополнительными публикациями — гарантия зафиксирована в договоре-оферте.","notes":["Недобор по гарантии — добираем за свой счёт по договору"]}
+  </script>
+</div>
+
+<!-- Слайд — Вопрос: происхождение просмотров -->
+<div class="slide" data-slide="74">
+  <div class="cb-wrap anim-3">
+    <h2 class="cb-heading anim-2">Откуда берутся <span class="highlight-blue">просмотры?</span></h2>
+    <p class="cb-body anim-3">Все просмотры органические — TikTok, Instagram, YouTube через сеть прогретых аккаунтов, без рекламы и без накруток.</p>
+    <p class="cb-body anim-4">Это реальные показы реальным пользователям — платформы это видят точно так же, как обычную органику.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Вопрос: происхождение просмотров","script":"Откуда берутся просмотры? Все органические — через сеть прогретых аккаунтов, без рекламы и без накруток.","notes":["Просмотры органические, без рекламы","Без накруток — реальные показы реальным пользователям"]}
+  </script>
+</div>
+
+<!-- Слайд — Вопрос: целевая аудитория -->
+<div class="slide" data-slide="75">
+  <div class="cb-wrap anim-3">
+    <h2 class="cb-heading anim-2">Будет ли аудитория <span class="highlight-blue">целевой?</span></h2>
+    <p class="cb-body anim-3">Аккаунты настраиваются под вашу нишу и гео, а алгоритмы соцсетей подбирают релевантную аудиторию сами.</p>
+    <p class="cb-body anim-4">Прогрев ведётся именно в вашей тематике, поэтому рекомендации показывают ролик тем, кому это действительно интересно.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Вопрос: целевая аудитория","script":"Будет ли аудитория целевой? Аккаунты настраиваются под нишу и гео, алгоритмы подбирают релевантную аудиторию.","notes":["Аккаунты настроены под нишу и гео клиента","Прогрев ведётся в нужной тематике"]}
+  </script>
+</div>
+
+<!-- Слайд — Вопрос: блокировка аккаунтов -->
+<div class="slide" data-slide="76">
+  <div class="cb-wrap anim-3">
+    <h2 class="cb-heading anim-2">Что если аккаунты <span class="highlight-blue">заблокируют?</span></h2>
+    <p class="cb-body anim-3">Риск полностью на нас — создаём и прогреваем новые аккаунты за свой счёт.</p>
+    <p class="cb-body anim-4">Ваша гарантия просмотров при этом не страдает: мы просто восполняем сеть и продолжаем публикации.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Вопрос: блокировка аккаунтов","script":"Что если аккаунты заблокируют? Риск полностью на нас — создаём и прогреваем новые аккаунты за свой счёт, гарантия не страдает.","notes":["Риск блокировок — на стороне Content Hunter","Гарантия просмотров не страдает"]}
+  </script>
+</div>
+
+<!-- Слайд — Вопрос: что нужно от клиента -->
+<div class="slide" data-slide="77">
+  <div class="glow-blob glow-blue" style="top:50%;left:50%;transform:translate(-50%,-50%);"></div>
+  <div class="cb-wrap anim-3">
+    <blockquote class="cb-keyquote anim-2">Что нужно делать с моей стороны?</blockquote>
+    <p class="cb-detail anim-3">Только загружать готовые ролики. Всё остальное — уникализация, распределение по аккаунтам, публикация по расписанию — происходит автоматически.</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Вопрос: что нужно от клиента","script":"И последний частый вопрос — что вообще требуется от вас. Только загружать готовые ролики, всё остальное система делает сама.","notes":["От клиента нужны только готовые ролики","Всё остальное — автоматически"]}
+  </script>
+</div>
+
+<!-- Слайд — Финальный CTA -->
+<div class="slide" data-slide="78">
+  <div class="glow-blob glow-blue" style="top:30%;left:30%;"></div>
+  <div class="glow-blob glow-green" style="bottom:20%;right:20%;"></div>
+  <h2 class="anim-1" style="font-size:clamp(30px,3.8vw,46px);">Получите <span class="gradient-text">специальные условия</span></h2>
+  <p class="subtitle anim-2 mt-16">Напишите менеджеру кодовое слово</p>
+  <div class="cta-box anim-3">
+    <p style="font-size:clamp(24px,3vw,38px);font-weight:800;color:var(--accent-blue);">«хочу ферму»</p>
+    <p style="font-size:clamp(14px,1.3vw,17px);color:var(--text-muted);margin-top:10px;">чтобы забронировать условия из этого вебинара</p>
+    <p style="font-size:clamp(15px,1.4vw,19px);font-weight:700;margin-top:16px;">Условия ограничены 3 днями</p>
+  </div>
+  <div class="rainbow-line anim-4 mt-24"></div>
+  <p class="subtitle anim-5" style="font-size:14px;margin-top:8px;">Ссылка на контакты специалиста — под этим видео</p>
+  <script type="application/json" class="slide-notes">
+  {"title":"Финальный призыв к действию","script":"Напишите менеджеру кодовое слово «хочу ферму», чтобы забронировать условия из этого вебинара. Условия ограничены 3 днями — ссылка на специалиста под этим видео.","notes":["Кодовое слово: «хочу ферму»","Лимит — 3 дня, без конкретной даты","Контакты специалиста — в описании под видео"]}
+  </script>
+</div>
+
+</div><!-- /deck -->
+
+<script>
+const pc = document.getElementById('particles');
+for (let i = 0; i < 35; i++) {
+  const p = document.createElement('div');
+  p.className = 'particle';
+  p.style.left = Math.random()*100+'%';
+  p.style.animationDuration = (8+Math.random()*14)+'s';
+  p.style.animationDelay = Math.random()*10+'s';
+  p.style.width = p.style.height = (1+Math.random()*2)+'px';
+  pc.appendChild(p);
+}
+
+const slides = document.querySelectorAll('.slide');
+const progress = document.getElementById('progress');
+const counter = document.getElementById('counter');
+let current = 0;
+const total = slides.length;
+
+function updateUI() {
+  progress.style.width = ((current+1)/total*100)+'%';
+  counter.textContent = `${current+1} / ${total}`;
+  document.querySelectorAll('.toc-item').forEach((d,i) => d.classList.toggle('toc-current', i===current));
+}
+
+function goTo(index) {
+  if (index<0 || index>=total || index===current) return;
+  current = index;
+  slides.forEach((s,i) => s.classList.toggle('active', i===current));
+  updateUI();
+  showSpeakerNotes(current);
+}
+
+function next() { goTo(current+1); }
+function prev() { goTo(current-1); }
+
+document.addEventListener('keydown', (e) => {
+  if (document.getElementById('tocPanel').classList.contains('toc-open')) {
+    if (e.key === 'Escape') closeToc();
+    return;
+  }
+  if (e.key==='ArrowRight'||e.key===' '||e.key==='PageDown') { e.preventDefault(); next(); }
+  if (e.key==='ArrowLeft'||e.key==='PageUp') { e.preventDefault(); prev(); }
+  if (e.key==='Home') { e.preventDefault(); goTo(0); }
+  if (e.key==='End') { e.preventDefault(); goTo(total-1); }
+});
+
+let touchStart = 0;
+document.addEventListener('touchstart', (e) => { touchStart=e.touches[0].clientX; });
+document.addEventListener('touchend', (e) => {
+  const diff = touchStart - e.changedTouches[0].clientX;
+  if (Math.abs(diff)>50) { diff>0 ? next() : prev(); }
+});
+
+let wheelCD = false;
+document.addEventListener('wheel', (e) => {
+  if (wheelCD) return; wheelCD = true;
+  setTimeout(() => wheelCD=false, 600);
+  if (e.deltaY>0||e.deltaX>0) next(); else prev();
+}, {passive:true});
+
+updateUI();
+
+function showSpeakerNotes(index) {
+  const slide = slides[index];
+  const notesEl = slide.querySelector('script.slide-notes') || slide.querySelector('[class="slide-notes"]');
+  console.clear();
+  if (notesEl) {
+    try {
+      const n = JSON.parse(notesEl.textContent);
+      const title = n.title || 'Slide ' + (index + 1);
+      const script = n.script || '';
+      const notes = n.notes || [];
+      var parts = ['\n%c Slide ' + (index+1) + '/' + total + ': ' + title + '\n'];
+      var styles = ['font-size:16px;font-weight:bold;color:#2f8f1c;'];
+      if (script) {
+        parts.push('\n%c' + script + '\n');
+        styles.push('font-size:14px;color:#d97706;line-height:1.6;');
+      }
+      if (notes.length) {
+        notes.forEach(function(note) {
+          parts.push('\n  %c-%c ' + note);
+          styles.push('color:#4ea82e;font-size:14px;');
+          styles.push('color:#4ea82e;font-size:14px;');
+        });
+        parts.push('\n');
+      }
+      console.log.apply(console, [parts.join('')].concat(styles));
+    } catch(e) {}
+  }
+}
+
+setTimeout(function() { showSpeakerNotes(0); }, 500);
+
+// Click anywhere on a slide (outside interactive chrome) to advance
+document.getElementById('deck').addEventListener('click', function (e) {
+  if (e.target.closest('a, button')) return;
+  next();
+});
+
+// Table of contents: built from each slide's first heading, toggled via button
+function slideTitle(slide, i) {
+  const h = slide.querySelector('h1, h2, blockquote');
+  if (!h) return 'Слайд ' + (i+1);
+  const clone = h.cloneNode(true);
+  clone.querySelectorAll('br').forEach(function (br) { br.replaceWith(' '); });
+  return clone.textContent.trim().replace(/\s+/g,' ');
+}
+const tocList = document.getElementById('tocList');
+slides.forEach((s, i) => {
+  if (s.dataset.section) {
+    const section = document.createElement('div');
+    section.className = 'toc-section';
+    section.textContent = s.dataset.section;
+    tocList.appendChild(section);
+  }
+  const item = document.createElement('div');
+  item.className = 'toc-item';
+  const num = document.createElement('span');
+  num.className = 'toc-num';
+  num.textContent = (i+1) + '.';
+  const label = document.createElement('span');
+  label.textContent = slideTitle(s, i);
+  item.appendChild(num);
+  item.appendChild(label);
+  item.addEventListener('click', () => { goTo(i); closeToc(); });
+  tocList.appendChild(item);
+});
+function openToc() { document.getElementById('tocPanel').classList.add('toc-open'); }
+function closeToc() { document.getElementById('tocPanel').classList.remove('toc-open'); }
+document.getElementById('tocBtn').addEventListener('click', function (e) { e.stopPropagation(); openToc(); });
+document.getElementById('tocPanel').addEventListener('click', function (e) { if (e.target.id === 'tocPanel') closeToc(); });
+
+// Hover-reveal bottom chrome: hidden until the mouse moves near the bottom of the screen
+const chromeEls = document.querySelectorAll('.chrome-fade');
+document.addEventListener('mousemove', function (e) {
+  const near = e.clientY > window.innerHeight - 140;
+  chromeEls.forEach(el => el.classList.toggle('chrome-visible', near));
+});
+</script>
+
+</body>
+</html>
