@@ -68,11 +68,12 @@ function mlDefaultProjects() {
 }
 
 async function mlLoadAll(env) {
-  const [tasks, projects, priorities, habits] = await Promise.all([
+  const [tasks, projects, priorities, habits, extraLogs] = await Promise.all([
     kget(env, 'mylife:tasks', []),
     kget(env, 'mylife:projects', null),
     kget(env, 'mylife:priorities', null),
     kget(env, 'mylife:habits', []),
+    kget(env, 'mylife:extra-logs', []),
   ]);
   let proj = projects;
   if (!proj) {
@@ -84,7 +85,7 @@ async function mlLoadAll(env) {
     pri = mlDefaultPriorities();
     await kset(env, 'mylife:priorities', pri);
   }
-  return { tasks, projects: proj, priorities: pri, habits };
+  return { tasks, projects: proj, priorities: pri, habits, extraLogs };
 }
 
 function jsonResponse(obj, status = 200) {
@@ -133,12 +134,39 @@ async function handleMylifeApi(request, env, url) {
     if (request.method === 'DELETE' && id) return mlDeleteHabit(env, id);
   }
 
+  if (resource === 'extra-logs') {
+    if (request.method === 'POST') return mlCreateExtraLog(env, await readJson(request));
+    if (request.method === 'DELETE' && id) return mlDeleteExtraLog(env, id);
+  }
+
   if (resource === 'link-preview' && request.method === 'POST') {
     const body = await readJson(request);
     return mlLinkPreview(env, body.url);
   }
 
   return jsonResponse({ error: 'not found' }, 404);
+}
+
+async function mlCreateExtraLog(env, body) {
+  const logs = await kget(env, 'mylife:extra-logs', []);
+  const text = (body.text || '').trim();
+  if (!text) return jsonResponse({ error: 'text required' }, 400);
+  const entry = {
+    id: crypto.randomUUID(),
+    dateKey: /^\d{4}-\d{2}-\d{2}$/.test(body.dateKey || '') ? body.dateKey : new Date().toISOString().slice(0, 10),
+    text,
+    createdAt: Date.now(),
+  };
+  logs.push(entry);
+  await kset(env, 'mylife:extra-logs', logs);
+  return jsonResponse({ entry, extraLogs: logs });
+}
+
+async function mlDeleteExtraLog(env, id) {
+  const logs = await kget(env, 'mylife:extra-logs', []);
+  const next = logs.filter(l => l.id !== id);
+  await kset(env, 'mylife:extra-logs', next);
+  return jsonResponse({ extraLogs: next });
 }
 
 async function mlDeleteProject(env, id) {
@@ -167,12 +195,19 @@ function mlDefaultHabits() {
   return [];
 }
 
+function sanitizeDaysOfWeek(days) {
+  if (!Array.isArray(days)) return null;
+  const clean = [...new Set(days.filter(d => Number.isInteger(d) && d >= 0 && d <= 6))].sort();
+  return clean.length ? clean : null;
+}
+
 async function mlCreateHabit(env, body) {
   const habits = await kget(env, 'mylife:habits', mlDefaultHabits());
   const habit = {
     id: crypto.randomUUID(),
     name: (body.name || '').trim() || 'Привычка',
     periodDays: [1, 7, 30].includes(body.periodDays) ? body.periodDays : 1,
+    daysOfWeek: sanitizeDaysOfWeek(body.daysOfWeek),
     order: habits.length,
     createdAt: Date.now(),
     log: [],
@@ -189,6 +224,7 @@ async function mlUpdateHabit(env, id, patch) {
 
   if (patch.name !== undefined) habit.name = patch.name;
   if (patch.periodDays !== undefined && [1, 7, 30].includes(patch.periodDays)) habit.periodDays = patch.periodDays;
+  if (patch.daysOfWeek !== undefined) habit.daysOfWeek = sanitizeDaysOfWeek(patch.daysOfWeek);
   if (patch.order !== undefined) habit.order = patch.order;
 
   if (patch.toggleDate) {
@@ -236,6 +272,7 @@ async function mlCreateTask(env, body) {
     projectId,
     priorityId: body.priorityId || null,
     dueDate: body.dueDate || null,
+    plannedMinutes: null,
     status: 'active',
     order: siblingCount,
     createdAt: Date.now(),
@@ -254,7 +291,7 @@ async function mlUpdateTask(env, id, patch) {
   const task = tasks.find(t => t.id === id);
   if (!task) return jsonResponse({ error: 'not found' }, 404);
 
-  const fields = ['title', 'description', 'projectId', 'priorityId', 'dueDate', 'order'];
+  const fields = ['title', 'description', 'projectId', 'priorityId', 'dueDate', 'order', 'plannedMinutes'];
   for (const f of fields) {
     if (patch[f] !== undefined) task[f] = patch[f];
   }
