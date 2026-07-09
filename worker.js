@@ -68,12 +68,13 @@ function mlDefaultProjects() {
 }
 
 async function mlLoadAll(env) {
-  const [tasks, projects, priorities, habits, extraLogs] = await Promise.all([
+  const [tasks, projects, priorities, habits, extraLogs, focus] = await Promise.all([
     kget(env, 'mylife:tasks', []),
     kget(env, 'mylife:projects', null),
     kget(env, 'mylife:priorities', null),
     kget(env, 'mylife:habits', []),
     kget(env, 'mylife:extra-logs', []),
+    kget(env, 'mylife:focus', {}),
   ]);
   let proj = projects;
   if (!proj) {
@@ -85,7 +86,7 @@ async function mlLoadAll(env) {
     pri = mlDefaultPriorities();
     await kset(env, 'mylife:priorities', pri);
   }
-  return { tasks, projects: proj, priorities: pri, habits, extraLogs };
+  return { tasks, projects: proj, priorities: pri, habits, extraLogs, focus };
 }
 
 function jsonResponse(obj, status = 200) {
@@ -140,6 +141,11 @@ async function handleMylifeApi(request, env, url) {
     if (request.method === 'DELETE' && id) return mlDeleteExtraLog(env, id);
   }
 
+  if (resource === 'focus') {
+    if (request.method === 'POST') return mlSetFocusDay(env, await readJson(request));
+    if (request.method === 'PATCH' && id) return mlUpdateFocusTask(env, id, await readJson(request));
+  }
+
   if (resource === 'link-preview' && request.method === 'POST') {
     const body = await readJson(request);
     return mlLinkPreview(env, body.url);
@@ -168,6 +174,49 @@ async function mlDeleteExtraLog(env, id) {
   const next = logs.filter(l => l.id !== id);
   await kset(env, 'mylife:extra-logs', next);
   return jsonResponse({ extraLogs: next });
+}
+
+function isValidDateKey(s) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s || '');
+}
+
+async function mlSetFocusDay(env, body) {
+  if (!isValidDateKey(body.dateKey)) return jsonResponse({ error: 'dateKey required' }, 400);
+  const rawTasks = Array.isArray(body.tasks) ? body.tasks.slice(0, 3) : [];
+  const tasks = rawTasks
+    .map(t => ({
+      id: crypto.randomUUID(),
+      name: (t.name || '').trim(),
+      estimatedMinutes: Number.isFinite(t.estimatedMinutes) && t.estimatedMinutes > 0 ? Math.round(t.estimatedMinutes) : null,
+      status: 'pending',
+      startedAt: null,
+      completedAt: null,
+      actualMinutes: null,
+    }))
+    .filter(t => t.name);
+  if (!tasks.length) return jsonResponse({ error: 'at least one task required' }, 400);
+
+  const focus = await kget(env, 'mylife:focus', {});
+  focus[body.dateKey] = { tasks };
+  await kset(env, 'mylife:focus', focus);
+  return jsonResponse({ focus });
+}
+
+async function mlUpdateFocusTask(env, dateKey, body) {
+  if (!isValidDateKey(dateKey)) return jsonResponse({ error: 'invalid dateKey' }, 400);
+  const focus = await kget(env, 'mylife:focus', {});
+  const day = focus[dateKey];
+  const task = day && day.tasks.find(t => t.id === body.taskId);
+  if (!task) return jsonResponse({ error: 'not found' }, 404);
+
+  const patch = body.patch || {};
+  const fields = ['status', 'startedAt', 'completedAt', 'actualMinutes'];
+  for (const f of fields) {
+    if (patch[f] !== undefined) task[f] = patch[f];
+  }
+
+  await kset(env, 'mylife:focus', focus);
+  return jsonResponse({ focus });
 }
 
 async function mlDeleteProject(env, id) {

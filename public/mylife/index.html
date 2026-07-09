@@ -319,6 +319,67 @@
   }
 
   .veil{position:fixed;inset:0;z-index:55;}
+  .focus-veil{z-index:85;background:rgba(0,0,0,.05);}
+
+  /* Morning Focus Lock */
+  body.focus-locked #bottom-bar,
+  body.focus-locked #right-rail,
+  body.focus-locked #right-panel,
+  body.focus-locked #mobile-tabs,
+  body.focus-locked #timer-widget{
+    display:none !important;
+  }
+  #focus-lock-root{
+    position:fixed;inset:0;z-index:200;background:var(--bg);
+    display:flex;align-items:center;justify-content:center;padding:24px;
+  }
+  .focus-card,.focus-entry,.focus-done{
+    width:100%;max-width:420px;background:var(--card);border:1px solid var(--border);
+    border-radius:24px;padding:32px 28px;box-shadow:0 24px 60px rgba(0,0,0,.08);
+  }
+  .focus-modal{
+    position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:90;
+    width:min(420px,90vw);background:var(--card);border-radius:24px;padding:32px 28px;
+    box-shadow:0 24px 60px rgba(0,0,0,.16);
+  }
+  .focus-progress{font-size:13px;color:var(--text-secondary);margin-bottom:16px;}
+  .focus-history{margin-bottom:20px;display:flex;flex-direction:column;gap:6px;}
+  .focus-history-item{font-size:13px;color:var(--text-secondary);}
+  .focus-task-name{font-size:22px;font-weight:600;margin-bottom:6px;letter-spacing:-.01em;}
+  .focus-task-estimate{font-size:14px;color:var(--text-secondary);margin-bottom:8px;}
+  .focus-timer{
+    font-size:44px;font-weight:700;font-variant-numeric:tabular-nums;
+    text-align:center;margin:20px 0;color:var(--text);
+  }
+  .focus-timer.overtime{color:#D64545;}
+  .focus-action-btn{
+    width:100%;padding:16px;border-radius:16px;background:var(--text);color:#fff;border:none;
+    font-size:16px;font-weight:600;text-align:center;cursor:pointer;font-family:inherit;
+  }
+  .focus-action-btn:hover{background:#000;}
+  .focus-entry-title{font-size:18px;font-weight:600;margin-bottom:20px;letter-spacing:-.01em;}
+  .focus-entry-row{display:flex;gap:10px;margin-bottom:12px;}
+  .focus-entry-name{
+    flex:1;border:1px solid var(--border);border-radius:12px;padding:12px 14px;
+    font-size:14px;font-family:inherit;outline:none;color:var(--text);min-width:0;
+  }
+  .focus-entry-name:focus{border-color:var(--border-strong);}
+  .focus-entry-estimate{
+    width:64px;border:1px solid var(--border);border-radius:12px;padding:12px 8px;
+    font-size:14px;font-family:inherit;outline:none;text-align:center;color:var(--text);
+  }
+  .focus-entry-actions{display:flex;gap:10px;margin-top:8px;}
+  .focus-entry-skip{
+    flex:0 0 auto;padding:14px 16px;border-radius:14px;color:var(--text-secondary);
+    font-size:14px;cursor:pointer;background:none;border:none;font-family:inherit;
+  }
+  .focus-entry-skip:hover{background:var(--bg);}
+  .focus-entry-submit{
+    flex:1;padding:14px;border-radius:14px;background:var(--text);color:#fff;border:none;
+    font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;
+  }
+  .focus-entry-submit:hover{background:#000;}
+  .focus-done-title{font-size:18px;font-weight:600;margin-bottom:16px;letter-spacing:-.01em;}
 
   /* Timer widget */
   #timer-widget{
@@ -400,16 +461,33 @@
   #mobile-tabs{
     display:none;position:fixed;top:0;left:0;right:156px;z-index:44;
     background:rgba(250,250,250,.9);backdrop-filter:blur(14px);
-    padding:14px 8px 10px 16px;overflow-x:auto;white-space:nowrap;
+    padding:14px 16px 10px;
     border-bottom:1px solid var(--border);
   }
-  #mobile-tabs::-webkit-scrollbar{display:none;}
-  .mobile-tab{
-    display:inline-flex;padding:8px 14px;border-radius:14px;font-size:13px;
-    color:var(--text-secondary);background:#fff;border:1px solid var(--border);
-    margin-right:8px;cursor:pointer;
+  .mobile-project-select{
+    display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:14px;
+    font-size:14px;font-weight:500;color:var(--text);background:#fff;
+    border:1px solid var(--border);cursor:pointer;max-width:100%;
   }
-  .mobile-tab.active{background:var(--text);color:#fff;border-color:var(--text);}
+  .mobile-project-select-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .mobile-project-select svg{flex-shrink:0;transition:transform .15s;color:var(--text-secondary);}
+  .mobile-project-select.open svg{transform:rotate(180deg);}
+  .mobile-project-dropdown{
+    position:fixed;top:64px;left:16px;z-index:47;
+    background:#fff;border:1px solid var(--border-strong);border-radius:16px;
+    box-shadow:0 24px 60px rgba(0,0,0,.14);padding:8px;min-width:200px;max-width:80vw;
+    max-height:60vh;overflow-y:auto;
+  }
+  .mobile-project-item{padding:10px 12px;border-radius:10px;font-size:14px;cursor:pointer;color:var(--text);}
+  .mobile-project-item:hover{background:var(--bg);}
+  .mobile-project-item.active{background:var(--bg);font-weight:600;}
+
+  .pull-refresh-indicator{
+    display:none;position:fixed;top:80px;left:0;right:0;z-index:44;
+    text-align:center;font-size:12px;color:var(--text-secondary);
+    pointer-events:none;
+  }
+  .pull-refresh-indicator.visible{display:block;}
 
   @media (max-width:860px){
     #canvas-viewport{display:none;}
@@ -496,6 +574,8 @@ const state = {
   tasks: [],
   habits: [],
   extraLogs: [],
+  focus: {},
+  eveningPromptDismissed: false,
   view: { x: 0, y: 0, zoom: 1 },
   composer: { projectId: null, priorityId: null, date: null },
   editingTaskId: null,
@@ -570,6 +650,14 @@ const api = {
   },
   async deleteExtraLog(id){
     const r = await fetch('/mylife/api/extra-logs/' + id, { method:'DELETE' });
+    return r.json();
+  },
+  async setFocusDay(dateKey, tasks){
+    const r = await fetch('/mylife/api/focus', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ dateKey, tasks }) });
+    return r.json();
+  },
+  async updateFocusTask(dateKey, taskId, patch){
+    const r = await fetch('/mylife/api/focus/' + dateKey, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ taskId, patch }) });
     return r.json();
   },
   async linkPreview(url){
@@ -785,28 +873,26 @@ function renderMobileList(){
   const tabsEl = $('#mobile-tabs');
   container.innerHTML = '';
   tabsEl.innerHTML = '';
+  $('#mobile-project-dropdown')?.remove();
 
   const sortedProjects = [...state.projects].sort((a,b) => a.order - b.order);
-
-  const habitsTab = el('div', 'mobile-tab' + (state.mobileActiveProjectId === HABITS_PROJECT_ID ? ' active' : ''), 'Привычки');
-  habitsTab.addEventListener('click', () => {
-    state.mobileActiveProjectId = HABITS_PROJECT_ID;
-    renderMobileList();
-  });
-  tabsEl.appendChild(habitsTab);
-
-  for (const project of sortedProjects){
-    const tab = el('div', 'mobile-tab' + (project.id === state.mobileActiveProjectId ? ' active' : ''), escapeHtml(project.name));
-    tab.addEventListener('click', () => {
-      state.mobileActiveProjectId = project.id;
-      renderMobileList();
-    });
-    tabsEl.appendChild(tab);
-  }
 
   if (!state.mobileActiveProjectId || (state.mobileActiveProjectId !== HABITS_PROJECT_ID && !sortedProjects.find(p => p.id === state.mobileActiveProjectId))){
     state.mobileActiveProjectId = sortedProjects.length ? sortedProjects[0].id : HABITS_PROJECT_ID;
   }
+
+  const currentName = state.mobileActiveProjectId === HABITS_PROJECT_ID
+    ? 'Привычки'
+    : (sortedProjects.find(p => p.id === state.mobileActiveProjectId)?.name || 'Проект');
+
+  const selectBtn = el('button', 'mobile-project-select');
+  selectBtn.appendChild(el('span', 'mobile-project-select-name', escapeHtml(currentName)));
+  selectBtn.appendChild(el('span', null, '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'));
+  selectBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleMobileProjectDropdown(selectBtn);
+  });
+  tabsEl.appendChild(selectBtn);
 
   if (state.mobileActiveProjectId === HABITS_PROJECT_ID){
     container.appendChild(buildHabitsBody());
@@ -828,6 +914,46 @@ function renderMobileList(){
   pEl.appendChild(grid);
   container.appendChild(pEl);
 }
+
+function toggleMobileProjectDropdown(anchorEl){
+  const existing = $('#mobile-project-dropdown');
+  if (existing){
+    existing.remove();
+    anchorEl.classList.remove('open');
+    return;
+  }
+
+  const sortedProjects = [...state.projects].sort((a,b) => a.order - b.order);
+  const dd = el('div', 'mobile-project-dropdown');
+  dd.id = 'mobile-project-dropdown';
+
+  const habitsItem = el('div', 'mobile-project-item' + (state.mobileActiveProjectId === HABITS_PROJECT_ID ? ' active' : ''), 'Привычки');
+  habitsItem.addEventListener('click', () => {
+    state.mobileActiveProjectId = HABITS_PROJECT_ID;
+    renderMobileList();
+  });
+  dd.appendChild(habitsItem);
+
+  for (const project of sortedProjects){
+    const item = el('div', 'mobile-project-item' + (project.id === state.mobileActiveProjectId ? ' active' : ''), escapeHtml(project.name));
+    item.addEventListener('click', () => {
+      state.mobileActiveProjectId = project.id;
+      renderMobileList();
+    });
+    dd.appendChild(item);
+  }
+
+  document.body.appendChild(dd);
+  anchorEl.classList.add('open');
+}
+
+document.addEventListener('pointerdown', (e) => {
+  const dd = $('#mobile-project-dropdown');
+  if (!dd) return;
+  if (e.target.closest('#mobile-project-dropdown') || e.target.closest('.mobile-project-select')) return;
+  dd.remove();
+  $('.mobile-project-select')?.classList.remove('open');
+});
 
 function renderCard(task){
   const card = el('div', 'task-card');
@@ -864,7 +990,7 @@ function renderCard(task){
     meta.appendChild(dot);
     card.style.borderColor = priority.color;
   }
-  meta.appendChild(el('span', 'task-age', daysActiveLabel(task.createdAt)));
+  meta.appendChild(el('span', 'task-age', task.plannedMinutes ? `⏱ ${task.plannedMinutes} мин` : daysActiveLabel(task.createdAt)));
   if (task.dueDate){
     meta.appendChild(el('span', 'task-date' + dueDateStatusClass(task.dueDate), fmtDate(new Date(task.dueDate).getTime())));
   }
@@ -958,6 +1084,13 @@ function zoomToProject(id){
   const l = state.projectLayout[id];
   if (!l) return;
   fitBoundsToView(l, { animate: true, maxZoom: 1.8, bottomClearance: BOTTOM_BAR_CLEARANCE });
+  // Explicit intent to focus this project — select it directly rather than relying on the
+  // ambient center-point+zoom-threshold heuristic, which can miss for large projects where
+  // the fit-to-view scale ends up below the threshold.
+  if (id !== HABITS_PROJECT_ID && id !== state.composer.projectId){
+    state.composer.projectId = id;
+    updateProjectBadge();
+  }
 }
 
 let panState = null;
@@ -2163,6 +2296,14 @@ const progressNav = $('#progress-nav');
 const panelList = $('#panel-list');
 attachThinScroll(panelList);
 
+document.addEventListener('pointerdown', (e) => {
+  if (!state.panelOpen) return;
+  if (e.target.closest('#right-panel') || e.target.closest('.rail-btn')) return;
+  if (e.target.closest('.popover') || e.target.closest('.veil')) return;
+  state.panelOpen = null;
+  updatePanel();
+});
+
 $('#week-prev').addEventListener('click', () => {
   state.progressWeekStart.setDate(state.progressWeekStart.getDate() - 7);
   renderPanel();
@@ -2582,20 +2723,303 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// ───────────────────────────── Morning Focus Lock ─────────────────────────────
+
+const FOCUS_EVENING_HOUR = 18;
+
+function isEveningNow(){
+  return new Date().getHours() >= FOCUS_EVENING_HOUR;
+}
+function tomorrowKey(){
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return toDateKey(d);
+}
+
+let focusLockActive = false;
+let focusTimerInterval = null;
+
+function checkFocusFlow(){
+  const todayKey = toDateKey(new Date());
+  const todayFocus = state.focus[todayKey];
+  const todayDone = todayFocus && todayFocus.tasks.length > 0 && todayFocus.tasks.every(t => t.status === 'done');
+
+  if (!todayFocus || !todayDone){
+    renderMorningLock(todayKey, todayFocus || null);
+    return;
+  }
+
+  if (isEveningNow() && !state.eveningPromptDismissed){
+    const tKey = tomorrowKey();
+    const tomorrowFocus = state.focus[tKey];
+    if (!tomorrowFocus || tomorrowFocus.tasks.length < 3){
+      renderEveningPrompt(tKey);
+    }
+  }
+}
+
+function buildFocusEntryForm(opts){
+  const wrap = el('div', 'focus-entry');
+  wrap.appendChild(el('div', 'focus-entry-title', opts.title));
+
+  const rows = [];
+  for (let i = 0; i < 3; i++){
+    const row = el('div', 'focus-entry-row');
+    const nameInput = el('input');
+    nameInput.type = 'text';
+    nameInput.className = 'focus-entry-name';
+    nameInput.placeholder = `Задача ${i + 1}`;
+    const estInput = el('input');
+    estInput.type = 'number';
+    estInput.min = '5';
+    estInput.step = '5';
+    estInput.className = 'focus-entry-estimate';
+    estInput.placeholder = 'мин';
+    row.appendChild(nameInput);
+    row.appendChild(estInput);
+    wrap.appendChild(row);
+    rows.push({ nameInput, estInput });
+  }
+
+  const actions = el('div', 'focus-entry-actions');
+  if (opts.allowSkip){
+    const skipBtn = el('button', 'focus-entry-skip', 'Позже');
+    skipBtn.addEventListener('click', () => opts.onSkip());
+    actions.appendChild(skipBtn);
+  }
+  const submitBtn = el('button', 'focus-entry-submit', opts.submitLabel || 'Сохранить');
+  submitBtn.addEventListener('click', () => {
+    const tasks = rows.map(r => ({
+      name: r.nameInput.value.trim(),
+      estimatedMinutes: r.estInput.value ? Math.max(5, Math.round(Number(r.estInput.value) / 5) * 5) : null,
+    }));
+    if (tasks.some(t => !t.name)) return;
+    opts.onSubmit(tasks);
+  });
+  actions.appendChild(submitBtn);
+  wrap.appendChild(actions);
+
+  return wrap;
+}
+
+function renderEveningPrompt(dateKey){
+  if ($('.focus-modal')) return;
+
+  const veil = el('div', 'veil focus-veil');
+  document.body.appendChild(veil);
+
+  const modal = el('div', 'focus-modal');
+  const close = () => { veil.remove(); modal.remove(); };
+  veil.addEventListener('pointerdown', () => {
+    state.eveningPromptDismissed = true;
+    close();
+  });
+
+  modal.appendChild(buildFocusEntryForm({
+    title: 'Какие 3 приоритетные задачи на завтра?',
+    submitLabel: 'Сохранить',
+    allowSkip: true,
+    onSkip: () => {
+      state.eveningPromptDismissed = true;
+      close();
+    },
+    onSubmit: async (tasks) => {
+      const { focus } = await api.setFocusDay(dateKey, tasks);
+      state.focus = focus;
+      close();
+    },
+  }));
+
+  document.body.appendChild(modal);
+}
+
+function closeFocusLock(){
+  focusLockActive = false;
+  document.body.classList.remove('focus-locked');
+  if (focusTimerInterval){ clearInterval(focusTimerInterval); focusTimerInterval = null; }
+  $('#focus-lock-root')?.remove();
+}
+
+function renderMorningLock(dateKey, dayData){
+  if (focusLockActive) return;
+  focusLockActive = true;
+  document.body.classList.add('focus-locked');
+
+  const root = el('div');
+  root.id = 'focus-lock-root';
+  document.body.appendChild(root);
+
+  if (!dayData){
+    root.appendChild(buildFocusEntryForm({
+      title: 'Какие 3 задачи в приоритете сегодня утром?',
+      submitLabel: 'Начать',
+      allowSkip: false,
+      onSubmit: async (tasks) => {
+        const { focus } = await api.setFocusDay(dateKey, tasks);
+        state.focus = focus;
+        renderFocusExecution(root, dateKey, state.focus[dateKey]);
+      },
+    }));
+  } else {
+    renderFocusExecution(root, dateKey, dayData);
+  }
+}
+
+function focusHistoryLine(t){
+  return `✓ ${escapeHtml(t.name)} — ${t.actualMinutes ?? '?'} мин${t.estimatedMinutes ? ` (план ${t.estimatedMinutes})` : ''}`;
+}
+
+function renderFocusExecution(root, dateKey, dayData){
+  root.innerHTML = '';
+  if (focusTimerInterval){ clearInterval(focusTimerInterval); focusTimerInterval = null; }
+
+  const tasks = dayData.tasks;
+  const activeIdx = tasks.findIndex(t => t.status !== 'done');
+
+  if (activeIdx === -1){
+    const wrap = el('div', 'focus-done');
+    wrap.appendChild(el('div', 'focus-done-title', 'Отлично! Все 3 задачи выполнены 💪'));
+    const list = el('div', 'focus-history');
+    for (const t of tasks) list.appendChild(el('div', 'focus-history-item', focusHistoryLine(t)));
+    wrap.appendChild(list);
+    const btn = el('button', 'focus-action-btn', 'Продолжить');
+    btn.addEventListener('click', () => closeFocusLock());
+    wrap.appendChild(btn);
+    root.appendChild(wrap);
+    return;
+  }
+
+  const card = el('div', 'focus-card');
+  card.appendChild(el('div', 'focus-progress', `Задача ${activeIdx + 1} из ${tasks.length}`));
+
+  if (activeIdx > 0){
+    const list = el('div', 'focus-history');
+    for (let i = 0; i < activeIdx; i++) list.appendChild(el('div', 'focus-history-item', focusHistoryLine(tasks[i])));
+    card.appendChild(list);
+  }
+
+  const current = tasks[activeIdx];
+  card.appendChild(el('div', 'focus-task-name', escapeHtml(current.name)));
+  if (current.estimatedMinutes) card.appendChild(el('div', 'focus-task-estimate', `~${current.estimatedMinutes} мин`));
+
+  const timerEl = el('div', 'focus-timer');
+  card.appendChild(timerEl);
+
+  const actionBtn = el('button', 'focus-action-btn');
+  card.appendChild(actionBtn);
+
+  root.appendChild(card);
+
+  function updateTimerDisplay(){
+    const elapsedMs = Date.now() - current.startedAt;
+    const estMs = (current.estimatedMinutes || 0) * 60000;
+    const overtime = current.estimatedMinutes ? elapsedMs > estMs : false;
+    const baseMs = current.estimatedMinutes ? Math.abs(estMs - elapsedMs) : elapsedMs;
+    const totalSec = Math.floor(baseMs / 1000);
+    const mm = Math.floor(totalSec / 60), ss = totalSec % 60;
+    timerEl.textContent = (overtime ? '−' : '') + `${mm}:${String(ss).padStart(2, '0')}`;
+    timerEl.classList.toggle('overtime', overtime);
+  }
+
+  function renderActive(){
+    updateTimerDisplay();
+    focusTimerInterval = setInterval(updateTimerDisplay, 1000);
+    actionBtn.textContent = 'Готово';
+    actionBtn.onclick = async () => {
+      clearInterval(focusTimerInterval); focusTimerInterval = null;
+      current.completedAt = Date.now();
+      current.actualMinutes = Math.max(1, Math.round((current.completedAt - current.startedAt) / 60000));
+      current.status = 'done';
+      await api.updateFocusTask(dateKey, current.id, { status: 'done', completedAt: current.completedAt, actualMinutes: current.actualMinutes });
+      renderFocusExecution(root, dateKey, dayData);
+    };
+  }
+
+  function renderIdle(){
+    timerEl.textContent = current.estimatedMinutes ? `${current.estimatedMinutes}:00` : '';
+    actionBtn.textContent = 'Начать';
+    actionBtn.onclick = async () => {
+      current.status = 'active';
+      current.startedAt = Date.now();
+      await api.updateFocusTask(dateKey, current.id, { status: 'active', startedAt: current.startedAt });
+      renderActive();
+    };
+  }
+
+  if (current.status === 'active' && current.startedAt) renderActive();
+  else renderIdle();
+}
+
 // ───────────────────────────── Init ─────────────────────────────
 
-async function init(){
+async function loadData(){
   const data = await api.getData();
   state.projects = data.projects;
   state.priorities = data.priorities;
   state.tasks = data.tasks;
   state.habits = data.habits || [];
   state.extraLogs = data.extraLogs || [];
+  state.focus = data.focus || {};
 
   updatePriorityPreview();
   updateDateBadge();
   updateProjectBadge();
   renderCanvas();
+  if (state.panelOpen) renderPanel();
+  checkFocusFlow();
+}
+
+// ── Mobile pull-to-refresh (no browser refresh button in the mobile view) ──
+
+(function setupPullToRefresh(){
+  const listEl = $('#mobile-list');
+  const indicator = el('div', 'pull-refresh-indicator', 'Потяните для обновления');
+  document.body.appendChild(indicator);
+
+  let startY = null, pulling = false, refreshing = false;
+  const THRESHOLD = 70;
+
+  listEl.addEventListener('touchstart', (e) => {
+    if (refreshing) return;
+    if (listEl.scrollTop <= 0){
+      startY = e.touches[0].clientY;
+      pulling = true;
+    } else {
+      startY = null;
+      pulling = false;
+    }
+  }, { passive: true });
+
+  listEl.addEventListener('touchmove', (e) => {
+    if (!pulling || startY === null) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy > 12){
+      indicator.classList.add('visible');
+      indicator.textContent = dy > THRESHOLD ? 'Отпустите для обновления' : 'Потяните для обновления';
+    }
+  }, { passive: true });
+
+  async function doRefresh(){
+    refreshing = true;
+    indicator.textContent = 'Обновление…';
+    indicator.classList.add('visible');
+    await loadData();
+    indicator.classList.remove('visible');
+    refreshing = false;
+  }
+
+  listEl.addEventListener('touchend', (e) => {
+    if (!pulling || startY === null) return;
+    const dy = (e.changedTouches[0]?.clientY ?? startY) - startY;
+    pulling = false;
+    startY = null;
+    if (dy > THRESHOLD) doRefresh();
+    else indicator.classList.remove('visible');
+  }, { passive: true });
+})();
+
+async function init(){
+  await loadData();
   runTimerLoop();
 }
 
