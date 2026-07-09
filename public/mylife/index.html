@@ -228,8 +228,6 @@
   .habit-row{margin-bottom:22px;}
   .habit-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;row-gap:4px;}
   .habit-name{font-size:14px;font-weight:500;flex:1;min-width:60px;}
-  .habit-period{font-size:12px;color:var(--text-secondary);}
-  .habit-stats{font-size:11px;color:var(--text-secondary);white-space:nowrap;}
   .habit-del{opacity:0;width:20px;height:20px;flex-shrink:0;color:var(--text-secondary);border-radius:50%;display:flex;align-items:center;justify-content:center;}
   .habit-row:hover .habit-del{opacity:1;}
   .habit-del:hover{background:var(--bg);color:var(--text);}
@@ -279,6 +277,12 @@
   .popover-item .p-del{opacity:0;width:18px;height:18px;flex-shrink:0;color:var(--text-secondary);border-radius:50%;display:flex;align-items:center;justify-content:center;}
   .popover-item:hover .p-del{opacity:1;}
   .popover-item .p-del:hover{background:rgba(0,0,0,.08);color:var(--text);}
+  .smart-pick-popover{width:300px;max-width:320px;}
+  .smart-pick-item{align-items:flex-start;}
+  .smart-pick-item .p-dot{margin-top:6px;}
+  .smart-pick-text{flex:1;min-width:0;}
+  .smart-pick-title{font-size:14px;line-height:1.45;color:var(--text);white-space:normal;word-break:break-word;}
+  .smart-pick-project{font-size:12px;color:var(--text-secondary);margin-top:3px;font-weight:400;}
   .popover-add{display:flex;align-items:center;gap:8px;padding:9px 10px;border-top:1px solid var(--border);margin-top:4px;}
   .popover-add input[type=text]{flex:1;border:none;outline:none;font-size:14px;font-family:inherit;background:none;color:var(--text);}
   .popover-add input[type=text]::placeholder{color:var(--text-secondary);}
@@ -528,6 +532,10 @@ const api = {
   async deleteTask(id){
     return fetch('/mylife/api/tasks/' + id, { method:'DELETE' });
   },
+  async reorderTasks(updates){
+    const r = await fetch('/mylife/api/tasks/reorder', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ updates }) });
+    return r.json();
+  },
   async createPriority(payload){
     const r = await fetch('/mylife/api/priorities', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     return r.json();
@@ -734,7 +742,6 @@ function renderCanvas(){
 
   const habitsEl = el('div', 'project habits-project');
   habitsEl.dataset.projectId = HABITS_PROJECT_ID;
-  habitsEl.appendChild(el('div', 'project-title', 'Привычки'));
   habitsEl.appendChild(buildHabitsBody());
   world.appendChild(habitsEl);
   nodes[HABITS_PROJECT_ID] = habitsEl;
@@ -872,7 +879,21 @@ function escapeHtml(s){
 
 function layoutProjects(nodes, sortedProjects){
   const GAP = 24;
-  const MAX_ROW_WIDTH = Math.max(1000, viewport.clientWidth * 1.15);
+  const vw = viewport.clientWidth;
+  const usableH = Math.max(300, viewport.clientHeight - BOTTOM_BAR_CLEARANCE);
+
+  // Pick a row-wrap width that makes the packed bounding box's aspect ratio roughly match
+  // the viewport's, so the later fit-to-view scale isn't bottlenecked by height (leaving
+  // wide empty margins left/right) just because projects happened to stack into a tall column.
+  let naturalWidth = 0, maxHeight = 0;
+  for (const project of sortedProjects){
+    const node = nodes[project.id];
+    naturalWidth += node.offsetWidth + GAP;
+    maxHeight = Math.max(maxHeight, node.offsetHeight);
+  }
+  const idealRowWidth = Math.sqrt(naturalWidth * maxHeight * vw / usableH);
+  const MAX_ROW_WIDTH = Math.max(vw * 0.92, idealRowWidth);
+
   let x = 0, y = 0, rowHeight = 0;
   const layout = {};
 
@@ -1147,7 +1168,7 @@ async function moveTask(task, targetProjectId, insertBeforeTaskId){
   }
 
   renderCanvas();
-  await Promise.all(updates.map(u => api.updateTask(u.id, u.patch)));
+  await api.reorderTasks(updates);
 }
 
 // ───────────────────────────── Card editor ─────────────────────────────
@@ -1946,7 +1967,7 @@ function openSmartPickPopover(){
   veil.addEventListener('pointerdown', closeAllPopovers);
   document.body.appendChild(veil);
 
-  const pop = el('div', 'popover');
+  const pop = el('div', 'popover smart-pick-popover');
   pop.dataset.kind = 'smart-pick';
   pop.addEventListener('pointerdown', (e) => e.stopPropagation());
 
@@ -1957,14 +1978,19 @@ function openSmartPickPopover(){
     list.appendChild(el('div', 'panel-empty', 'Активных задач нет'));
   } else {
     for (const task of picks){
-      const row = el('div', 'popover-item');
+      const row = el('div', 'popover-item smart-pick-item');
       const priority = priorityById(task.priorityId);
       const dot = el('span', 'p-dot');
       dot.style.background = priority ? priority.color : 'transparent';
       if (!priority) dot.style.border = '1.4px solid var(--border-strong)';
       row.appendChild(dot);
+
+      const textWrap = el('div', 'smart-pick-text');
+      textWrap.appendChild(el('div', 'smart-pick-title', escapeHtml(task.title)));
       const proj = projectById(task.projectId);
-      row.appendChild(el('span', 'p-name', escapeHtml(task.title) + (proj ? ` · ${escapeHtml(proj.name)}` : '')));
+      if (proj) textWrap.appendChild(el('div', 'smart-pick-project', escapeHtml(proj.name)));
+      row.appendChild(textWrap);
+
       row.addEventListener('click', () => {
         closeAllPopovers();
         if (!isMobile() && task.projectId !== HABITS_PROJECT_ID) zoomToProject(task.projectId);
@@ -2244,7 +2270,6 @@ function habitMatchesDay(habit, date){
   return habit.daysOfWeek.includes((date.getDay() + 6) % 7);
 }
 
-// Most recent `cap` qualifying occurrences since the habit's creation date, oldest first.
 // Most recent `count` qualifying occurrences ending today, regardless of creation date — used for cell display
 // so a freshly-created habit whose creation day doesn't match its schedule still shows a populated grid.
 function habitRecentDates(habit, count){
@@ -2271,50 +2296,8 @@ function habitRecentDates(habit, count){
   return dates;
 }
 
-// Qualifying occurrences since the habit's creation date, capped at `cap` — used for stats so a new
-// habit isn't unfairly penalized for days before it existed.
-function habitOccurrencesSinceCreation(habit, cap){
-  const created = new Date(habit.createdAt); created.setHours(0,0,0,0);
-  const today = new Date(); today.setHours(0,0,0,0);
-  const dates = [];
-
-  if (habit.periodDays !== 1){
-    let b = periodBucketDate(today, habit.periodDays);
-    const createdBucket = periodBucketDate(created, habit.periodDays);
-    let guard = 0;
-    while (b >= createdBucket && dates.length < cap && guard < 400){
-      dates.unshift(new Date(b));
-      if (habit.periodDays === 30) b.setMonth(b.getMonth() - 1);
-      else b.setDate(b.getDate() - habit.periodDays);
-      guard++;
-    }
-    return dates;
-  }
-
-  const cursor = new Date(today);
-  let guard = 0;
-  while (cursor >= created && dates.length < cap && guard < 5000){
-    if (habitMatchesDay(habit, cursor)) dates.unshift(new Date(cursor));
-    cursor.setDate(cursor.getDate() - 1);
-    guard++;
-  }
-  return dates;
-}
-
 function habitCellDates(habit, count){
   return habitRecentDates(habit, count);
-}
-
-function computeHabitStats(habit){
-  const occ = habitOccurrencesSinceCreation(habit, 60);
-  const flags = occ.map(d => !!habitBucketLogDate(habit, d));
-  const total = flags.length;
-  const done = flags.filter(Boolean).length;
-  let streak = 0;
-  for (let i = flags.length - 1; i >= 0; i--){
-    if (flags[i]) streak++; else break;
-  }
-  return { percent: total ? Math.round(done / total * 100) : 0, streak, total };
 }
 
 function habitCellLabel(date, habit){
@@ -2324,13 +2307,6 @@ function habitCellLabel(date, habit){
     return `${date.getDate()}–${end.getDate()}`;
   }
   return MONTHS_NOM[date.getMonth()].slice(0, 3);
-}
-
-function habitScheduleLabel(habit){
-  if (habit.periodDays === 7) return 'Еженедельно';
-  if (habit.periodDays === 30) return 'Ежемесячно';
-  if (habit.daysOfWeek && habit.daysOfWeek.length) return habit.daysOfWeek.map(d => WEEKDAYS_SHORT[d]).join(', ');
-  return 'Ежедневно';
 }
 
 function openHabitSchedulePopover(anchorEl, habit){
@@ -2388,20 +2364,15 @@ function buildHabitRow(habit){
   const row = el('div', 'habit-row');
 
   const header = el('div', 'habit-header');
-  header.appendChild(el('span', 'habit-name', escapeHtml(habit.name)));
-
-  const scheduleBtn = el('span', 'habit-period', habitScheduleLabel(habit));
-  scheduleBtn.style.cursor = 'pointer';
-  scheduleBtn.addEventListener('click', (e) => {
+  const nameEl = el('span', 'habit-name', escapeHtml(habit.name));
+  nameEl.title = 'Изменить расписание';
+  nameEl.style.cursor = 'pointer';
+  nameEl.addEventListener('click', (e) => {
     e.stopPropagation();
     closeAllPopovers();
-    openHabitSchedulePopover(scheduleBtn, habit);
+    openHabitSchedulePopover(nameEl, habit);
   });
-  header.appendChild(scheduleBtn);
-
-  const stats = computeHabitStats(habit);
-  const statsLabel = stats.streak > 1 ? `🔥${stats.streak} · ${stats.percent}%` : `${stats.percent}%`;
-  header.appendChild(el('span', 'habit-stats', statsLabel));
+  header.appendChild(nameEl);
 
   const del = el('div', 'habit-del', '&times;');
   del.addEventListener('click', async (e) => {
@@ -2436,6 +2407,10 @@ function buildHabitAddBox(){
   nameInput.placeholder = 'Новая привычка…';
   addBox.appendChild(nameInput);
 
+  const configWrap = el('div', 'habit-add-config');
+  configWrap.style.display = 'none';
+  addBox.appendChild(configWrap);
+
   const choice = el('div', 'habit-period-choice');
   const weekdayWrap = el('div', 'habit-weekday-choice');
   let selectedPeriod = 1;
@@ -2466,9 +2441,13 @@ function buildHabitAddBox(){
     choice.appendChild(b);
     return { el: b, days };
   });
-  addBox.appendChild(choice);
-  addBox.appendChild(weekdayWrap);
+  configWrap.appendChild(choice);
+  configWrap.appendChild(weekdayWrap);
   renderWeekdayChips();
+
+  nameInput.addEventListener('input', () => {
+    configWrap.style.display = nameInput.value.trim() ? 'block' : 'none';
+  });
 
   nameInput.addEventListener('keydown', async (e) => {
     if (e.key === 'Enter' && nameInput.value.trim()){
