@@ -113,6 +113,7 @@ async function handleMylifeApi(request, env, url) {
   }
 
   if (resource === 'tasks') {
+    if (id === 'reorder' && request.method === 'POST') return mlReorderTasks(env, await readJson(request));
     if (request.method === 'POST') return mlCreateTask(env, await readJson(request));
     if (request.method === 'PATCH' && id) return mlUpdateTask(env, id, await readJson(request));
     if (request.method === 'DELETE' && id) return mlDeleteTask(env, id);
@@ -308,6 +309,21 @@ async function mlUpdateTask(env, id, patch) {
 
   await kset(env, 'mylife:tasks', tasks);
   return jsonResponse({ task });
+}
+
+async function mlReorderTasks(env, body) {
+  const updates = Array.isArray(body.updates) ? body.updates : [];
+  const tasks = await kget(env, 'mylife:tasks', []);
+
+  for (const u of updates) {
+    const task = tasks.find(t => t.id === u.id);
+    if (!task || !u.patch) continue;
+    if (u.patch.projectId !== undefined) task.projectId = u.patch.projectId;
+    if (u.patch.order !== undefined) task.order = u.patch.order;
+  }
+
+  await kset(env, 'mylife:tasks', tasks);
+  return jsonResponse({ tasks });
 }
 
 async function mlDeleteTask(env, id) {
