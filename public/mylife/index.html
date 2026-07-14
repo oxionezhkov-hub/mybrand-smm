@@ -352,11 +352,31 @@
     text-align:center;margin:20px 0;color:var(--text);
   }
   .focus-timer.overtime{color:#D64545;}
+  .focus-timer.paused{opacity:.5;}
+  .focus-paused-info{font-size:12px;color:var(--text-secondary);text-align:center;margin:-14px 0 14px;min-height:16px;}
+  .focus-actions-row{display:flex;gap:10px;}
   .focus-action-btn{
-    width:100%;padding:16px;border-radius:16px;background:var(--text);color:#fff;border:none;
+    flex:1;padding:16px;border-radius:16px;background:var(--text);color:#fff;border:none;
     font-size:16px;font-weight:600;text-align:center;cursor:pointer;font-family:inherit;
   }
   .focus-action-btn:hover{background:#000;}
+  .focus-pause-btn{
+    flex:0 0 auto;padding:16px 18px;border-radius:16px;background:var(--bg);color:var(--text);
+    border:1px solid var(--border);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;
+  }
+  .focus-pause-btn:hover{background:var(--border);}
+  .focus-side-capture{margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;}
+  .focus-side-row{display:flex;gap:8px;}
+  .focus-side-input{
+    flex:1;border:1px solid var(--border);border-radius:12px;padding:10px 12px;
+    font-size:13px;font-family:inherit;outline:none;color:var(--text);min-width:0;background:var(--bg);
+  }
+  .focus-side-input:focus{border-color:var(--border-strong);}
+  .focus-side-btn{
+    flex:0 0 auto;width:36px;border-radius:12px;background:var(--text);color:#fff;border:none;
+    font-size:16px;font-weight:600;cursor:pointer;font-family:inherit;
+  }
+  .focus-side-btn:hover{background:#000;}
   .focus-entry-title{font-size:18px;font-weight:600;margin-bottom:20px;letter-spacing:-.01em;}
   .focus-entry-row{display:flex;gap:10px;margin-bottom:12px;}
   .focus-entry-name{
@@ -2866,7 +2886,58 @@ function renderMorningLock(dateKey, dayData){
 }
 
 function focusHistoryLine(t){
-  return `✓ ${escapeHtml(t.name)} — ${t.actualMinutes ?? '?'} мин${t.estimatedMinutes ? ` (план ${t.estimatedMinutes})` : ''}`;
+  const pause = t.pausedMinutes ? `, пауза ${t.pausedMinutes} мин` : '';
+  return `✓ ${escapeHtml(t.name)} — ${t.actualMinutes ?? '?'} мин${t.estimatedMinutes ? ` (план ${t.estimatedMinutes})` : ''}${pause}`;
+}
+
+function buildFocusSideCapture(dateKey){
+  const wrap = el('div', 'focus-side-capture');
+
+  const ideaRow = el('div', 'focus-side-row');
+  const ideaInput = el('input');
+  ideaInput.type = 'text';
+  ideaInput.className = 'focus-side-input';
+  ideaInput.placeholder = 'Новая идея задачи — в общий список';
+  const ideaBtn = el('button', 'focus-side-btn', '+');
+  const addIdea = async () => {
+    const title = ideaInput.value.trim();
+    if (!title) return;
+    ideaBtn.disabled = true;
+    try {
+      const { task } = await api.createTask({ title });
+      if (task) state.tasks.push(task);
+      ideaInput.value = '';
+    } finally { ideaBtn.disabled = false; ideaInput.focus(); }
+  };
+  ideaBtn.addEventListener('click', addIdea);
+  ideaInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addIdea(); });
+  ideaRow.appendChild(ideaInput);
+  ideaRow.appendChild(ideaBtn);
+  wrap.appendChild(ideaRow);
+
+  const sideRow = el('div', 'focus-side-row');
+  const sideInput = el('input');
+  sideInput.type = 'text';
+  sideInput.className = 'focus-side-input';
+  sideInput.placeholder = 'Сделал попутно, не по фокусу';
+  const sideBtn = el('button', 'focus-side-btn', '+');
+  const addSide = async () => {
+    const text = sideInput.value.trim();
+    if (!text) return;
+    sideBtn.disabled = true;
+    try {
+      const { extraLogs } = await api.createExtraLog({ dateKey, text });
+      if (extraLogs) state.extraLogs = extraLogs;
+      sideInput.value = '';
+    } finally { sideBtn.disabled = false; sideInput.focus(); }
+  };
+  sideBtn.addEventListener('click', addSide);
+  sideInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addSide(); });
+  sideRow.appendChild(sideInput);
+  sideRow.appendChild(sideBtn);
+  wrap.appendChild(sideRow);
+
+  return wrap;
 }
 
 function renderFocusExecution(root, dateKey, dayData){
@@ -2882,6 +2953,7 @@ function renderFocusExecution(root, dateKey, dayData){
     const list = el('div', 'focus-history');
     for (const t of tasks) list.appendChild(el('div', 'focus-history-item', focusHistoryLine(t)));
     wrap.appendChild(list);
+    wrap.appendChild(buildFocusSideCapture(dateKey));
     const btn = el('button', 'focus-action-btn', 'Продолжить');
     btn.addEventListener('click', () => closeFocusLock());
     wrap.appendChild(btn);
@@ -2905,13 +2977,24 @@ function renderFocusExecution(root, dateKey, dayData){
   const timerEl = el('div', 'focus-timer');
   card.appendChild(timerEl);
 
+  const pausedInfoEl = el('div', 'focus-paused-info');
+  card.appendChild(pausedInfoEl);
+
+  const actionsRow = el('div', 'focus-actions-row');
+  const pauseBtn = el('button', 'focus-pause-btn');
   const actionBtn = el('button', 'focus-action-btn');
-  card.appendChild(actionBtn);
+  actionsRow.appendChild(pauseBtn);
+  actionsRow.appendChild(actionBtn);
+  card.appendChild(actionsRow);
+
+  card.appendChild(buildFocusSideCapture(dateKey));
 
   root.appendChild(card);
 
   function updateTimerDisplay(){
-    const elapsedMs = Date.now() - current.startedAt;
+    const pausedMs = current.pausedMs || 0;
+    const nowRef = current.status === 'paused' ? current.pausedAt : Date.now();
+    const elapsedMs = Math.max(0, nowRef - current.startedAt - pausedMs);
     const estMs = (current.estimatedMinutes || 0) * 60000;
     const overtime = current.estimatedMinutes ? elapsedMs > estMs : false;
     const baseMs = current.estimatedMinutes ? Math.abs(estMs - elapsedMs) : elapsedMs;
@@ -2919,34 +3002,83 @@ function renderFocusExecution(root, dateKey, dayData){
     const mm = Math.floor(totalSec / 60), ss = totalSec % 60;
     timerEl.textContent = (overtime ? '−' : '') + `${mm}:${String(ss).padStart(2, '0')}`;
     timerEl.classList.toggle('overtime', overtime);
+    const pausedMin = Math.round(pausedMs / 60000);
+    pausedInfoEl.textContent = pausedMin > 0 ? `На паузе: ${pausedMin} мин` : '';
+  }
+
+  async function finishTask(){
+    clearInterval(focusTimerInterval); focusTimerInterval = null;
+    const now = Date.now();
+    if (current.status === 'paused' && current.pausedAt){
+      current.pausedMs = (current.pausedMs || 0) + (now - current.pausedAt);
+      current.pausedAt = null;
+    }
+    current.completedAt = now;
+    current.actualMinutes = Math.max(1, Math.round((current.completedAt - current.startedAt - (current.pausedMs || 0)) / 60000));
+    current.pausedMinutes = Math.round((current.pausedMs || 0) / 60000);
+    current.status = 'done';
+    await api.updateFocusTask(dateKey, current.id, {
+      status: 'done',
+      completedAt: current.completedAt,
+      actualMinutes: current.actualMinutes,
+      pausedMinutes: current.pausedMinutes,
+      pausedMs: current.pausedMs,
+      pausedAt: null,
+    });
+    renderFocusExecution(root, dateKey, dayData);
   }
 
   function renderActive(){
     updateTimerDisplay();
     focusTimerInterval = setInterval(updateTimerDisplay, 1000);
+    timerEl.classList.remove('paused');
     actionBtn.textContent = 'Готово';
-    actionBtn.onclick = async () => {
+    actionBtn.onclick = finishTask;
+    pauseBtn.textContent = 'Пауза';
+    pauseBtn.style.display = '';
+    pauseBtn.onclick = async () => {
       clearInterval(focusTimerInterval); focusTimerInterval = null;
-      current.completedAt = Date.now();
-      current.actualMinutes = Math.max(1, Math.round((current.completedAt - current.startedAt) / 60000));
-      current.status = 'done';
-      await api.updateFocusTask(dateKey, current.id, { status: 'done', completedAt: current.completedAt, actualMinutes: current.actualMinutes });
-      renderFocusExecution(root, dateKey, dayData);
+      current.status = 'paused';
+      current.pausedAt = Date.now();
+      await api.updateFocusTask(dateKey, current.id, { status: 'paused', pausedAt: current.pausedAt });
+      renderPaused();
+    };
+  }
+
+  function renderPaused(){
+    updateTimerDisplay();
+    timerEl.classList.add('paused');
+    actionBtn.textContent = 'Готово';
+    actionBtn.onclick = finishTask;
+    pauseBtn.textContent = 'Продолжить';
+    pauseBtn.style.display = '';
+    pauseBtn.onclick = async () => {
+      const now = Date.now();
+      current.pausedMs = (current.pausedMs || 0) + (now - current.pausedAt);
+      current.pausedAt = null;
+      current.status = 'active';
+      await api.updateFocusTask(dateKey, current.id, { status: 'active', pausedAt: null, pausedMs: current.pausedMs });
+      renderActive();
     };
   }
 
   function renderIdle(){
+    timerEl.classList.remove('paused');
     timerEl.textContent = current.estimatedMinutes ? `${current.estimatedMinutes}:00` : '';
+    pausedInfoEl.textContent = '';
     actionBtn.textContent = 'Начать';
+    pauseBtn.style.display = 'none';
     actionBtn.onclick = async () => {
       current.status = 'active';
       current.startedAt = Date.now();
-      await api.updateFocusTask(dateKey, current.id, { status: 'active', startedAt: current.startedAt });
+      current.pausedMs = current.pausedMs || 0;
+      await api.updateFocusTask(dateKey, current.id, { status: 'active', startedAt: current.startedAt, pausedMs: current.pausedMs });
       renderActive();
     };
   }
 
   if (current.status === 'active' && current.startedAt) renderActive();
+  else if (current.status === 'paused' && current.startedAt) renderPaused();
   else renderIdle();
 }
 
