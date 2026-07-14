@@ -191,16 +191,20 @@ html, body {
 }
 
 .shot-frame {
-  position: relative; width: 100%; max-width: 980px; aspect-ratio: 16 / 10;
+  position: relative; width: 100%; max-width: min(980px, calc(min(58vh, 560px) * 1.6)); aspect-ratio: 16 / 10;
   max-height: min(58vh, 560px);
   margin-top: clamp(14px, 2.4vh, 26px); border-radius: 18px; overflow: hidden;
   border: 2px dashed var(--green-soft-border); background: var(--green-soft);
 }
+.shot-frame.has-photo {
+  border-style: solid; border-color: var(--border); background: var(--bg-card);
+}
 .shot-frame img.shot-real {
-  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
   opacity: 0; transition: opacity 0.35s ease;
 }
 .shot-frame img.shot-real.shot-loaded { opacity: 1; }
+.shot-frame.has-photo .shot-placeholder { display: none; }
 .shot-placeholder {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center; text-align: center; gap: clamp(4px,1vh,8px);
@@ -643,15 +647,15 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
   <p class="subtitle anim-2" style="font-size:15px;margin-bottom:4px;">39 лет · живу между Дубаем и Россией, сейчас — Таиланд, Хуахин · предприниматель и управленец с 20-летним опытом в бизнесе</p>
   <div class="about-media anim-3">
     <div class="shot-frame shot-mini" style="width:170px;aspect-ratio:1/1;max-height:170px;">
-      <img class="shot-real" alt="Фото Кирилла" src="assets/screenshots/screenshot-11-kirill-photo.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+      <img class="shot-real" alt="Фото Кирилла" src="assets/screenshots/screenshot-11-kirill-photo.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
       <div class="shot-placeholder"><div class="shot-desc">Фото Кирилла</div></div>
     </div>
     <div class="shot-frame shot-mini" style="width:120px;aspect-ratio:1/1;max-height:120px;">
-      <img class="shot-real" alt="Логотип Систематика" src="assets/screenshots/screenshot-15-logo-sistematika.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+      <img class="shot-real" alt="Логотип Систематика" src="assets/screenshots/screenshot-15-logo-sistematika.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
       <div class="shot-placeholder"><div class="shot-desc">Логотип<br>Систематика</div></div>
     </div>
     <div class="shot-frame shot-mini" style="width:120px;aspect-ratio:1/1;max-height:120px;">
-      <img class="shot-real" alt="Логотип Content Hunter" src="assets/screenshots/screenshot-14-logo-contenthunter.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+      <img class="shot-real" alt="Логотип Content Hunter" src="assets/screenshots/screenshot-14-logo-contenthunter.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
       <div class="shot-placeholder"><div class="shot-desc">Логотип<br>Content Hunter</div></div>
     </div>
   </div>
@@ -703,8 +707,8 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <!-- Слайд — Способ 2: специальные сервисы -->
 <div class="slide" data-slide="12">
   <h2 class="anim-2">Способ 2: <span class="highlight-blue">специальные сервисы</span></h2>
-  <div class="shot-frame anim-3" style="max-height:min(38vh,320px);">
-    <img class="shot-real" alt="Сервис трендовой аналитики" src="assets/screenshots/screenshot-16-trend-service.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+  <div class="shot-frame anim-3" style="max-height:min(38vh,320px);max-width:min(980px,calc(min(38vh,320px) * 1.6));">
+    <img class="shot-real" alt="Сервис трендовой аналитики" src="assets/screenshots/screenshot-16-trend-service.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
     <div class="shot-placeholder">
       <div class="shot-file">screenshot-16-trend-service.png</div>
       <div class="shot-size">1600×1000</div>
@@ -758,7 +762,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="16">
   <h2 class="anim-2">Разбор <span class="highlight-blue">конкурента</span></h2>
   <div class="shot-frame anim-3">
-    <img class="shot-real" alt="Профиль конкурента с топ-роликами" src="assets/screenshots/screenshot-01-competitor-analysis.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+    <img class="shot-real" alt="Профиль конкурента с топ-роликами" src="assets/screenshots/screenshot-01-competitor-analysis.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
     <div class="shot-placeholder">
       <div class="shot-file">screenshot-01-competitor-analysis.png</div>
       <div class="shot-size">1600×1000</div>
@@ -857,7 +861,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="23">
   <h2 class="anim-2">Мой пример <span class="highlight-blue">сценария</span></h2>
   <div class="shot-frame anim-3">
-    <img class="shot-real" alt="Текстовый сценарий рилса с разметкой блоков" src="assets/screenshots/screenshot-02-script-example.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+    <img class="shot-real" alt="Текстовый сценарий рилса с разметкой блоков" src="assets/screenshots/screenshot-02-script-example.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
     <div class="shot-placeholder">
       <div class="shot-file">screenshot-02-script-example.png</div>
       <div class="shot-size">1600×1000</div>
@@ -936,7 +940,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="30">
   <h2 class="anim-2">До <span class="highlight-orange">/</span> После <span class="highlight-blue">монтажа</span></h2>
   <div class="shot-frame anim-3">
-    <img class="shot-real" alt="Сравнение сырого и смонтированного видео" src="assets/screenshots/screenshot-03-editing-before-after.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+    <img class="shot-real" alt="Сравнение сырого и смонтированного видео" src="assets/screenshots/screenshot-03-editing-before-after.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
     <div class="shot-placeholder">
       <div class="shot-file">screenshot-03-editing-before-after.png</div>
       <div class="shot-size">1600×1000</div>
@@ -959,8 +963,8 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <!-- Слайд — Воронка 1: кодовое слово -->
 <div class="slide" data-slide="32">
   <h2 class="anim-2">Воронка 1: <span class="highlight-blue">кодовое слово</span></h2>
-  <div class="shot-frame anim-3" style="max-height:min(42vh,360px);">
-    <img class="shot-real" alt="QR-код с инструкцией" src="assets/screenshots/screenshot-08-funnel-bot.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+  <div class="shot-frame anim-3" style="max-height:min(42vh,360px);max-width:min(980px,calc(min(42vh,360px) * 1.6));">
+    <img class="shot-real" alt="QR-код с инструкцией" src="assets/screenshots/screenshot-08-funnel-bot.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
     <div class="shot-placeholder">
       <div class="shot-file">screenshot-08-funnel-bot.png</div>
       <div class="shot-size">1600×1000</div>
@@ -1170,7 +1174,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="49">
   <h2 class="anim-2">Мои аккаунты = <span class="highlight-blue">филиалы</span></h2>
   <div class="shot-frame anim-3">
-    <img class="shot-real" alt="Сетка аккаунтов моей фермы" src="assets/screenshots/screenshot-04-accounts-network.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+    <img class="shot-real" alt="Сетка аккаунтов моей фермы" src="assets/screenshots/screenshot-04-accounts-network.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
     <div class="shot-placeholder">
       <div class="shot-file">screenshot-04-accounts-network.png</div>
       <div class="shot-size">1600×1000</div>
@@ -1195,8 +1199,8 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
     <div class="chain-sep">&rarr;</div>
     <div class="chain-node bounce-4"><div class="chain-node-label">Моя сеть аккаунтов</div></div>
   </div>
-  <div class="shot-frame anim-4" style="max-height:min(34vh,280px);margin-top:16px;">
-    <img class="shot-real" alt="Процесс уникализации моего ролика" src="assets/screenshots/screenshot-05-uniqualization-example.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+  <div class="shot-frame anim-4" style="max-height:min(34vh,280px);margin-top:16px;max-width:min(980px,calc(min(34vh,280px) * 1.6));">
+    <img class="shot-real" alt="Процесс уникализации моего ролика" src="assets/screenshots/screenshot-05-uniqualization-example.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
     <div class="shot-placeholder">
       <div class="shot-file">screenshot-05-uniqualization-example.png</div>
       <div class="shot-size">1600×1000</div>
@@ -1222,8 +1226,8 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <!-- Слайд — Уникализация способ 2: сервисы и боты -->
 <div class="slide" data-slide="52">
   <h2 class="anim-2">Способ 2: <span class="highlight-blue">сервисы и боты</span></h2>
-  <div class="shot-frame anim-3" style="max-height:min(38vh,320px);">
-    <img class="shot-real" alt="Сервис уникализации видео" src="assets/screenshots/screenshot-17-uniqualization-service.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+  <div class="shot-frame anim-3" style="max-height:min(38vh,320px);max-width:min(980px,calc(min(38vh,320px) * 1.6));">
+    <img class="shot-real" alt="Сервис уникализации видео" src="assets/screenshots/screenshot-17-uniqualization-service.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
     <div class="shot-placeholder">
       <div class="shot-file">screenshot-17-uniqualization-service.png</div>
       <div class="shot-size">1600×1000</div>
@@ -1241,7 +1245,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="53">
   <h2 class="anim-2">Способ 3: <span class="highlight-blue">наша платформа</span></h2>
   <div class="shot-frame anim-3">
-    <img class="shot-real" alt="Уникализация на платформе Content Hunter" src="assets/screenshots/screenshot-05-uniqualization-example.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+    <img class="shot-real" alt="Уникализация на платформе Content Hunter" src="assets/screenshots/screenshot-05-uniqualization-example.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
     <div class="shot-placeholder">
       <div class="shot-file">screenshot-05-uniqualization-example.png</div>
       <div class="shot-size">1600×1000</div>
@@ -1333,7 +1337,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="60">
   <h2 class="anim-2">Как я выкладываю <span class="highlight-blue">ролики</span></h2>
   <div class="shot-frame anim-3">
-    <img class="shot-real" alt="Интерфейс платформы с журналом публикаций" src="assets/screenshots/screenshot-06-platform-upload.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+    <img class="shot-real" alt="Интерфейс платформы с журналом публикаций" src="assets/screenshots/screenshot-06-platform-upload.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
     <div class="shot-placeholder">
       <div class="shot-file">screenshot-06-platform-upload.png</div>
       <div class="shot-size">1600×1000</div>
@@ -1355,8 +1359,8 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
     <div class="case-stat"><div class="case-stat-label">Заявки</div><div class="case-stat-val">С 6 до 210 заявок в месяц</div></div>
     <div class="case-stat"><div class="case-stat-label">Форматы роликов</div><div class="case-stat-val">Личные истории, разборы кейсов, ответы на вопросы</div></div>
   </div>
-  <div class="shot-frame anim-4" style="max-height:min(30vh,240px);">
-    <img class="shot-real" alt="Дашборд моей личной аналитики" src="assets/screenshots/screenshot-09-my-case-dashboard.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+  <div class="shot-frame anim-4" style="max-height:min(30vh,240px);max-width:min(980px,calc(min(30vh,240px) * 1.6));">
+    <img class="shot-real" alt="Дашборд моей личной аналитики" src="assets/screenshots/screenshot-09-my-case-dashboard.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
     <div class="shot-placeholder">
       <div class="shot-file">screenshot-09-my-case-dashboard.png</div>
       <div class="shot-size">1600×1000</div>
@@ -1469,7 +1473,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="69">
   <h2 class="anim-2">Платформа для <span class="highlight-blue">управления фермой</span></h2>
   <div class="shot-frame anim-3">
-    <img class="shot-real" alt="Платформа управления фермой" src="assets/screenshots/screenshot-10-farm-platform.png" onload="this.classList.add('shot-loaded')" onerror="this.remove()">
+    <img class="shot-real" alt="Платформа управления фермой" src="assets/screenshots/screenshot-10-farm-platform.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
     <div class="shot-placeholder">
       <div class="shot-file">screenshot-10-farm-platform.png</div>
       <div class="shot-size">1600×1000</div>
