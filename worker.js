@@ -192,6 +192,9 @@ async function mlSetFocusDay(env, body) {
       startedAt: null,
       completedAt: null,
       actualMinutes: null,
+      pausedAt: null,
+      pausedMs: 0,
+      pausedMinutes: null,
     }))
     .filter(t => t.name);
   if (!tasks.length) return jsonResponse({ error: 'at least one task required' }, 400);
@@ -210,7 +213,7 @@ async function mlUpdateFocusTask(env, dateKey, body) {
   if (!task) return jsonResponse({ error: 'not found' }, 404);
 
   const patch = body.patch || {};
-  const fields = ['status', 'startedAt', 'completedAt', 'actualMinutes'];
+  const fields = ['status', 'startedAt', 'completedAt', 'actualMinutes', 'pausedAt', 'pausedMs', 'pausedMinutes'];
   for (const f of fields) {
     if (patch[f] !== undefined) task[f] = patch[f];
   }
