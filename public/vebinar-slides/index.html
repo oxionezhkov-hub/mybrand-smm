@@ -191,13 +191,15 @@ html, body {
 }
 
 .shot-frame {
-  position: relative; width: 100%; max-width: min(980px, calc(min(58vh, 560px) * 1.6)); aspect-ratio: 16 / 10;
-  max-height: min(58vh, 560px);
-  margin-top: clamp(14px, 2.4vh, 26px); border-radius: 18px; overflow: hidden;
+  position: relative; width: 100%; max-width: min(1180px, calc(min(68vh, 660px) * 1.6)); aspect-ratio: 16 / 10;
+  max-height: min(68vh, 660px);
+  margin-top: clamp(14px, 2.4vh, 26px); border-radius: 20px; overflow: hidden;
   border: 2px dashed var(--green-soft-border); background: var(--green-soft);
+  box-shadow: 0 18px 60px rgba(17,24,39,0.10);
 }
 .shot-frame.has-photo {
-  border-style: solid; border-color: var(--border); background: var(--bg-card);
+  border-style: solid; border-width: 3px; border-color: var(--bg-card); background: var(--bg-card);
+  box-shadow: 0 22px 70px rgba(17,24,39,0.16), 0 0 0 1px var(--border);
 }
 .shot-frame img.shot-real {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
@@ -254,6 +256,32 @@ html, body {
 .facts-list li .facts-dot { color: var(--accent-blue); font-weight: 800; flex-shrink: 0; }
 
 .about-media { display: flex; align-items: center; justify-content: center; gap: clamp(12px,1.6vw,20px); flex-wrap: wrap; margin-top: clamp(6px,1.4vh,14px); margin-bottom: clamp(6px,1.4vh,14px); }
+
+.about-layout { display: flex; align-items: center; justify-content: center; gap: clamp(28px,4vw,56px); width: 100%; max-width: 1100px; margin-top: clamp(16px,2.4vh,28px); flex-wrap: wrap; }
+.about-layout .about-list-col { flex: 1 1 340px; max-width: 460px; }
+.about-layout .about-list-col .facts-list { max-width: none; }
+.about-photo-col { display: flex; flex-direction: column; align-items: center; gap: clamp(10px,1.4vh,16px); flex-shrink: 0; }
+.about-photo-col .shot-frame { margin-top: 0; }
+.about-photo-logos { display: flex; align-items: center; justify-content: center; gap: clamp(10px,1.2vw,16px); }
+@media (max-width: 900px) { .about-layout { flex-direction: column-reverse; } }
+
+/* ====== Emotional accents (red) ====== */
+.glow-red { background: var(--accent-red) !important; }
+.cb-wrap.accent-red .cb-keyquote { border-left-color: var(--accent-red) !important; color: var(--accent-red) !important; }
+.pill-red { background: rgba(220,38,38,0.08) !important; color: var(--accent-red) !important; border-color: rgba(220,38,38,0.28) !important; }
+.card-v2.glow-red { border-color: rgba(220,38,38,0.24) !important; }
+.card-v2.glow-red:hover { border-color: rgba(220,38,38,0.45) !important; box-shadow: 0 10px 40px rgba(220,38,38,0.10) !important; }
+.card-v2.glow-red .card-title { color: var(--accent-red) !important; }
+
+/* ====== Countdown timer ====== */
+.countdown { display: flex; gap: clamp(10px,1.4vw,18px); margin-top: clamp(14px,2vh,22px); justify-content: center; }
+.countdown-unit {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-width: clamp(58px,6vw,84px); padding: clamp(8px,1.2vh,14px) clamp(6px,1vw,10px);
+  background: rgba(220,38,38,0.06); border: 1.5px solid rgba(220,38,38,0.28); border-radius: 14px;
+}
+.countdown-val { font-family: var(--font-mono); font-size: clamp(22px,2.6vw,36px); font-weight: 800; color: var(--accent-red); line-height: 1; font-variant-numeric: tabular-nums; }
+.countdown-label { font-size: clamp(10px,0.9vw,12px); color: var(--text-dim); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
 
 .case-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: clamp(10px,1.4vw,18px); width: 100%; max-width: 900px; margin-top: clamp(16px,2.2vh,26px); }
 .case-stat { padding: clamp(12px,1.6vh,18px) clamp(14px,1.6vw,20px); }
@@ -552,34 +580,31 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 
 <!-- Слайд — Боль 1/4 -->
 <div class="slide" data-slide="1">
-  <div class="cb-wrap anim-3">
+  <div class="glow-blob glow-red" style="top:20%;left:10%;"></div>
+  <div class="cb-wrap accent-red anim-3">
     <blockquote class="cb-keyquote anim-2">Ведёте контент, платите смм-щику — а лидов вроде нет</blockquote>
-    <p class="cb-detail anim-3">Публикации выходят по плану, страница выглядит красиво — а посчитать, сколько из этого превратилось в деньги, не получается.</p>
-    <p class="cb-detail anim-4">Контент как будто есть, а монетизировать его не выходит.</p>
   </div>
   <script type="application/json" class="slide-notes">
-  {"title":"Боль 1: контент есть, а лидов и монетизации нет","script":"Знакомо? Ведёте контент, платите смм-щику, публикации выходят регулярно — а лидов вроде нет, и монетизировать это не получается.","notes":["Контент ведётся регулярно, но не считается в деньгах","Смм-специалист не даёт измеримого результата"]}
+  {"title":"Боль 1: контент есть, а лидов и монетизации нет","script":"Знакомо? Ведёте контент, платите смм-щику, публикации выходят регулярно — а лидов вроде нет, и монетизировать это не получается. Контент как будто есть, а посчитать, сколько из этого превратилось в деньги, не получается.","notes":["Контент ведётся регулярно, но не считается в деньгах","Смм-специалист не даёт измеримого результата"]}
   </script>
 </div>
 
 <!-- Слайд — Боль 2/4 -->
 <div class="slide" data-slide="2">
-  <div class="cb-wrap anim-3">
+  <div class="glow-blob glow-red" style="top:30%;right:5%;"></div>
+  <div class="cb-wrap accent-red anim-3">
     <blockquote class="cb-keyquote anim-2">Только таргет и работает</blockquote>
-    <p class="cb-detail anim-3">Реклама даёт результат, а органика — нет. Непонятно, как вообще управлять контентом: что снимать, зачем и когда.</p>
-    <p class="cb-detail anim-4">Всё держится на нестабильном ручье трафика, который в любой момент может подорожать или отключиться.</p>
   </div>
   <script type="application/json" class="slide-notes">
-  {"title":"Боль 2: только таргет работает","script":"Только таргет и работает. Непонятно, как управлять контентом — всё нестабильно и держится на рекламном бюджете.","notes":["Органика не даёт результата, только платный трафик","Непонятно, как системно управлять контентом"]}
+  {"title":"Боль 2: только таргет работает","script":"Только таргет и работает. Непонятно, как управлять контентом — всё нестабильно и держится на рекламном бюджете, который в любой момент может подорожать или отключиться.","notes":["Органика не даёт результата, только платный трафик","Непонятно, как системно управлять контентом"]}
   </script>
 </div>
 
 <!-- Слайд — Боль 3/4 -->
 <div class="slide" data-slide="3">
-  <div class="cb-wrap anim-3">
+  <div class="glow-blob glow-red" style="bottom:15%;left:8%;"></div>
+  <div class="cb-wrap accent-red anim-3">
     <blockquote class="cb-keyquote anim-2">Кажется, что у конкурентов всё лучше</blockquote>
-    <p class="cb-detail anim-3">У них охваты, у них комментарии, у них будто бы всё получается само собой.</p>
-    <p class="cb-detail anim-4">А ты смотришь на свою страницу и не понимаешь, что делаешь не так.</p>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Боль 3: кажется, что у конкурентов всё лучше","script":"Кажется, что у конкурентов всё лучше — охваты, вовлечённость, рост. А у себя не понимаешь, в чём проблема.","notes":["Ощущение, что у конкурентов всё получается легче"]}
@@ -588,13 +613,12 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 
 <!-- Слайд — Боль 4/4 -->
 <div class="slide" data-slide="4">
-  <div class="cb-wrap anim-3">
+  <div class="glow-blob glow-red" style="top:25%;left:50%;transform:translate(-50%,-50%);"></div>
+  <div class="cb-wrap accent-red anim-3">
     <blockquote class="cb-keyquote anim-2">Вроде всё делаете — но не получается</blockquote>
-    <p class="cb-detail anim-3">Снимаете, публикуете, стараетесь по всем правилам — а результата, которого ждали, всё нет.</p>
-    <p class="cb-detail anim-4">Дальше расскажу, в чём на самом деле разница.</p>
   </div>
   <script type="application/json" class="slide-notes">
-  {"title":"Боль 4: вроде всё делаете, но не получается","script":"Вроде всё делаете правильно — а не получается. Дальше расскажу, в чём разница на самом деле.","notes":["Все формальные действия выполнены, а результата нет"]}
+  {"title":"Боль 4: вроде всё делаете, но не получается","script":"Вроде всё делаете правильно — снимаете, публикуете, стараетесь по всем правилам — а результата, которого ждали, всё нет. Дальше расскажу, в чём разница на самом деле.","notes":["Все формальные действия выполнены, а результата нет"]}
   </script>
 </div>
 
@@ -618,7 +642,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
     <li><span class="facts-dot">—</span><span>Ваш продукт не привязан к гео</span></li>
     <li><span class="facts-dot">—</span><span>У вас уже есть рилсы</span></li>
   </ul>
-  <p class="cb-detail anim-4" style="color:var(--accent-red);font-weight:700;text-align:center;max-width:760px;margin-top:24px;">Но если контента нет или у вас локальный бизнес — вам этот вебинар не поможет, можете его не смотреть.</p>
+  <span class="pill pill-red anim-4" style="margin-top:24px;">Нет контента или локальный бизнес? Вебинар не для вас</span>
   <script type="application/json" class="slide-notes">
   {"title":"Кому поможет этот вебинар","script":"Этот вебинар поможет, если продукт массовый и разрешённый, не привязан к гео и у вас уже есть рилсы. Если контента нет или бизнес локальный — вебинар вам не поможет, можно не смотреть дальше.","notes":["Подходит: массовый разрешённый продукт, не привязан к гео, есть рилсы","Не подходит: нет контента или локальный бизнес"]}
   </script>
@@ -644,29 +668,35 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <!-- Слайд — Обо мне -->
 <div class="slide" data-slide="8">
   <h2 class="anim-2">Кирилл <span class="highlight-blue">Попов</span></h2>
-  <p class="subtitle anim-2" style="font-size:15px;margin-bottom:4px;">39 лет · живу между Дубаем и Россией, сейчас — Таиланд, Хуахин · предприниматель и управленец с 20-летним опытом в бизнесе</p>
-  <div class="about-media anim-3">
-    <div class="shot-frame shot-mini" style="width:170px;aspect-ratio:1/1;max-height:170px;">
-      <img class="shot-real" alt="Фото Кирилла" src="assets/screenshots/screenshot-11-kirill-photo.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
-      <div class="shot-placeholder"><div class="shot-desc">Фото Кирилла</div></div>
+  <p class="subtitle anim-2" style="font-size:15px;margin-bottom:4px;">39 лет · Дубай / Таиланд · 20 лет в бизнесе</p>
+  <div class="about-layout anim-3">
+    <div class="about-list-col">
+      <ul class="facts-list">
+        <li><span class="facts-dot">—</span><span>CEO проектов от 1 млрд ₽/год, есть экзиты</span></li>
+        <li><span class="facts-dot">—</span><span>Coffee Like, Laser Pro, Lifehacker Coffee</span></li>
+        <li><span class="facts-dot">—</span><span>22 проекта: 10 закрыл, 8 работают, 4 продал</span></li>
+        <li><span class="facts-dot">—</span><span>Систематика — AI-навигатор для бизнеса</span></li>
+        <li><span class="facts-dot">—</span><span>Content Hunter — контент-ферма в аренду</span></li>
+        <li><span class="facts-dot">—</span><span>Telegram: t.me/baristasss</span></li>
+      </ul>
     </div>
-    <div class="shot-frame shot-mini" style="width:120px;aspect-ratio:1/1;max-height:120px;">
-      <img class="shot-real" alt="Логотип Систематика" src="assets/screenshots/screenshot-15-logo-sistematika.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
-      <div class="shot-placeholder"><div class="shot-desc">Логотип<br>Систематика</div></div>
-    </div>
-    <div class="shot-frame shot-mini" style="width:120px;aspect-ratio:1/1;max-height:120px;">
-      <img class="shot-real" alt="Логотип Content Hunter" src="assets/screenshots/screenshot-14-logo-contenthunter.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
-      <div class="shot-placeholder"><div class="shot-desc">Логотип<br>Content Hunter</div></div>
+    <div class="about-photo-col">
+      <div class="shot-frame" style="width:min(30vw,300px);aspect-ratio:1/1;max-height:min(30vw,300px);">
+        <img class="shot-real" alt="Фото Кирилла" src="assets/screenshots/screenshot-11-kirill-photo.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
+        <div class="shot-placeholder"><div class="shot-desc">Фото Кирилла</div></div>
+      </div>
+      <div class="about-photo-logos">
+        <div class="shot-frame shot-mini" style="width:110px;aspect-ratio:1/1;max-height:110px;">
+          <img class="shot-real" alt="Логотип Систематика" src="assets/screenshots/screenshot-15-logo-sistematika.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
+          <div class="shot-placeholder"><div class="shot-desc">Логотип<br>Систематика</div></div>
+        </div>
+        <div class="shot-frame shot-mini" style="width:110px;aspect-ratio:1/1;max-height:110px;">
+          <img class="shot-real" alt="Логотип Content Hunter" src="assets/screenshots/screenshot-14-logo-contenthunter.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
+          <div class="shot-placeholder"><div class="shot-desc">Логотип<br>Content Hunter</div></div>
+        </div>
+      </div>
     </div>
   </div>
-  <ul class="facts-list anim-4">
-    <li><span class="facts-dot">—</span><span>CEO проектов с выручкой от 1 млрд ₽ в год и экзитами</span></li>
-    <li><span class="facts-dot">—</span><span>Ключевые: Coffee Like, Laser Pro, Lifehacker Coffee</span></li>
-    <li><span class="facts-dot">—</span><span>Из 22 проектов: 10 закрыл, 8 работают, 4 продал</span></li>
-    <li><span class="facts-dot">—</span><span>Систематика — AI бизнес-навигатор для собственников</span></li>
-    <li><span class="facts-dot">—</span><span>Content Hunter — контент-ферма в аренду</span></li>
-    <li><span class="facts-dot">—</span><span>Telegram: t.me/baristasss — «Дело не в кофе»</span></li>
-  </ul>
   <script type="application/json" class="slide-notes">
   {"title":"Кто ведёт вебинар","script":"Пару слов о себе. Мне 39, живу между Дубаем и Россией, сейчас — Таиланд. Предприниматель с 20-летним опытом, CEO проектов с выручкой от миллиарда рублей в год. Сейчас развиваю Систематику — AI бизнес-навигатор — и Content Hunter, контент-ферму в аренду, о которой сегодня и поговорим.","notes":["39 лет, 20 лет опыта в бизнесе","CEO проектов с выручкой от 1 млрд ₽, есть экзиты","Из 22 проектов: 10 закрыл, 8 работают, 4 продал","Сейчас — Систематика (AI бизнес-навигатор) и Content Hunter (контент-ферма в аренду)"]}
   </script>
@@ -684,8 +714,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="10">
   <div class="glow-blob glow-blue" style="top:40%;left:50%;transform:translate(-50%,-50%);"></div>
   <div class="cb-wrap anim-3">
-    <blockquote class="cb-keyquote anim-2">Без тренда даже хороший ролик не наберёт охват.</blockquote>
-    <p class="cb-detail anim-3">Алгоритм любит то, что уже «заходит» у аудитории прямо сейчас. Он не оценивает качество съёмки — он оценивает, досматривают ли ролик, комментируют ли, пересылают ли. А это чаще случается с темами, которые уже в тренде.</p>
+    <blockquote class="cb-keyquote anim-2">Без тренда даже хороший ролик не наберёт охват</blockquote>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Почему трендвотчинг — первый шаг","script":"Алгоритм не оценивает, насколько красиво снят ролик — он оценивает поведение зрителей: досмотры, комментарии, репосты. А это чаще случается с темами, которые уже резонируют с аудиторией.","notes":["Алгоритм продвигает то, что уже вовлекает аудиторию","Даже качественный контент без тренда не наберёт охват","Тема первична, съёмка вторична"]}
@@ -695,10 +724,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <!-- Слайд — Способ 1: ИИ-промпт и скиллы -->
 <div class="slide" data-slide="11">
   <h2 class="anim-2">Способ 1: <span class="highlight-blue">ИИ-промпт и скиллы</span></h2>
-  <div class="cb-wrap anim-3" style="text-align:center;align-items:center;">
-    <p class="cb-body anim-3" style="text-align:center;">Использую ИИ с промптами и скиллами для трендвотчинга — прошу проанализировать топовые ролики в нише и выделить закономерности.</p>
-    <p class="cb-body anim-4" style="text-align:center;">Это экономит часы ручного анализа и сразу даёт готовые гипотезы для сценария.</p>
-  </div>
+  <p class="subtitle anim-3">ИИ анализирует топовые ролики в нише и выделяет закономерности</p>
   <script type="application/json" class="slide-notes">
   {"title":"Способ 1: ИИ-промпт и скиллы","script":"Первый способ — использую ИИ с промптами и скиллами для трендвотчинга. Прошу проанализировать топовые ролики в нише и выделить закономерности.","notes":["ИИ-промпты и скиллы для анализа трендов","Экономит часы ручного анализа"]}
   </script>
@@ -707,7 +733,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <!-- Слайд — Способ 2: специальные сервисы -->
 <div class="slide" data-slide="12">
   <h2 class="anim-2">Способ 2: <span class="highlight-blue">специальные сервисы</span></h2>
-  <div class="shot-frame anim-3" style="max-height:min(38vh,320px);max-width:min(980px,calc(min(38vh,320px) * 1.6));">
+  <div class="shot-frame anim-3" style="max-height:min(44vh,380px);max-width:min(1180px,calc(min(44vh,380px) * 1.6));">
     <img class="shot-real" alt="Сервис трендовой аналитики" src="assets/screenshots/screenshot-16-trend-service.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
     <div class="shot-placeholder">
       <div class="shot-file">screenshot-16-trend-service.png</div>
@@ -725,10 +751,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <!-- Слайд — Способ 3: ручной метод -->
 <div class="slide" data-slide="13">
   <h2 class="anim-2">Способ 3: <span class="highlight-blue">ручной метод</span></h2>
-  <div class="cb-wrap anim-3" style="text-align:center;align-items:center;">
-    <p class="cb-body anim-3" style="text-align:center;">Раз в неделю смотрю топ-аккаунты в своей нише и отмечаю, что стабильно набирает охваты.</p>
-    <p class="cb-body anim-4" style="text-align:center;">Слежу за 5–10 конкурентами постоянно — это даёт понимание, какие темы «в моменте».</p>
-  </div>
+  <p class="subtitle anim-3">Раз в неделю смотрю топ-аккаунты в нише и слежу за 5–10 конкурентами</p>
   <script type="application/json" class="slide-notes">
   {"title":"Способ 3: ручной метод","script":"Третий способ — вручную слежу за конкурентами в нише. Раз в неделю смотрю топ-аккаунты и отмечаю, что стабильно набирает охваты.","notes":["Ручной мониторинг 5-10 конкурентов в нише","Раз в неделю — просмотр топ-аккаунтов"]}
   </script>
@@ -738,7 +761,6 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="14">
   <div class="cb-wrap anim-3">
     <blockquote class="cb-keyquote anim-2">Не бойтесь снимать — просто берите и делайте</blockquote>
-    <p class="cb-detail anim-3">Не нужно оценивать заранее, «сработает» тема или нет, по тому, что зашло у всех остальных. Берём и делаем — а дальше уже смотрим на результат.</p>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Рекомендация: не бояться снимать","script":"Не бойтесь снимать какие-то ролики и не пытайтесь заранее оценить, сработает тема или нет. Берём и делаем.","notes":["Не оценивать заранее — тестировать на практике","Берём и делаем"]}
@@ -787,7 +809,6 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="18">
   <div class="cb-wrap">
     <blockquote class="cb-keyquote anim-2">Хук — первые 0–3 секунды</blockquote>
-    <p class="cb-detail anim-3">Без сильного хука в первые три секунды всё остальное просто не досмотрят.</p>
     <div class="cb-pair anim-4">
       <div class="cb-card problem bounce-1"><div class="cb-card-label problem-label">Плохо</div><p class="cb-card-text">«Сегодня хочу рассказать о маркетинге»</p></div>
       <div class="cb-card fix bounce-2"><div class="cb-card-label fix-label">Хорошо</div><p class="cb-card-text">«Я потратил 3000 долларов на рекламу и получил 2 лида — вот что сделал вместо этого»</p></div>
@@ -802,7 +823,6 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="19">
   <div class="cb-wrap">
     <blockquote class="cb-keyquote anim-2">Конфликт — обозначаем проблему</blockquote>
-    <p class="cb-detail anim-3">Зритель должен узнать в этой проблеме себя — тогда он остаётся смотреть дальше.</p>
     <div class="cb-pair anim-4">
       <div class="cb-card problem bounce-1"><div class="cb-card-label problem-label">Плохо</div><p class="cb-card-text">«У всех разные проблемы с продвижением»</p></div>
       <div class="cb-card fix bounce-2"><div class="cb-card-label fix-label">Хорошо</div><p class="cb-card-text">«Ты снимаешь ролик за роликом, а просмотров всё те же 300»</p></div>
@@ -817,7 +837,6 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="20">
   <div class="cb-wrap">
     <blockquote class="cb-keyquote anim-2">Решение — суть, которую вы даёте</blockquote>
-    <p class="cb-detail anim-3">Конкретная польза, а не общие слова — то, ради чего ролик вообще досматривают.</p>
     <div class="cb-pair anim-4">
       <div class="cb-card problem bounce-1"><div class="cb-card-label problem-label">Плохо</div><p class="cb-card-text">«Просто нужно делать хороший контент»</p></div>
       <div class="cb-card fix bounce-2"><div class="cb-card-label fix-label">Хорошо</div><p class="cb-card-text">«Я публикую один и тот же ролик на 50 аккаунтов — и получаю 500 000 просмотров»</p></div>
@@ -832,7 +851,6 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="21">
   <div class="cb-wrap">
     <blockquote class="cb-keyquote anim-2">Призыв — что сделать зрителю дальше</blockquote>
-    <p class="cb-detail anim-3">Комментарий, переход в профиль, кодовое слово — любое чёткое действие.</p>
     <div class="cb-pair anim-4">
       <div class="cb-card problem bounce-1"><div class="cb-card-label problem-label">Плохо</div><p class="cb-card-text">«Подписывайтесь, если понравилось»</p></div>
       <div class="cb-card fix bounce-2"><div class="cb-card-label fix-label">Хорошо</div><p class="cb-card-text">«Напиши слово ФЕРМА в комментариях — пришлю подробный гайд»</p></div>
@@ -843,17 +861,17 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
   </script>
 </div>
 
-<!-- Слайд — Примеры хуков -->
+<!-- Слайд — Примеры сценариев -->
 <div class="slide" data-slide="22">
-  <h2 class="anim-2">Примеры <span class="highlight-blue">хуков</span></h2>
+  <h2 class="anim-2">Примеры <span class="highlight-blue">сценариев</span></h2>
   <div class="grid-3 anim-3">
-    <div class="card-v2 glow-blue bounce-1"><div class="card-desc" style="font-size:clamp(15px,1.4vw,18px);color:var(--text);">«Я потратил 3000 долларов на рекламу и получил 2 лида. Вот что сделал вместо этого»</div></div>
-    <div class="card-v2 glow-blue bounce-2"><div class="card-desc" style="font-size:clamp(15px,1.4vw,18px);color:var(--text);">«Никогда не покупайте недвижимость в Дубае, пока не увидите это»</div></div>
-    <div class="card-v2 glow-blue bounce-3"><div class="card-desc" style="font-size:clamp(15px,1.4vw,18px);color:var(--text);">«90% основателей SaaS не знают этой метрики»</div></div>
+    <div class="card-v2 glow-blue bounce-1"><div class="card-title">Провал с рекламой</div><div class="card-desc">3000$ бюджета и 2 лида → что сделал вместо этого</div></div>
+    <div class="card-v2 glow-blue bounce-2"><div class="card-title">Правда про Дубай</div><div class="card-desc">Что скрывают при продаже недвижимости</div></div>
+    <div class="card-v2 glow-blue bounce-3"><div class="card-title">Слепая метрика</div><div class="card-desc">Что не считают 90% основателей SaaS</div></div>
   </div>
-  <p class="subtitle anim-4 mt-24" style="font-size:16px;">Хук должен обещать конкретную пользу или интригу — а не быть общими словами</p>
+  <p class="subtitle anim-4 mt-24" style="font-size:16px;">Каждый — по структуре: хук → конфликт → решение → призыв</p>
   <script type="application/json" class="slide-notes">
-  {"title":"Примеры хуков","script":"Вот примеры хуков под разные ниши — заметьте, каждый обещает конкретную пользу или интригу, а не общую фразу типа «сегодня расскажу интересное».","notes":["Хук про рекламный бюджет и лиды","Хук про недвижимость в Дубае","Хук про метрику для SaaS-основателей","Общее правило: конкретика вместо общих фраз"]}
+  {"title":"Примеры сценариев","script":"Вот три готовых сценария под разные ниши, каждый выстроен по нашей структуре: хук, конфликт, решение, призыв. Разберу вживую, как это звучит от начала до конца.","notes":["Сценарий про провал с рекламным бюджетом","Сценарий про недвижимость в Дубае","Сценарий про слепую метрику SaaS-основателей","Все три — по структуре хук/конфликт/решение/CTA"]}
   </script>
 </div>
 
@@ -885,7 +903,6 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="25">
   <div class="cb-wrap anim-3">
     <blockquote class="cb-keyquote anim-2">Съёмка — 0 рублей, просто на телефон</blockquote>
-    <p class="cb-detail anim-3">Нативность и простота выигрывают у продакшена. Максимально просто и естественно снять видео, наложить субтитры, картинки, музыку.</p>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Съёмка на телефон — 0 рублей","script":"Съёмка стоит 0 рублей — просто телефон. Нативность и простота выигрывают у продакшена: снимаем просто и естественно, накладываем субтитры, картинки, музыку.","notes":["Съёмка на телефон, без затрат","Нативность выигрывает у продакшена"]}
@@ -896,7 +913,6 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="26">
   <div class="cb-wrap anim-3">
     <blockquote class="cb-keyquote anim-2">Чем короче — тем лучше, до 30 секунд</blockquote>
-    <p class="cb-detail anim-3">Чем выше процент досмотра ролика, тем лучше алгоритм его продвигает. Короткое видео легче досмотреть до конца — отсюда и высокий процент.</p>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Длина ролика — до 30 секунд","script":"По продолжительности — чем короче, тем лучше, до 30 секунд. Потому что чем выше процент досмотра, тем лучше продвижение.","notes":["До 30 секунд по длине","Процент досмотра важнее абсолютной длины"]}
@@ -906,8 +922,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <!-- Слайд — Динамика -->
 <div class="slide" data-slide="27">
   <div class="cb-wrap anim-3">
-    <blockquote class="cb-keyquote anim-2">Динамика</blockquote>
-    <p class="cb-detail anim-3">Смена планов и кадров каждые 2–4 секунды — глаз не устаёт, внимание не рассеивается.</p>
+    <blockquote class="cb-keyquote anim-2">Динамика — смена планов каждые 2–4 секунды</blockquote>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Что влияет на удержание: Динамика","script":"Первое — динамика. Смена планов и кадров каждые 2-4 секунды не даёт глазу устать.","notes":["Смена планов каждые 2-4 секунды"]}
@@ -917,8 +932,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <!-- Слайд — Субтитры -->
 <div class="slide" data-slide="28">
   <div class="cb-wrap anim-3">
-    <blockquote class="cb-keyquote anim-2">Субтитры</blockquote>
-    <p class="cb-detail anim-3">Обязательно — большинство смотрит без звука, и без субтитров половина сути теряется.</p>
+    <blockquote class="cb-keyquote anim-2">Субтитры — обязательно</blockquote>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Что влияет на удержание: Субтитры","script":"Второе — субтитры. Обязательны, потому что большинство смотрит без звука.","notes":["Субтитры обязательны — большинство смотрит без звука"]}
@@ -928,8 +942,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <!-- Слайд — Следование сценарию -->
 <div class="slide" data-slide="29">
   <div class="cb-wrap anim-3">
-    <blockquote class="cb-keyquote anim-2">Следование сценарию</blockquote>
-    <p class="cb-detail anim-3">Не отклоняться от структуры хук → конфликт → решение → призыв — это решает удержание больше, чем техника съёмки.</p>
+    <blockquote class="cb-keyquote anim-2">Следование сценарию без отклонений</blockquote>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Что влияет на удержание: Следование сценарию","script":"Третье — дисциплина по структуре сценария. Это решает удержание больше, чем техника съёмки.","notes":["Держаться структуры сценария без отклонений","Техника съёмки вторична"]}
@@ -963,7 +976,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <!-- Слайд — Воронка 1: кодовое слово -->
 <div class="slide" data-slide="32">
   <h2 class="anim-2">Воронка 1: <span class="highlight-blue">кодовое слово</span></h2>
-  <div class="shot-frame anim-3" style="max-height:min(42vh,360px);max-width:min(980px,calc(min(42vh,360px) * 1.6));">
+  <div class="shot-frame anim-3" style="max-height:min(48vh,420px);max-width:min(1180px,calc(min(48vh,420px) * 1.6));">
     <img class="shot-real" alt="QR-код с инструкцией" src="assets/screenshots/screenshot-08-funnel-bot.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
     <div class="shot-placeholder">
       <div class="shot-file">screenshot-08-funnel-bot.png</div>
@@ -980,8 +993,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <!-- Слайд — Воронка 2: ссылка в шапке -->
 <div class="slide" data-slide="33">
   <div class="cb-wrap anim-3">
-    <blockquote class="cb-keyquote anim-2">Воронка 2: призыв «переходите по ссылке в шапке»</blockquote>
-    <p class="cb-detail anim-3">В конце ролика — прямой призыв перейти в шапку профиля, где ссылка на бота, сайт или канал.</p>
+    <blockquote class="cb-keyquote anim-2">Воронка 2: «переходите по ссылке в шапке»</blockquote>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Воронка 2: ссылка в шапке","script":"Второй тип воронки — призыв в ролике перейти по ссылке в шапке профиля.","notes":["Прямой призыв в конце ролика","Ссылка в шапке ведёт на бота, сайт или канал"]}
@@ -991,8 +1003,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <!-- Слайд — Воронка 3: хайлайты и сторис -->
 <div class="slide" data-slide="34">
   <div class="cb-wrap anim-3">
-    <blockquote class="cb-keyquote anim-2">Воронка 3: призыв через хайлайты и сторис</blockquote>
-    <p class="cb-detail anim-3">Закреплённый хайлайт с инструкцией, к которому отправляем зрителя из сторис или из самого ролика.</p>
+    <blockquote class="cb-keyquote anim-2">Воронка 3: хайлайты и сторис</blockquote>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Воронка 3: хайлайты и сторис","script":"Третий тип воронки — призыв через хайлайты и сторис. Закреплённый хайлайт с инструкцией.","notes":["Закреплённый хайлайт с инструкцией","Зритель попадает туда из сторис"]}
@@ -1003,7 +1014,6 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="35">
   <div class="cb-wrap anim-3">
     <blockquote class="cb-keyquote anim-2">Воронка 4: артикул или промокод в описании</blockquote>
-    <p class="cb-detail anim-3">Указываем код в описании видео — зритель находит его сам, без прямого призыва в кадре.</p>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Воронка 4: артикул или промокод","script":"Четвёртый тип воронки — артикул или промокод в описании видео. Зритель находит его сам.","notes":["Код в описании видео","Без прямого призыва в кадре"]}
@@ -1022,7 +1032,6 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="37">
   <div class="cb-wrap anim-3">
     <blockquote class="cb-keyquote anim-2">Провоцируй комментарии</blockquote>
-    <p class="cb-detail anim-3">Снимай ролики и крючки так, чтобы люди хотели ответить, записать голосовое или поспорить в комментариях.</p>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Прокачка аккаунта: провоцируй комментарии","script":"Первое — делай ролики и крючки так, чтобы люди хотели писать комментарии: отвечать, записывать голосовые, спорить.","notes":["Комментарии — ответы, голосовые, споры"]}
@@ -1033,7 +1042,6 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="38">
   <div class="cb-wrap anim-3">
     <blockquote class="cb-keyquote anim-2">Провоцируй пересылки</blockquote>
-    <p class="cb-detail anim-3">Делай видео, которым хочется поделиться со знакомыми — это самый сильный бесплатный охват.</p>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Прокачка аккаунта: провоцируй пересылки","script":"Второе — делай видео, которым хочется поделиться со знакомыми.","notes":["Пересылки знакомым — сильный бесплатный охват"]}
@@ -1044,7 +1052,6 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="39">
   <div class="cb-wrap anim-3">
     <blockquote class="cb-keyquote anim-2">Провоцируй кодовое слово</blockquote>
-    <p class="cb-detail anim-3">Прямая связка с воронкой: чем больше людей пишут кодовое слово в комментариях, тем выше и охват, и заявки.</p>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Прокачка аккаунта: провоцируй кодовое слово","script":"Третье — провоцируй кодовое слово в комментариях, это прямая связка с воронкой.","notes":["Кодовое слово в комментариях — связка с воронкой"]}
@@ -1055,91 +1062,107 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 <div class="slide" data-slide="40">
   <div class="cb-wrap anim-3">
     <blockquote class="cb-keyquote anim-2">Коллаборации и эфиры</blockquote>
-    <p class="cb-detail anim-3">Делай совместные публикации с другими аккаунтами и проводи эфиры — это даёт доступ к чужой аудитории и доверие.</p>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Прокачка аккаунта: коллаборации и эфиры","script":"Четвёртое — совместные публикации с другими аккаунтами и эфиры.","notes":["Совместные публикации с другими аккаунтами","Эфиры"]}
   </script>
 </div>
 
-<!-- Слайд — Ещё 2 приёма -->
+<!-- Слайд — Ещё приёмы -->
 <div class="slide" data-slide="41">
-  <h2 class="anim-2">Ещё <span class="highlight-blue">2 приёма</span></h2>
-  <div class="grid-2 anim-3">
-    <div class="card-v2 glow-blue bounce-1"><div class="card-title">Отвечай быстро</div><div class="card-desc">Отвечай на комментарии в первый час после публикации — это поднимает ролик в алгоритме</div></div>
-    <div class="card-v2 glow-blue bounce-2"><div class="card-title">Держись рубрики</div><div class="card-desc">Несколько роликов подряд на одну тему, пока она не «выстрелит»</div></div>
+  <h2 class="anim-2">Ещё <span class="highlight-blue">приёмы</span></h2>
+  <div class="grid-4 anim-3">
+    <div class="card-v2 glow-blue bounce-1"><div class="card-title">Отвечай быстро</div><div class="card-desc">В первый час после публикации</div></div>
+    <div class="card-v2 glow-blue bounce-2"><div class="card-title">Держись рубрики</div><div class="card-desc">Пока тема не «выстрелит»</div></div>
+    <div class="card-v2 glow-blue bounce-3"><div class="card-title">Трендовые звуки</div><div class="card-desc">Алгоритм продвигает их охотнее</div></div>
+    <div class="card-v2 glow-blue bounce-4"><div class="card-title">Пиковые часы</div><div class="card-desc">Публикуй, когда аудитория онлайн</div></div>
   </div>
   <script type="application/json" class="slide-notes">
-  {"title":"Ещё 2 приёма для прокачки аккаунта","script":"И ещё два приёма: отвечай на комментарии в первый час, и держись одной рубрики несколько роликов подряд, пока не выстрелит.","notes":["Ответы на комментарии в первый час","Серия роликов на одну тему"]}
+  {"title":"Ещё приёмы для прокачки аккаунта","script":"И ещё несколько приёмов: отвечай на комментарии в первый час, держись одной рубрики несколько роликов подряд, пока не выстрелит, используй трендовые звуки и публикуй в часы, когда твоя аудитория максимально активна.","notes":["Ответы на комментарии в первый час","Серия роликов на одну тему","Трендовая музыка/звук поднимает охват","Публикация в пиковые часы активности аудитории"]}
+  </script>
+</div>
+
+<!-- Слайд — Рекап: что уже разобрали -->
+<div class="slide" data-slide="42">
+  <h2 class="anim-2">Что мы уже <span class="highlight-blue">разобрали</span></h2>
+  <div class="status-timeline anim-3">
+    <div class="status-item stag-1"><div class="status-dot green"></div><div class="status-text"><strong>1. Анализ трендов</strong></div></div>
+    <div class="status-item stag-2"><div class="status-dot green"></div><div class="status-text"><strong>2. Сценарии рилсов</strong></div></div>
+    <div class="status-item stag-3"><div class="status-dot green"></div><div class="status-text"><strong>3. Съёмка и монтаж</strong></div></div>
+    <div class="status-item stag-4"><div class="status-dot green"></div><div class="status-text"><strong>4. Воронка продаж</strong></div></div>
+    <div class="status-item stag-5"><div class="status-dot green"></div><div class="status-text"><strong>5. Прокачка аккаунта</strong></div></div>
+  </div>
+  <span class="pill pill-red anim-4 mt-24">И это ещё не всё, что влияет на охваты</span>
+  <script type="application/json" class="slide-notes">
+  {"title":"Рекап: что уже разобрали","script":"Итак, мы уже прошли пять шагов: анализ трендов, сценарии, съёмку и монтаж, воронку продаж и прокачку аккаунта. Но даже всё это вместе — ещё не всё, что влияет на охваты в соцсетях. Дальше покажу, в чём настоящий потолок.","notes":["Рекап пройденных 5 шагов","Переход: это ещё не всё — дальше про потолок одного аккаунта"]}
   </script>
 </div>
 
 <!-- Слайд — Даже с этим есть потолок -->
-<div class="slide" data-slide="42">
-  <div class="glow-blob glow-orange" style="top:50%;left:50%;transform:translate(-50%,-50%);"></div>
-  <div class="cb-wrap anim-3">
-    <blockquote class="cb-keyquote anim-2">Даже с этим — один аккаунт упирается в потолок.</blockquote>
-    <p class="cb-detail anim-3">Дело не в усилиях — дело в том, что один аккаунт физически ограничен своей аудиторией.</p>
+<div class="slide" data-slide="43">
+  <div class="glow-blob glow-red" style="top:50%;left:50%;transform:translate(-50%,-50%);"></div>
+  <div class="cb-wrap accent-red anim-3">
+    <blockquote class="cb-keyquote anim-2">Даже с этим — один аккаунт упирается в потолок</blockquote>
   </div>
   <script type="application/json" class="slide-notes">
-  {"title":"Проблема одного аккаунта","script":"Но даже при идеальной дисциплине один аккаунт упирается в потолок. Дело не в усилиях, а в ограничении одного аккаунта.","notes":["Проблема не в усилиях, а в ограничении одного аккаунта"]}
+  {"title":"Проблема одного аккаунта","script":"Но даже при идеальной дисциплине один аккаунт упирается в потолок. Дело не в усилиях — дело в том, что один аккаунт физически ограничен своей аудиторией.","notes":["Проблема не в усилиях, а в ограничении одного аккаунта"]}
   </script>
 </div>
 
 <!-- Слайд — Мой личный опыт с этим потолком -->
-<div class="slide" data-slide="43">
+<div class="slide" data-slide="44">
   <div class="glow-blob glow-orange" style="bottom:20%;right:-10%;"></div>
   <div class="cb-wrap anim-3">
-    <blockquote class="cb-keyquote anim-2">У меня самого ролики стабильно давали 300–500 просмотров</blockquote>
-    <p class="cb-detail anim-3">Сколько бы я ни старался — снимал каждый день, держался тем, отвечал на все комментарии. Дальше нужен не ещё больше стараний, а масштаб.</p>
+    <blockquote class="cb-keyquote anim-2">Дело не в качестве ролика — дело в масштабе публикаций</blockquote>
+    <p class="cb-detail anim-3">Раньше — 30 роликов в месяц, по одному в день, на одном аккаунте. Сейчас — те же 30 роликов, но на сеть аккаунтов.</p>
   </div>
   <script type="application/json" class="slide-notes">
-  {"title":"Мой личный опыт с потолком","script":"У меня самого ролики стабильно давали 300-500 просмотров, сколько бы я ни старался. Дальше нужен масштаб, а не ещё больше усилий.","notes":["Личный опыт: потолок в 300-500 просмотров при любых стараниях","Вывод — нужен масштаб, переходим к контент-ферме"]}
+  {"title":"Мой личный опыт с потолком","script":"У меня самого ролики стабильно давали 300-500 просмотров, сколько бы я ни старался — снимал каждый день, держался тем, отвечал на все комментарии. И дошло, что дело не в качестве ролика, а в масштабе публикаций. Раньше я публиковал 30 роликов в месяц — по одному в день, на одном аккаунте. Сейчас публикую те же 30 роликов, но сразу на сеть аккаунтов.","notes":["Личный опыт: потолок в 300-500 просмотров при любых стараниях","Раньше: 30 роликов/мес, по 1 в день, 1 аккаунт","Сейчас: те же 30 роликов на сеть аккаунтов","Вывод — дело не в качестве, а в масштабе"]}
   </script>
 </div>
 
 <!-- Слайд — Заголовок шага 6 -->
-<div class="slide" data-slide="44" data-section="Шаг 6. Уникализация роликов">
+<div class="slide" data-slide="45" data-section="Шаг 6. Уникализация роликов">
   <h1 class="anim-2" style="font-size:clamp(30px,4.1vw,50px);">Как из каждого ролика<br>делать по <span class="highlight-blue">30–50 публикаций</span></h1>
+  <p class="subtitle anim-3">Не более качественный контент — тот же ролик, просто больше раз</p>
   <script type="application/json" class="slide-notes">
   {"title":"Шаг 6. Как из каждого ролика делать по 30-50 публикаций","script":"Шестой шаг — уникализация. Расскажу, как я вышел за пределы одного ролика и одного аккаунта — это то, что превратило мой потолок в 300-500 просмотров в миллионы.","notes":["Открываем блок про Шаг 6","Рассказываю от первого лица, как это работает у меня"]}
   </script>
 </div>
 
 <!-- Слайд — Простая математика 1/2 -->
-<div class="slide" data-slide="45">
+<div class="slide" data-slide="46">
   <div class="stat-flow anim-3">
     <div class="stat-flow-item pop-1">
       <div class="stat-flow-num">30 000</div>
-      <div class="stat-flow-label">Сейчас: 30 роликов / мес на одном аккаунте</div>
+      <div class="stat-flow-label">Раньше: 30 роликов / мес на одном аккаунте</div>
     </div>
   </div>
-  <p class="subtitle anim-4 mt-24" style="font-size:16px;">Это моя точка отсчёта — тот самый потолок одного аккаунта</p>
+  <p class="subtitle anim-4 mt-24" style="font-size:16px;">Точка отсчёта — тот самый потолок одного аккаунта</p>
   <script type="application/json" class="slide-notes">
   {"title":"Простая математика: сейчас","script":"30 роликов в месяц на одном аккаунте дают 30 000 просмотров. Это моя точка отсчёта.","notes":["30 роликов / мес на одном аккаунте = 30 000 просмотров"]}
   </script>
 </div>
 
 <!-- Слайд — Простая математика 2/2 -->
-<div class="slide" data-slide="46">
+<div class="slide" data-slide="47">
   <div class="stat-flow anim-3">
     <div class="stat-flow-item pop-2">
       <div class="stat-flow-num is-accent">1 000 000+</div>
-      <div class="stat-flow-label">С системой: те же 30 роликов × сеть аккаунтов</div>
+      <div class="stat-flow-label">Сейчас: те же 30 роликов × сеть аккаунтов</div>
     </div>
   </div>
-  <p class="subtitle anim-4 mt-24" style="font-size:16px;">Тот же контент, размноженный на десятки аккаунтов — никакой магии, просто арифметика охвата</p>
+  <p class="subtitle anim-4 mt-24" style="font-size:16px;">Тот же контент на десятки аккаунтов — просто арифметика охвата</p>
   <script type="application/json" class="slide-notes">
   {"title":"Простая математика: с системой","script":"Те же 30 роликов, размноженные на сеть аккаунтов, дают у меня от миллиона просмотров. Это чистая арифметика, а не удача.","notes":["Та же база роликов через сеть аккаунтов = от 1 000 000 просмотров","Это арифметика охвата, а не удача"]}
   </script>
 </div>
 
 <!-- Слайд — Что такое контент-ферма для меня -->
-<div class="slide" data-slide="47">
+<div class="slide" data-slide="48">
   <div class="glow-blob glow-blue" style="top:50%;left:50%;transform:translate(-50%,-50%);"></div>
   <div class="cb-wrap anim-3">
-    <blockquote class="cb-keyquote anim-2">Для меня контент-ферма — система массового распространения моего контента.</blockquote>
-    <p class="cb-detail anim-3">Я перестал думать «зайдёт или нет», потому что результат теперь гарантирует система, а не удача. Один мой ролик автоматически превращается в десятки версий на десятках аккаунтов.</p>
+    <blockquote class="cb-keyquote anim-2">Контент-ферма — система массового распространения моего контента</blockquote>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Что такое контент-ферма","script":"Для меня контент-ферма — это система автоматического и массового распространения моего контента. Я перестал думать «зайдёт или нет».","notes":["Контент-ферма = автоматизация + массовое распространение","Результат перестаёт зависеть от удачи одного ролика"]}
@@ -1147,7 +1170,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Как было / как стало -->
-<div class="slide" data-slide="48">
+<div class="slide" data-slide="49">
   <h2 class="anim-2">Как было <span class="highlight-purple">/</span> как <span class="highlight-blue">стало</span></h2>
   <div class="vs-container anim-3">
     <div class="vs-card card-left slide-l">
@@ -1171,7 +1194,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Мои аккаунты = филиалы -->
-<div class="slide" data-slide="49">
+<div class="slide" data-slide="50">
   <h2 class="anim-2">Мои аккаунты = <span class="highlight-blue">филиалы</span></h2>
   <div class="shot-frame anim-3">
     <img class="shot-real" alt="Сетка аккаунтов моей фермы" src="assets/screenshots/screenshot-04-accounts-network.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
@@ -1188,7 +1211,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Из 1 ролика — 30 -->
-<div class="slide" data-slide="50">
+<div class="slide" data-slide="51">
   <h2 class="anim-2">Из 1 ролика — <span class="highlight-blue">30</span></h2>
   <div class="chain-flow anim-3" style="margin-top:10px;">
     <div class="chain-node bounce-1"><div class="chain-node-label">1 ролик</div></div>
@@ -1199,7 +1222,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
     <div class="chain-sep">&rarr;</div>
     <div class="chain-node bounce-4"><div class="chain-node-label">Моя сеть аккаунтов</div></div>
   </div>
-  <div class="shot-frame anim-4" style="max-height:min(34vh,280px);margin-top:16px;max-width:min(980px,calc(min(34vh,280px) * 1.6));">
+  <div class="shot-frame anim-4" style="max-height:min(40vh,340px);margin-top:16px;max-width:min(1180px,calc(min(40vh,340px) * 1.6));">
     <img class="shot-real" alt="Процесс уникализации моего ролика" src="assets/screenshots/screenshot-05-uniqualization-example.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
     <div class="shot-placeholder">
       <div class="shot-file">screenshot-05-uniqualization-example.png</div>
@@ -1213,7 +1236,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Уникализация способ 1: перемонтаж у фрилансера -->
-<div class="slide" data-slide="51">
+<div class="slide" data-slide="52">
   <div class="cb-wrap anim-3">
     <blockquote class="cb-keyquote anim-2">Способ 1: перемонтаж у фрилансера</blockquote>
     <p class="cb-detail anim-3">За 2 доллара фрилансер меняет 30% видео — кадры, концовку и другие детали. Получаем новую версию, которую можно публиковать повторно.</p>
@@ -1224,9 +1247,9 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Уникализация способ 2: сервисы и боты -->
-<div class="slide" data-slide="52">
+<div class="slide" data-slide="53">
   <h2 class="anim-2">Способ 2: <span class="highlight-blue">сервисы и боты</span></h2>
-  <div class="shot-frame anim-3" style="max-height:min(38vh,320px);max-width:min(980px,calc(min(38vh,320px) * 1.6));">
+  <div class="shot-frame anim-3" style="max-height:min(44vh,380px);max-width:min(1180px,calc(min(44vh,380px) * 1.6));">
     <img class="shot-real" alt="Сервис уникализации видео" src="assets/screenshots/screenshot-17-uniqualization-service.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
     <div class="shot-placeholder">
       <div class="shot-file">screenshot-17-uniqualization-service.png</div>
@@ -1242,7 +1265,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Уникализация способ 3: наша платформа -->
-<div class="slide" data-slide="53">
+<div class="slide" data-slide="54">
   <h2 class="anim-2">Способ 3: <span class="highlight-blue">наша платформа</span></h2>
   <div class="shot-frame anim-3">
     <img class="shot-real" alt="Уникализация на платформе Content Hunter" src="assets/screenshots/screenshot-05-uniqualization-example.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
@@ -1259,7 +1282,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Заголовок шага 7 -->
-<div class="slide" data-slide="54" data-section="Шаг 7. Автопубликация в 100 аккаунтов">
+<div class="slide" data-slide="55" data-section="Шаг 7. Автопубликация в 100 аккаунтов">
   <h1 class="anim-2" style="font-size:clamp(28px,3.9vw,48px);">Как автоматически выкладывать<br>рилсы сразу в <span class="highlight-blue">100 аккаунтов</span></h1>
   <script type="application/json" class="slide-notes">
   {"title":"Шаг 7. Автопубликация в 100 аккаунтов","script":"Седьмой шаг — как автоматически выкладывать рилсы сразу в сто аккаунтов. Сначала покажу, как это сделать самому.","notes":["Открываем блок про Шаг 7"]}
@@ -1267,7 +1290,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Если делать самому -->
-<div class="slide" data-slide="55">
+<div class="slide" data-slide="56">
   <h2 class="anim-2">Если делать <span class="highlight-blue">самому</span></h2>
   <div class="status-timeline anim-3">
     <div class="status-item stag-1"><div class="status-dot green"></div><div class="status-text"><strong>1. Купить смартфоны</strong> — iPhone или Samsung</div></div>
@@ -1282,51 +1305,54 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Почему самому сложно -->
-<div class="slide" data-slide="56">
-  <h2 class="anim-2">Почему самому <span class="highlight-orange">сложно</span></h2>
+<div class="slide" data-slide="57">
+  <h2 class="anim-2">Почему самому <span class="highlight-red">сложно</span></h2>
   <div class="grid-2 anim-3">
-    <div class="card-v2 glow-orange bounce-1"><div class="card-title">Любая мелочь — и блок</div><div class="card-desc">Один неверный шаг — блокировка аккаунта или 0 просмотров</div></div>
-    <div class="card-v2 glow-orange bounce-2"><div class="card-title">Дорогое оборудование</div><div class="card-desc">Смартфоны на каждый аккаунт стоят денег</div></div>
-    <div class="card-v2 glow-orange bounce-3"><div class="card-title">Сложно автоматизировать</div><div class="card-desc">Без опыта настройка алгоритмов управления занимает недели</div></div>
-    <div class="card-v2 glow-orange bounce-4"><div class="card-title">Нужно постоянно чинить</div><div class="card-desc">Аккаунты требуют обслуживания и регулярного вмешательства</div></div>
+    <div class="card-v2 glow-red bounce-1"><div class="card-title">Любая мелочь — и блок</div><div class="card-desc">Один неверный шаг — блокировка аккаунта или 0 просмотров</div></div>
+    <div class="card-v2 glow-red bounce-2"><div class="card-title">Дорогое оборудование</div><div class="card-desc">Смартфоны на каждый аккаунт стоят денег</div></div>
+    <div class="card-v2 glow-red bounce-3"><div class="card-title">Сложно автоматизировать</div><div class="card-desc">Без опыта — недели настройки</div></div>
+    <div class="card-v2 glow-red bounce-4"><div class="card-title">Нужно постоянно чинить</div><div class="card-desc">Регулярное обслуживание и вмешательство</div></div>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Почему самому сложно","script":"Почему делать это самому сложно: любая мелочь — блокировка или 0 просмотров, дорогое оборудование, сложно автоматизировать, и всё это нужно постоянно обслуживать и чинить.","notes":["Блокировка или 0 просмотров от любой мелкой ошибки","Дорогое оборудование","Сложно автоматизировать","Нужно постоянно обслуживать и чинить"]}
   </script>
 </div>
 
-<!-- Слайд — Мы сделаем это бесплатно -->
-<div class="slide" data-slide="57">
-  <div class="glow-blob glow-blue" style="top:50%;left:50%;transform:translate(-50%,-50%);"></div>
-  <div class="cb-wrap anim-3">
-    <blockquote class="cb-keyquote anim-2">Мы сделаем это бесплатно, с удобной платформой</blockquote>
-    <p class="cb-detail anim-3">Вместо того чтобы разбираться со всем этим самому, вы получаете готовую ферму и платформу для управления ей.</p>
+<!-- Слайд — Я дам вам доступ к своей платформе -->
+<div class="slide" data-slide="58">
+  <h2 class="anim-2">Я дам вам доступ <span class="highlight-blue">к своей платформе</span></h2>
+  <p class="cb-body anim-3" style="text-align:center;max-width:760px;">Моя команда бесплатно соберёт для вас оборудование и прогреет аккаунты — вам останется только публиковать</p>
+  <div class="shot-frame anim-4">
+    <img class="shot-real" alt="Аналитика на платформе Content Hunter" src="assets/screenshots/screenshot-07-analytics-dashboard.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
+    <div class="shot-placeholder">
+      <div class="shot-file">screenshot-07-analytics-dashboard.png</div>
+      <div class="shot-size">1600×1000</div>
+      <div class="shot-desc">Дашборд аналитики Content Hunter — вид платформы, доступ к которой получает клиент</div>
+    </div>
   </div>
   <script type="application/json" class="slide-notes">
-  {"title":"Мы сделаем это бесплатно","script":"Самому это сложно и долго. Мы сделаем это бесплатно и дадим удобную платформу для управления фермой.","notes":["Переход от «сложно самому» к предложению Content Hunter"]}
+  {"title":"Я дам вам доступ к своей платформе","script":"Самому это сложно и долго. Поэтому я лично дам вам доступ к своей платформе — а моя команда бесплатно соберёт для вас всё оборудование и прогреет аккаунты. От вас требуется только публиковать готовые ролики.","notes":["Личное предложение: доступ к моей платформе","Команда бесплатно собирает оборудование и прогревает аккаунты","От клиента — только публикация роликов"]}
   </script>
 </div>
 
-<!-- Слайд — Откуда берутся мои аккаунты -->
-<div class="slide" data-slide="58">
+<!-- Слайд — Как мы создаём аккаунты -->
+<div class="slide" data-slide="59">
   <div class="glow-blob glow-blue" style="top:30%;left:-10%;"></div>
   <div class="cb-wrap anim-3">
-    <h2 class="cb-heading anim-2">Откуда берутся <span class="highlight-blue">мои аккаунты</span></h2>
-    <p class="cb-body anim-3">Аккаунты создаются под <span class="cb-accent">мой бренд</span>, каждый — на отдельном устройстве с уникальным IP.</p>
-    <p class="cb-body anim-4">Алгоритмы видят живого пользователя, а не ферму — поэтому риск для основного аккаунта минимален.</p>
+    <h2 class="cb-heading anim-2">Как мы создаём <span class="highlight-blue">аккаунты</span></h2>
+    <p class="cb-body anim-3">Под <span class="cb-accent">ваш бренд</span>, по два аккаунта на устройство, с уникальным IP — для алгоритма это живой пользователь, а не ферма</p>
   </div>
   <script type="application/json" class="slide-notes">
-  {"title":"Откуда берутся аккаунты","script":"Частый вопрос — а не забанят ли? Аккаунты создаются под мой бренд, каждый на отдельном устройстве с уникальным IP, так что для соцсетей это выглядит как живой пользователь, а не ферма.","notes":["Аккаунты создаются под бренд","Отдельное устройство и уникальный IP на каждый аккаунт"]}
+  {"title":"Как мы создаём аккаунты","script":"Частый вопрос — а не забанят ли? Аккаунты создаются под ваш бренд, по два аккаунта на устройство, каждое — с уникальным IP. Так что для соцсетей это выглядит как живой пользователь, а не ферма.","notes":["Аккаунты создаются под бренд клиента","По два аккаунта на устройство, уникальный IP"]}
   </script>
 </div>
 
 <!-- Слайд — Прогрев аккаунтов -->
-<div class="slide" data-slide="59">
+<div class="slide" data-slide="60">
   <div class="glow-blob glow-green" style="bottom:20%;right:-10%;"></div>
   <div class="cb-wrap anim-3">
     <h2 class="cb-heading anim-2">Прогрев <span class="highlight-blue">аккаунтов</span></h2>
-    <p class="cb-body anim-3">Новый аккаунт — как <span class="cb-accent">незнакомец на улице</span>: алгоритм ему не доверяет.</p>
-    <p class="cb-body anim-4">Прогрев имитирует поведение живого пользователя, чтобы соцсети начали показывать аккаунт в рекомендациях.</p>
+    <p class="cb-body anim-3">Новый аккаунт — как <span class="cb-accent">незнакомец на улице</span>: мы имитируем живое поведение, пока алгоритм не начнёт доверять</p>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Прогрев аккаунтов","script":"Новый аккаунт для алгоритма — как незнакомец на улице, доверия к нему нет. Прогрев имитирует поведение живого пользователя.","notes":["Новому аккаунту алгоритм не доверяет по умолчанию","Прогрев имитирует живое поведение пользователя"]}
@@ -1334,7 +1360,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Как я выкладываю ролики -->
-<div class="slide" data-slide="60">
+<div class="slide" data-slide="61">
   <h2 class="anim-2">Как я выкладываю <span class="highlight-blue">ролики</span></h2>
   <div class="shot-frame anim-3">
     <img class="shot-real" alt="Интерфейс платформы с журналом публикаций" src="assets/screenshots/screenshot-06-platform-upload.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
@@ -1350,8 +1376,26 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
   </script>
 </div>
 
+<!-- Слайд — Призыв: бесплатная консультация -->
+<div class="slide" data-slide="62">
+  <div class="glow-blob glow-blue" style="top:30%;left:20%;"></div>
+  <div class="shot-frame shot-mini anim-2" style="width:96px;aspect-ratio:1/1;max-height:96px;border-radius:50%;">
+    <img class="shot-real" alt="Фото Кирилла" src="assets/screenshots/screenshot-11-kirill-photo.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
+    <div class="shot-placeholder"><div class="shot-desc">Фото Кирилла</div></div>
+  </div>
+  <h2 class="anim-2" style="margin-top:14px;">Хотите узнать, подойдёт ли <span class="highlight-blue">это вам?</span></h2>
+  <p class="subtitle anim-3">Напишите мне лично — бесплатно разберём ваш проект</p>
+  <div class="cta-box anim-4">
+    <p style="font-size:clamp(24px,3vw,38px);font-weight:800;color:var(--accent-blue);">«хочу ферму»</p>
+    <p style="font-size:clamp(14px,1.3vw,17px);color:var(--text-muted);margin-top:10px;">менеджеру — и запишитесь на бесплатную консультацию</p>
+  </div>
+  <script type="application/json" class="slide-notes">
+  {"title":"Призыв на бесплатную консультацию","script":"Прежде чем показать кейсы других проектов — если хотите разобрать именно свой, напишите мне лично кодовое слово «хочу ферму» и запишитесь на бесплатную консультацию.","notes":["Мягкий CTA — бесплатная консультация, не продажа","Кодовое слово: «хочу ферму»"]}
+  </script>
+</div>
+
 <!-- Слайд — Мой личный кейс -->
-<div class="slide" data-slide="61">
+<div class="slide" data-slide="63">
   <h2 class="anim-2">Мой <span class="highlight-blue">личный кейс</span></h2>
   <div class="case-stats anim-3">
     <div class="case-stat"><div class="case-stat-label">Точка А</div><div class="case-stat-val">30 000 просмотров / мес · 1 аккаунт</div></div>
@@ -1359,7 +1403,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
     <div class="case-stat"><div class="case-stat-label">Заявки</div><div class="case-stat-val">С 6 до 210 заявок в месяц</div></div>
     <div class="case-stat"><div class="case-stat-label">Форматы роликов</div><div class="case-stat-val">Личные истории, разборы кейсов, ответы на вопросы</div></div>
   </div>
-  <div class="shot-frame anim-4" style="max-height:min(30vh,240px);max-width:min(980px,calc(min(30vh,240px) * 1.6));">
+  <div class="shot-frame anim-4" style="max-height:min(36vh,300px);max-width:min(1180px,calc(min(36vh,300px) * 1.6));">
     <img class="shot-real" alt="Дашборд моей личной аналитики" src="assets/screenshots/screenshot-09-my-case-dashboard.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
     <div class="shot-placeholder">
       <div class="shot-file">screenshot-09-my-case-dashboard.png</div>
@@ -1373,11 +1417,10 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Ферма работает не только у меня -->
-<div class="slide" data-slide="62">
+<div class="slide" data-slide="64">
   <div class="glow-blob glow-blue" style="top:50%;left:50%;transform:translate(-50%,-50%);"></div>
   <div class="cb-wrap anim-3">
-    <blockquote class="cb-keyquote anim-2">И ферма работает не только у меня.</blockquote>
-    <p class="cb-detail anim-3">Тот же подход я внедрил для нескольких проектов в разных нишах — вот несколько примеров.</p>
+    <blockquote class="cb-keyquote anim-2">И ферма работает не только у меня</blockquote>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Не только у меня","script":"Система работает не только у меня. Тот же подход я внедрил для нескольких проектов в разных нишах.","notes":["Переход к кейсам других проектов"]}
@@ -1385,13 +1428,21 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Кейс 1/4: онлайн-школа английского -->
-<div class="slide" data-slide="63" data-section="Кейсы">
+<div class="slide" data-slide="65" data-section="Кейсы">
   <h2 class="anim-2">Онлайн-школа <span class="highlight-blue">английского</span></h2>
   <div class="case-stats anim-3">
     <div class="case-stat"><div class="case-stat-label">Точка А</div><div class="case-stat-val">40 000 просмотров / мес · 5 лидов / мес</div></div>
     <div class="case-stat"><div class="case-stat-label">Точка Б</div><div class="case-stat-val">620 000 просмотров / мес · 95 лидов / мес</div></div>
     <div class="case-stat"><div class="case-stat-label">Продажи</div><div class="case-stat-val">+18 новых учеников / мес</div></div>
     <div class="case-stat"><div class="case-stat-label">Форматы роликов</div><div class="case-stat-val">Разборы ошибок, «угадай перевод», отзывы учеников</div></div>
+  </div>
+  <div class="shot-frame anim-4" style="max-height:min(26vh,220px);max-width:min(1180px,calc(min(26vh,220px) * 1.6));">
+    <img class="shot-real" alt="Кейс: онлайн-школа английского" src="assets/screenshots/screenshot-18-case-english-school.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
+    <div class="shot-placeholder">
+      <div class="shot-file">screenshot-18-case-english-school.png</div>
+      <div class="shot-size">1600×1000</div>
+      <div class="shot-desc">Скрин аналитики/роста онлайн-школы английского на платформе</div>
+    </div>
   </div>
   <p class="subtitle anim-4 mt-24" style="font-size:15px;">Рост в 15 раз за 6 недель — без увеличения рекламного бюджета</p>
   <script type="application/json" class="slide-notes">
@@ -1400,13 +1451,21 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Кейс 2/4: SaaS для фрилансеров -->
-<div class="slide" data-slide="64">
+<div class="slide" data-slide="66">
   <h2 class="anim-2">SaaS для <span class="highlight-blue">фрилансеров</span></h2>
   <div class="case-stats anim-3">
     <div class="case-stat"><div class="case-stat-label">Точка А</div><div class="case-stat-val">12 000 просмотров / мес · 20 регистраций / мес</div></div>
     <div class="case-stat"><div class="case-stat-label">Точка Б</div><div class="case-stat-val">340 000 просмотров / мес · 200 регистраций / мес</div></div>
     <div class="case-stat"><div class="case-stat-label">Продажи</div><div class="case-stat-val">+45 платных подписок / мес</div></div>
     <div class="case-stat"><div class="case-stat-label">Форматы роликов</div><div class="case-stat-val">Демо фич, «до/после» продуктивности, отзывы фрилансеров</div></div>
+  </div>
+  <div class="shot-frame anim-4" style="max-height:min(26vh,220px);max-width:min(1180px,calc(min(26vh,220px) * 1.6));">
+    <img class="shot-real" alt="Кейс: SaaS для фрилансеров" src="assets/screenshots/screenshot-19-case-saas.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
+    <div class="shot-placeholder">
+      <div class="shot-file">screenshot-19-case-saas.png</div>
+      <div class="shot-size">1600×1000</div>
+      <div class="shot-desc">Скрин аналитики/роста SaaS для фрилансеров на платформе</div>
+    </div>
   </div>
   <p class="subtitle anim-4 mt-24" style="font-size:15px;">Органический контент заменил платный трафик как основной канал регистраций</p>
   <script type="application/json" class="slide-notes">
@@ -1415,13 +1474,21 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Кейс 3/4: эксперт по недвижимости (Дубай) -->
-<div class="slide" data-slide="65">
+<div class="slide" data-slide="67">
   <h2 class="anim-2">Эксперт по недвижимости <span class="highlight-blue">в Дубае</span></h2>
   <div class="case-stats anim-3">
     <div class="case-stat"><div class="case-stat-label">Точка А</div><div class="case-stat-val">60 000 просмотров / мес · лид 80 долларов</div></div>
     <div class="case-stat"><div class="case-stat-label">Точка Б</div><div class="case-stat-val">900 000 просмотров / мес · лид 20 долларов</div></div>
     <div class="case-stat"><div class="case-stat-label">Продажи</div><div class="case-stat-val">+12 сделок за квартал</div></div>
     <div class="case-stat"><div class="case-stat-label">Форматы роликов</div><div class="case-stat-val">Обзоры объектов, разбор районов Дубая, «сколько стоит жизнь в Дубае»</div></div>
+  </div>
+  <div class="shot-frame anim-4" style="max-height:min(26vh,220px);max-width:min(1180px,calc(min(26vh,220px) * 1.6));">
+    <img class="shot-real" alt="Кейс: эксперт по недвижимости в Дубае" src="assets/screenshots/screenshot-20-case-dubai-realestate.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
+    <div class="shot-placeholder">
+      <div class="shot-file">screenshot-20-case-dubai-realestate.png</div>
+      <div class="shot-size">1600×1000</div>
+      <div class="shot-desc">Скрин аналитики/роста эксперта по недвижимости в Дубае на платформе</div>
+    </div>
   </div>
   <p class="subtitle anim-4 mt-24" style="font-size:15px;">Больше охвата — и одновременно в 4 раза дешевле лид</p>
   <script type="application/json" class="slide-notes">
@@ -1430,13 +1497,21 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Кейс 4/4: приложение для медитаций -->
-<div class="slide" data-slide="66">
+<div class="slide" data-slide="68">
   <h2 class="anim-2">Приложение для <span class="highlight-blue">медитаций</span></h2>
   <div class="case-stats anim-3">
     <div class="case-stat"><div class="case-stat-label">Точка А</div><div class="case-stat-val">250 000 просмотров / мес · 2 200 установок / мес</div></div>
     <div class="case-stat"><div class="case-stat-label">Точка Б</div><div class="case-stat-val">1 200 000 просмотров / мес · +35% органических установок</div></div>
     <div class="case-stat"><div class="case-stat-label">Продажи</div><div class="case-stat-val">+900 платных подписок / мес</div></div>
     <div class="case-stat"><div class="case-stat-label">Форматы роликов</div><div class="case-stat-val">Короткие практики, «звук для сна», отзывы пользователей</div></div>
+  </div>
+  <div class="shot-frame anim-4" style="max-height:min(26vh,220px);max-width:min(1180px,calc(min(26vh,220px) * 1.6));">
+    <img class="shot-real" alt="Кейс: приложение для медитаций" src="assets/screenshots/screenshot-21-case-meditation-app.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
+    <div class="shot-placeholder">
+      <div class="shot-file">screenshot-21-case-meditation-app.png</div>
+      <div class="shot-size">1600×1000</div>
+      <div class="shot-desc">Скрин аналитики/роста приложения для медитаций на платформе</div>
+    </div>
   </div>
   <p class="subtitle anim-4 mt-24" style="font-size:15px;">Подход одинаково хорошо ложится и на образование, и на IT, и на недвижимость, и на мобильные приложения</p>
   <script type="application/json" class="slide-notes">
@@ -1445,7 +1520,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Переход к предложению -->
-<div class="slide" data-slide="67" data-section="Предложение и тарифы">
+<div class="slide" data-slide="69" data-section="Предложение и тарифы">
   <div class="glow-blob glow-blue" style="top:30%;left:20%;"></div>
   <h1 class="anim-2" style="font-size:clamp(32px,4.2vw,54px);">Хотите те же результаты<br>для <span class="highlight-blue">своего проекта?</span></h1>
   <p class="subtitle anim-3">Я показал, как это работает у меня и в этих кейсах. Дальше — как внедрить это себе, без стройки фермы с нуля</p>
@@ -1455,22 +1530,22 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Специальное предложение -->
-<div class="slide" data-slide="68">
+<div class="slide" data-slide="70">
   <div class="glow-blob glow-blue" style="bottom:-100px;right:-80px;"></div>
-  <h2 class="anim-2">Для участников <span class="highlight-blue">вебинара</span></h2>
-  <p class="cb-body anim-3" style="text-align:center;max-width:760px;font-size:clamp(16px,1.6vw,21px);">Мы бесплатно построим для вас контент-ферму — <span class="cb-accent">с любым количеством смартфонов и аккаунтов</span>, под ваш масштаб. Платите только за пакет публикаций, на который мы даём гарантию просмотров.</p>
+  <h2 class="anim-2">Моё личное предложение <span class="highlight-blue">участникам вебинара</span></h2>
+  <p class="cb-body anim-3" style="text-align:center;max-width:760px;font-size:clamp(16px,1.6vw,21px);">Я лично бесплатно построю для вас контент-ферму — <span class="cb-accent">с любым количеством смартфонов и аккаунтов</span>, под ваш масштаб.</p>
   <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin-top:20px;" class="anim-4">
     <span class="pill">Настройка — бесплатно</span>
     <span class="pill">Гарантия просмотров по договору</span>
   </div>
-  <p class="subtitle anim-5" style="font-size:14px;margin-top:20px;">Ссылка на контакты специалиста по контент-фермам — под этим видео</p>
+  <p class="subtitle anim-5" style="font-size:14px;margin-top:20px;">Мои личные контакты — под этим видео</p>
   <script type="application/json" class="slide-notes">
-  {"title":"Специальное предложение","script":"Для участников вебинара — мы бесплатно построим ферму с любым количеством смартфонов и аккаунтов под ваш масштаб. Платите только за пакет публикаций, на который даём гарантию просмотров.","notes":["Настройка фермы — бесплатно, любое количество смартфонов и аккаунтов","Оплата только за пакет публикаций","Гарантия просмотров закреплена договором"]}
+  {"title":"Специальное предложение","script":"Для участников вебинара — я лично бесплатно построю ферму с любым количеством смартфонов и аккаунтов под ваш масштаб. Платите только за пакет публикаций, на который даю гарантию просмотров.","notes":["Личное предложение от Кирилла, не безликий «мы»","Настройка фермы — бесплатно, любое количество смартфонов и аккаунтов","Оплата только за пакет публикаций","Гарантия просмотров закреплена договором"]}
   </script>
 </div>
 
 <!-- Слайд — Платформа для управления фермой -->
-<div class="slide" data-slide="69">
+<div class="slide" data-slide="71">
   <h2 class="anim-2">Платформа для <span class="highlight-blue">управления фермой</span></h2>
   <div class="shot-frame anim-3">
     <img class="shot-real" alt="Платформа управления фермой" src="assets/screenshots/screenshot-10-farm-platform.png" onload="this.classList.add('shot-loaded');this.closest('.shot-frame').classList.add('has-photo')" onerror="this.remove()">
@@ -1487,7 +1562,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Тарифы 1/2: конфигурация -->
-<div class="slide" data-slide="70">
+<div class="slide" data-slide="72">
   <h2 class="anim-2">Выберите <span class="highlight-blue">свой масштаб</span></h2>
   <div class="table-wrap anim-3">
     <table>
@@ -1509,7 +1584,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Тарифы 2/2: публикации и стоимость -->
-<div class="slide" data-slide="71">
+<div class="slide" data-slide="73">
   <h2 class="anim-2">Публикации <span class="highlight-blue">и стоимость</span></h2>
   <p class="cb-body anim-3" style="text-align:center;max-width:780px;font-size:clamp(15px,1.4vw,19px);">В зависимости от размера фермы, на ней можно делать разное количество публикаций. Вы платите за пакет публикаций, а мы даём гарантию-минимум по просмотрам.</p>
   <div class="table-wrap anim-3">
@@ -1534,7 +1609,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — CTA 1: после тарифов -->
-<div class="slide" data-slide="72">
+<div class="slide" data-slide="74">
   <div class="glow-blob glow-blue" style="top:30%;left:30%;"></div>
   <div class="glow-blob glow-green" style="bottom:20%;right:20%;"></div>
   <h2 class="anim-1" style="font-size:clamp(30px,3.8vw,46px);">Готовы <span class="gradient-text">внедрить это себе?</span></h2>
@@ -1542,21 +1617,26 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
   <div class="cta-box anim-3">
     <p style="font-size:clamp(24px,3vw,38px);font-weight:800;color:var(--accent-blue);">«хочу ферму»</p>
     <p style="font-size:clamp(14px,1.3vw,17px);color:var(--text-muted);margin-top:10px;">чтобы забронировать условия из этого вебинара</p>
-    <p style="font-size:clamp(15px,1.4vw,19px);font-weight:700;margin-top:16px;">Условия ограничены 3 днями</p>
+    <p style="font-size:clamp(15px,1.4vw,19px);font-weight:700;margin-top:16px;color:var(--accent-red);">Особые условия сгорают через:</p>
+    <div class="countdown js-countdown">
+      <div class="countdown-unit"><div class="countdown-val" data-unit="d">—</div><div class="countdown-label">дни</div></div>
+      <div class="countdown-unit"><div class="countdown-val" data-unit="h">—</div><div class="countdown-label">часы</div></div>
+      <div class="countdown-unit"><div class="countdown-val" data-unit="m">—</div><div class="countdown-label">мин</div></div>
+      <div class="countdown-unit"><div class="countdown-val" data-unit="s">—</div><div class="countdown-label">сек</div></div>
+    </div>
   </div>
   <div class="rainbow-line anim-4 mt-24"></div>
   <p class="subtitle anim-5" style="font-size:14px;margin-top:8px;">Ссылка на контакты специалиста — под этим видео</p>
   <script type="application/json" class="slide-notes">
-  {"title":"Призыв к действию после тарифов","script":"Напишите менеджеру кодовое слово «хочу ферму», чтобы забронировать условия из этого вебинара. Условия ограничены 3 днями.","notes":["Кодовое слово: «хочу ферму»","Лимит — 3 дня","Контакты специалиста — под видео"]}
+  {"title":"Призыв к действию после тарифов","script":"Напишите менеджеру кодовое слово «хочу ферму», чтобы забронировать условия из этого вебинара. Особые условия сгорают через 3 дня — таймер прямо на слайде.","notes":["Кодовое слово: «хочу ферму»","Лимит — 3 дня, живой таймер на слайде","Контакты специалиста — под видео"]}
   </script>
 </div>
 
 <!-- Слайд — Вопрос: гарантия просмотров -->
-<div class="slide" data-slide="73" data-section="Вопросы и ответы">
+<div class="slide" data-slide="75" data-section="Вопросы и ответы">
   <div class="cb-wrap anim-3">
     <h2 class="cb-heading anim-2">Что если не наберутся <span class="highlight-blue">гарантированные просмотры?</span></h2>
-    <p class="cb-body anim-3">Добираем за свой счёт дополнительными публикациями — без доплат с вашей стороны.</p>
-    <p class="cb-body anim-4">Гарантия зафиксирована в договоре-оферте, так что это не обещание на словах, а обязательство.</p>
+    <p class="cb-body anim-3">Добираем за свой счёт — гарантия зафиксирована в договоре-оферте</p>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Вопрос: гарантия просмотров","script":"Что если не наберутся гарантированные просмотры? Добираем за свой счёт дополнительными публикациями — гарантия зафиксирована в договоре-оферте.","notes":["Недобор по гарантии — добираем за свой счёт по договору"]}
@@ -1564,11 +1644,10 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Вопрос: происхождение просмотров -->
-<div class="slide" data-slide="74">
+<div class="slide" data-slide="76">
   <div class="cb-wrap anim-3">
     <h2 class="cb-heading anim-2">Откуда берутся <span class="highlight-blue">просмотры?</span></h2>
-    <p class="cb-body anim-3">Все просмотры органические — TikTok, Instagram, YouTube через сеть прогретых аккаунтов, без рекламы и без накруток.</p>
-    <p class="cb-body anim-4">Это реальные показы реальным пользователям — платформы это видят точно так же, как обычную органику.</p>
+    <p class="cb-body anim-3">Все органические — через сеть прогретых аккаунтов, без рекламы и накруток</p>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Вопрос: происхождение просмотров","script":"Откуда берутся просмотры? Все органические — через сеть прогретых аккаунтов, без рекламы и без накруток.","notes":["Просмотры органические, без рекламы","Без накруток — реальные показы реальным пользователям"]}
@@ -1576,11 +1655,10 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Вопрос: целевая аудитория -->
-<div class="slide" data-slide="75">
+<div class="slide" data-slide="77">
   <div class="cb-wrap anim-3">
     <h2 class="cb-heading anim-2">Будет ли аудитория <span class="highlight-blue">целевой?</span></h2>
-    <p class="cb-body anim-3">Аккаунты настраиваются под вашу нишу и гео, а алгоритмы соцсетей подбирают релевантную аудиторию сами.</p>
-    <p class="cb-body anim-4">Прогрев ведётся именно в вашей тематике, поэтому рекомендации показывают ролик тем, кому это действительно интересно.</p>
+    <p class="cb-body anim-3">Аккаунты настроены под вашу нишу и гео — алгоритм сам подбирает релевантную аудиторию</p>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Вопрос: целевая аудитория","script":"Будет ли аудитория целевой? Аккаунты настраиваются под нишу и гео, алгоритмы подбирают релевантную аудиторию.","notes":["Аккаунты настроены под нишу и гео клиента","Прогрев ведётся в нужной тематике"]}
@@ -1588,11 +1666,10 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Вопрос: блокировка аккаунтов -->
-<div class="slide" data-slide="76">
-  <div class="cb-wrap anim-3">
-    <h2 class="cb-heading anim-2">Что если аккаунты <span class="highlight-blue">заблокируют?</span></h2>
-    <p class="cb-body anim-3">Риск полностью на нас — создаём и прогреваем новые аккаунты за свой счёт.</p>
-    <p class="cb-body anim-4">Ваша гарантия просмотров при этом не страдает: мы просто восполняем сеть и продолжаем публикации.</p>
+<div class="slide" data-slide="78">
+  <div class="cb-wrap accent-red anim-3">
+    <h2 class="cb-heading anim-2">Что если аккаунты <span class="highlight-red">заблокируют?</span></h2>
+    <p class="cb-body anim-3">Риск полностью на нас — создаём новые аккаунты за свой счёт, гарантия не страдает</p>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Вопрос: блокировка аккаунтов","script":"Что если аккаунты заблокируют? Риск полностью на нас — создаём и прогреваем новые аккаунты за свой счёт, гарантия не страдает.","notes":["Риск блокировок — на стороне Content Hunter","Гарантия просмотров не страдает"]}
@@ -1600,11 +1677,10 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Вопрос: что нужно от клиента -->
-<div class="slide" data-slide="77">
+<div class="slide" data-slide="79">
   <div class="glow-blob glow-blue" style="top:50%;left:50%;transform:translate(-50%,-50%);"></div>
   <div class="cb-wrap anim-3">
-    <blockquote class="cb-keyquote anim-2">Что нужно делать с моей стороны?</blockquote>
-    <p class="cb-detail anim-3">Только загружать готовые ролики. Всё остальное — уникализация, распределение по аккаунтам, публикация по расписанию — происходит автоматически.</p>
+    <blockquote class="cb-keyquote anim-2">С вашей стороны — только загружать готовые ролики</blockquote>
   </div>
   <script type="application/json" class="slide-notes">
   {"title":"Вопрос: что нужно от клиента","script":"И последний частый вопрос — что вообще требуется от вас. Только загружать готовые ролики, всё остальное система делает сама.","notes":["От клиента нужны только готовые ролики","Всё остальное — автоматически"]}
@@ -1612,7 +1688,7 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
 </div>
 
 <!-- Слайд — Финальный CTA -->
-<div class="slide" data-slide="78">
+<div class="slide" data-slide="80">
   <div class="glow-blob glow-blue" style="top:30%;left:30%;"></div>
   <div class="glow-blob glow-green" style="bottom:20%;right:20%;"></div>
   <h2 class="anim-1" style="font-size:clamp(30px,3.8vw,46px);">Получите <span class="gradient-text">специальные условия</span></h2>
@@ -1620,12 +1696,18 @@ h2 { font-size: clamp(28px,3.5vw,48px); font-weight: 800; line-height: 1.15; let
   <div class="cta-box anim-3">
     <p style="font-size:clamp(24px,3vw,38px);font-weight:800;color:var(--accent-blue);">«хочу ферму»</p>
     <p style="font-size:clamp(14px,1.3vw,17px);color:var(--text-muted);margin-top:10px;">чтобы забронировать условия из этого вебинара</p>
-    <p style="font-size:clamp(15px,1.4vw,19px);font-weight:700;margin-top:16px;">Условия ограничены 3 днями</p>
+    <p style="font-size:clamp(15px,1.4vw,19px);font-weight:700;margin-top:16px;color:var(--accent-red);">Особые условия сгорают через:</p>
+    <div class="countdown js-countdown">
+      <div class="countdown-unit"><div class="countdown-val" data-unit="d">—</div><div class="countdown-label">дни</div></div>
+      <div class="countdown-unit"><div class="countdown-val" data-unit="h">—</div><div class="countdown-label">часы</div></div>
+      <div class="countdown-unit"><div class="countdown-val" data-unit="m">—</div><div class="countdown-label">мин</div></div>
+      <div class="countdown-unit"><div class="countdown-val" data-unit="s">—</div><div class="countdown-label">сек</div></div>
+    </div>
   </div>
   <div class="rainbow-line anim-4 mt-24"></div>
   <p class="subtitle anim-5" style="font-size:14px;margin-top:8px;">Ссылка на контакты специалиста — под этим видео</p>
   <script type="application/json" class="slide-notes">
-  {"title":"Финальный призыв к действию","script":"Напишите менеджеру кодовое слово «хочу ферму», чтобы забронировать условия из этого вебинара. Условия ограничены 3 днями — ссылка на специалиста под этим видео.","notes":["Кодовое слово: «хочу ферму»","Лимит — 3 дня, без конкретной даты","Контакты специалиста — в описании под видео"]}
+  {"title":"Финальный призыв к действию","script":"Напишите менеджеру кодовое слово «хочу ферму», чтобы забронировать условия из этого вебинара. Особые условия сгорают через 3 дня — таймер прямо на слайде.","notes":["Кодовое слово: «хочу ферму»","Лимит — 3 дня, живой таймер на слайде","Контакты специалиста — в описании под видео"]}
   </script>
 </div>
 
@@ -1769,6 +1851,36 @@ document.addEventListener('mousemove', function (e) {
   const near = e.clientY > window.innerHeight - 140;
   chromeEls.forEach(el => el.classList.toggle('chrome-visible', near));
 });
+
+// Countdown timer: 3-day scarcity window, starts on each viewer's first visit
+(function () {
+  const countdowns = document.querySelectorAll('.js-countdown');
+  if (!countdowns.length) return;
+  const STORAGE_KEY = 'ch-webinar-offer-deadline';
+  const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+  let deadline = parseInt(localStorage.getItem(STORAGE_KEY), 10);
+  if (!deadline || isNaN(deadline)) {
+    deadline = Date.now() + THREE_DAYS_MS;
+    localStorage.setItem(STORAGE_KEY, String(deadline));
+  }
+  function render() {
+    const remaining = Math.max(0, deadline - Date.now());
+    const d = Math.floor(remaining / 86400000);
+    const h = Math.floor((remaining % 86400000) / 3600000);
+    const m = Math.floor((remaining % 3600000) / 60000);
+    const s = Math.floor((remaining % 60000) / 1000);
+    const pad = (n) => String(n).padStart(2, '0');
+    countdowns.forEach((el) => {
+      el.querySelector('[data-unit="d"]').textContent = pad(d);
+      el.querySelector('[data-unit="h"]').textContent = pad(h);
+      el.querySelector('[data-unit="m"]').textContent = pad(m);
+      el.querySelector('[data-unit="s"]').textContent = pad(s);
+    });
+    if (remaining <= 0) clearInterval(timer);
+  }
+  render();
+  const timer = setInterval(render, 1000);
+})();
 </script>
 
 </body>
