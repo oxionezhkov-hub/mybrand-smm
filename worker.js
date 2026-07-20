@@ -40,6 +40,29 @@ const ONBOARDING_STEPS = [
   },
 ];
 
+// ── Sell-First Builder: content-ops constants ─────────────────────────────────
+// Funnel: IG/FB Reels → YouTube → Telegram free → Telegram paid.
+// See section 3 of the playbook for pillar definitions.
+
+const SFB_PILLARS = [
+  { key: 'sell_first', label: 'Продавай, потом строй' },
+  { key: 'validate', label: 'Как валидировать по-настоящему' },
+  { key: 'fund_build', label: 'Финансируй разработку клиентами' },
+  { key: 'case_studies', label: 'Кейсы (свои и чужие)' },
+  { key: 'bts', label: 'Закулисье / proof-of-work' },
+  { key: 'tactical', label: 'Тактика: хуки, офферы, лендинги' },
+];
+
+const SFB_PLATFORMS = ['IG', 'FB', 'YouTube', 'Telegram'];
+const SFB_TYPES = ['trial reel', 'grid', 'carousel', 'long-form'];
+const SFB_HOOK_VARIANTS = ['A', 'B', 'C', 'D', 'n/a'];
+
+const SFB_TRIAL_DAILY_CEILING = 5;
+const SFB_TRIAL_WEEKLY_TARGET = [3, 5];
+const SFB_GRID_WEEKLY_MIN = 3;
+const SFB_PUSH_WINDOW_HOURS = 48;
+const SFB_COOLDOWN_GROWTH_PCT = 25;
+
 // ── KV helpers ────────────────────────────────────────────────────────────────
 
 async function kget(env, key, def = null) {
@@ -929,6 +952,22 @@ async function handleMessage(env, msg) {
     return;
   }
 
+  if (session.state === 'sfb_hooks_collect') {
+    await handleSfbHooksInput(env, session, text);
+    return;
+  }
+
+  if (['sfb_log_magnet', 'sfb_log_linked', 'sfb_log_metrics'].includes(session.state)) {
+    await handleSfbLogText(env, session, text);
+    return;
+  }
+
+  // Button-only steps of the content-ops flows — nudge back to the keyboard
+  if (typeof session.state === 'string' && session.state.startsWith('sfb_')) {
+    await send(env, 'Выбери вариант кнопкой выше 👆');
+    return;
+  }
+
   // Progress shortcuts — "записал", "снял", "смонтировал", "выложил" outside checklist flow
   const progressMatch = detectProgress(text);
   if (progressMatch) {
@@ -1083,6 +1122,78 @@ async function handleCallback(env, query) {
     await handleChecklistStep(env, profile, data.replace('cl:', ''));
     return;
   }
+
+  // ── Sell-First Builder: content-ops callbacks ──────────────────────────────
+
+  if (data.startsWith('sfbideapillar:')) {
+    const session = await kget(env, 'session', {});
+    if (session.state !== 'sfb_idea_pillar') return;
+    await finalizeSfbIdea(env, session, data.replace('sfbideapillar:', ''));
+    return;
+  }
+
+  if (data.startsWith('sfblogplatform:')) {
+    const session = await kget(env, 'session', {});
+    if (session.state !== 'sfb_log_platform') return;
+    session.draft.platform = sfbDec(data.replace('sfblogplatform:', ''));
+    session.state = 'sfb_log_type';
+    await kset(env, 'session', session);
+    await send(env, 'Тип публикации:', { reply_markup: sfbButtonsKeyboard(SFB_TYPES, 'sfblogtype:') });
+    return;
+  }
+
+  if (data.startsWith('sfblogtype:')) {
+    const session = await kget(env, 'session', {});
+    if (session.state !== 'sfb_log_type') return;
+    session.draft.type = sfbDec(data.replace('sfblogtype:', ''));
+    session.state = 'sfb_log_pillar';
+    await kset(env, 'session', session);
+    await send(env, 'Столп контента:', { reply_markup: sfbPillarKeyboard('sfblogpillar:') });
+    return;
+  }
+
+  if (data.startsWith('sfblogpillar:')) {
+    const session = await kget(env, 'session', {});
+    if (session.state !== 'sfb_log_pillar') return;
+    session.draft.pillar = data.replace('sfblogpillar:', '');
+    session.state = 'sfb_log_hook';
+    await kset(env, 'session', session);
+    await send(env, 'Вариант хука:', { reply_markup: sfbButtonsKeyboard(SFB_HOOK_VARIANTS, 'sfbloghook:') });
+    return;
+  }
+
+  if (data.startsWith('sfbloghook:')) {
+    const session = await kget(env, 'session', {});
+    if (session.state !== 'sfb_log_hook') return;
+    session.draft.hookVariant = sfbDec(data.replace('sfbloghook:', ''));
+    session.state = 'sfb_log_cta';
+    await kset(env, 'session', session);
+    await send(env, 'Был комментарий-CTA (unlock за коммент)?', { reply_markup: sfbButtonsKeyboard(['да', 'нет'], 'sfblogcta:') });
+    return;
+  }
+
+  if (data.startsWith('sfblogcta:')) {
+    const session = await kget(env, 'session', {});
+    if (session.state !== 'sfb_log_cta') return;
+    const yes = sfbDec(data.replace('sfblogcta:', '')) === 'да';
+    session.draft.ctaUsed = yes;
+    if (yes) {
+      session.state = 'sfb_log_magnet';
+      await kset(env, 'session', session);
+      await send(env, 'Какой лид-магнит? (чек-лист, гайд, шаблон…):');
+    } else {
+      session.draft.leadMagnet = null;
+      session.state = 'sfb_log_linked';
+      await kset(env, 'session', session);
+      await send(env, 'Связано с идеей/постом? Пришли <code>i3</code>, <code>p5</code> (если рекайкл) или «нет»:', { parse_mode: 'HTML' });
+    }
+    return;
+  }
+
+  if (data.startsWith('sfbpush:')) {
+    await sfbLogPush(env, data.replace('sfbpush:', ''));
+    return;
+  }
 }
 
 // ── Answer to morning question ────────────────────────────────────────────────
@@ -1216,17 +1327,12 @@ async function handleIdeaInput(env, text) {
     }
   }
 
-  const ideas = await kget(env, 'ideas', []);
-  ideas.push({ date: todayMSK(), summary, original: text });
-  if (ideas.length > 100) ideas.shift();
-  await kset(env, 'ideas', ideas);
-
-  await kset(env, 'session', { state: 'idle' });
+  await kset(env, 'session', { state: 'sfb_idea_pillar', summary, original: text });
 
   const reply = isUrl
-    ? `💡 Сохранил идею:\n\n<i>${summary}</i>`
-    : '💡 Идея добавлена в банк тем.';
-  await send(env, reply);
+    ? `💡 Понял идею:\n\n<i>${summary}</i>\n\nК какому столпу контента она относится?`
+    : '💡 Идея принята. К какому столпу контента она относится?';
+  await send(env, reply, { reply_markup: sfbPillarKeyboard('sfbideapillar:') });
 }
 
 // ── Viral analysis ────────────────────────────────────────────────────────────
@@ -1392,7 +1498,7 @@ async function handleCommand(env, profile, text) {
   const cmd = text.split(/\s+/)[0].toLowerCase();
 
   if (cmd === '/start' || cmd === '/help') {
-    await send(env, `<b>Команды</b>\n\n/reel — сделать сценарий (после команды напиши тему или скажи голосовым)\n/viral — разобрать виральный рилс и адаптировать под тебя\n/profile — профиль и статистика\n/idea — добавить идею в банк тем\n/stats — ввести аналитику из Instagram\n/skip — пропустить сегодня (стрик сгорит)\n/help — справка`);
+    await send(env, `<b>Команды</b>\n\n/reel — сделать сценарий (после команды напиши тему или скажи голосовым)\n/viral — разобрать виральный рилс и адаптировать под тебя\n/profile — профиль и статистика\n/idea — добавить идею в бэклог (с привязкой к столпу)\n/stats — ввести аналитику из Instagram\n/skip — пропустить сегодня (стрик сгорит)\n\n<b>Sell-First Builder — контент-система</b>\n/idea — идея → бэклог\n/hooks [id] — записать 4 варианта хука для ABCD-теста\n/log — залогировать выложенный пост (пошагово)\n/log push &lt;id&gt; — отметить пост как пушнутый в grid\n/log update &lt;id&gt; &lt;views&gt; &lt;comments&gt; &lt;saves&gt; &lt;shares&gt; — обновить метрики\n/today — квоты на сегодня/неделю + открытые hook-тесты\n/winners — trial-рилсы, которым пора решать: пуш или мимо\n/week — недельный обзор контент-системы\n/funnel [email tgFree tgPaid] — воронка email → TG free → TG paid\n/streak — стрик публикаций\n\n/help — справка`);
     return;
   }
 
@@ -1441,6 +1547,41 @@ async function handleCommand(env, profile, text) {
     await kset(env, 'profile', profile);
     await kset(env, 'session', { state: 'idle' });
     await send(env, '⏭ Пропустил сегодня. Стрик сгорел.\nЗавтра в 7:00 — новый шанс.');
+    return;
+  }
+
+  if (cmd === '/hooks') {
+    await handleSfbHooksCommand(env, text);
+    return;
+  }
+
+  if (cmd === '/log') {
+    await handleSfbLogCommand(env, text);
+    return;
+  }
+
+  if (cmd === '/today') {
+    await handleSfbTodayCommand(env);
+    return;
+  }
+
+  if (cmd === '/winners') {
+    await handleSfbWinnersCommand(env);
+    return;
+  }
+
+  if (cmd === '/week') {
+    await handleSfbWeekCommand(env);
+    return;
+  }
+
+  if (cmd === '/funnel') {
+    await handleSfbFunnelCommand(env, text);
+    return;
+  }
+
+  if (cmd === '/streak') {
+    await handleSfbStreakCommand(env);
     return;
   }
 
@@ -1496,6 +1637,18 @@ async function handleScheduled(env, cron) {
   // 18:00 MSK Sunday = 15:00 UTC Sunday
   if (cron === '0 15 * * 0') {
     await sendWeeklyReflection(env);
+    return;
+  }
+
+  // 21:00 MSK = 18:00 UTC — content-ops daily nudge (quotas + 48h/cooldown alerts)
+  if (cron === '0 18 * * *') {
+    await sfbDailyNudge(env);
+    return;
+  }
+
+  // 20:00 MSK Sunday = 17:00 UTC Sunday — content-ops weekly review
+  if (cron === '0 17 * * 0') {
+    await sfbWeeklyReviewNudge(env);
     return;
   }
 }
@@ -1560,6 +1713,478 @@ async function sendWeeklyReflection(env) {
   txt += `\n\n<b>Что сработало лучше всего на этой неделе?</b>`;
 
   await send(env, txt);
+}
+
+// ── Sell-First Builder: content-ops system ────────────────────────────────────
+// Idea/hook backlog + activity log + funnel tracking for the trial-reels growth
+// playbook (IG/FB → YouTube → Telegram free → Telegram paid).
+
+function sfbChunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+function sfbEnc(s) { return String(s).replace(/\s+/g, '_'); }
+function sfbDec(s) { return String(s).replace(/_/g, ' '); }
+
+function sfbPillarLabel(key) {
+  return SFB_PILLARS.find(p => p.key === key)?.label || key || '—';
+}
+
+function sfbPillarKeyboard(prefix) {
+  return { inline_keyboard: sfbChunk(SFB_PILLARS.map(p => ({ text: p.label, callback_data: `${prefix}${p.key}` })), 2) };
+}
+
+function sfbButtonsKeyboard(items, prefix, perRow = 2) {
+  return { inline_keyboard: sfbChunk(items.map(v => ({ text: v, callback_data: `${prefix}${sfbEnc(v)}` })), perRow) };
+}
+
+async function sfbBacklog(env) { return kget(env, 'sfb:backlog', []); }
+async function sfbSaveBacklog(env, arr) { await kset(env, 'sfb:backlog', arr); }
+async function sfbPosts(env) { return kget(env, 'sfb:posts', []); }
+async function sfbSavePosts(env, arr) { await kset(env, 'sfb:posts', arr); }
+async function sfbFunnel(env) { return kget(env, 'sfb:funnel', { emailSubs: 0, tgFree: 0, tgPaid: 0, updatedAt: null }); }
+async function sfbFunnelLog(env) { return kget(env, 'sfb:funnelLog', []); }
+
+async function sfbNextId(env, kind) {
+  const counters = await kget(env, 'sfb:counters', { idea: 0, post: 0 });
+  counters[kind] = (counters[kind] || 0) + 1;
+  await kset(env, 'sfb:counters', counters);
+  return counters[kind];
+}
+
+function daysAgoStr(n) {
+  const d = new Date(Date.now() + TZ_OFFSET * 3600 * 1000 - n * 24 * 3600 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+
+function sfbGrowthPct(post) {
+  const m = post.metrics;
+  if (!m || m.length < 2) return null;
+  const prev = m[m.length - 2].views;
+  const cur = m[m.length - 1].views;
+  if (!prev) return null;
+  return Math.round(((cur - prev) / prev) * 100);
+}
+
+// ── /idea: pillar-tagged backlog (also feeds the legacy AI idea bank) ────────
+
+async function finalizeSfbIdea(env, session, pillarKey) {
+  const ideas = await kget(env, 'ideas', []);
+  ideas.push({ date: todayMSK(), summary: session.summary, original: session.original });
+  if (ideas.length > 100) ideas.shift();
+  await kset(env, 'ideas', ideas);
+
+  const backlog = await sfbBacklog(env);
+  const id = await sfbNextId(env, 'idea');
+  const idea = {
+    id: `I${id}`,
+    pillar: pillarKey,
+    concept: session.summary,
+    status: 'raw idea',
+    hooks: [null, null, null, null],
+    createdAt: todayMSK(),
+  };
+  backlog.push(idea);
+  await sfbSaveBacklog(env, backlog);
+
+  await kset(env, 'session', { state: 'idle' });
+
+  await send(env, `✅ Добавлено в бэклог: <b>${idea.id}</b> · ${sfbPillarLabel(pillarKey)}\n<i>${idea.concept}</i>\n\nКогда снимешь тело видео — запиши хуки: <code>/hooks ${idea.id}</code>`);
+}
+
+// ── /hooks: 4 hook variants per idea for the ABCD test ───────────────────────
+
+async function handleSfbHooksCommand(env, text) {
+  const arg = text.replace('/hooks', '').trim();
+  const backlog = await sfbBacklog(env);
+
+  if (!arg) {
+    const pending = backlog.filter(i => i.hooks.some(h => !h));
+    if (!pending.length) {
+      await send(env, '🎣 Все идеи в бэклоге уже с хуками. Добавь новую: /idea');
+      return;
+    }
+    const rows = pending.slice(-10).map(i => `<b>${i.id}</b> · ${sfbPillarLabel(i.pillar)} — ${i.concept.slice(0, 60)}`).join('\n');
+    await send(env, `🎣 <b>Без хуков ещё:</b>\n\n${rows}\n\nЗапусти: <code>/hooks ${pending[pending.length - 1].id}</code>`);
+    return;
+  }
+
+  const idea = backlog.find(i => i.id.toLowerCase() === arg.toLowerCase());
+  if (!idea) {
+    await send(env, `Не нашёл идею ${arg}. Запусти /hooks без аргумента — покажу список.`);
+    return;
+  }
+
+  await kset(env, 'session', { state: 'sfb_hooks_collect', ideaId: idea.id, hookIndex: 0, hooks: [] });
+  await send(env, `🎣 <b>${idea.id}</b> · ${idea.concept}\n\nСними тело один раз, затем пришли хук #1 (2–3 сек):`);
+}
+
+async function handleSfbHooksInput(env, session, text) {
+  const hooks = [...session.hooks, text.trim()];
+  const nextIndex = session.hookIndex + 1;
+
+  if (nextIndex < 4) {
+    await kset(env, 'session', { ...session, hookIndex: nextIndex, hooks });
+    await send(env, `Хук #${nextIndex + 1}:`);
+    return;
+  }
+
+  const backlog = await sfbBacklog(env);
+  const idea = backlog.find(i => i.id === session.ideaId);
+  if (idea) {
+    idea.hooks = hooks;
+    idea.status = 'hooks recorded';
+    await sfbSaveBacklog(env, backlog);
+  }
+  await kset(env, 'session', { state: 'idle' });
+
+  const list = hooks.map((h, i) => `${String.fromCharCode(65 + i)}: ${h}`).join('\n');
+  await send(env, `✅ Хуки записаны для <b>${session.ideaId}</b>:\n\n${list}\n\nВыложи все 4 отдельными trial-рилсами с разницей в пару минут, потом залогируй каждый через /log (столп ${idea ? sfbPillarLabel(idea.pillar) : ''}, укажи «${session.ideaId}» как связанную идею).`);
+}
+
+// ── /log: activity log — one row per posted piece ────────────────────────────
+
+async function handleSfbLogCommand(env, text) {
+  const args = text.split(/\s+/).slice(1);
+
+  if (args[0]?.toLowerCase() === 'push') {
+    await sfbLogPush(env, args[1]);
+    return;
+  }
+  if (args[0]?.toLowerCase() === 'update') {
+    await sfbLogUpdateMetrics(env, args[1], args.slice(2));
+    return;
+  }
+
+  await kset(env, 'session', { state: 'sfb_log_platform', draft: {} });
+  await send(env, '📋 <b>Логируем пост.</b> Платформа:', { reply_markup: sfbButtonsKeyboard(SFB_PLATFORMS, 'sfblogplatform:') });
+}
+
+async function sfbLogPush(env, idArg) {
+  if (!idArg) { await send(env, 'Укажи id: <code>/log push P4</code>'); return; }
+  const posts = await sfbPosts(env);
+  const post = posts.find(p => p.id.toLowerCase() === idArg.toLowerCase());
+  if (!post) { await send(env, `Не нашёл пост ${idArg}.`); return; }
+
+  post.pushedToGrid = true;
+  post.pushedAt = Date.now();
+  await sfbSavePosts(env, posts);
+
+  if (post.ideaId) {
+    const backlog = await sfbBacklog(env);
+    const idea = backlog.find(i => i.id.toLowerCase() === post.ideaId.toLowerCase());
+    if (idea) { idea.status = 'pushed to grid'; await sfbSaveBacklog(env, backlog); }
+  }
+
+  await send(env, `🚀 ${post.id} отмечен как пушнутый в grid.`);
+}
+
+async function sfbLogUpdateMetrics(env, idArg, numArgs) {
+  if (!idArg || numArgs.length < 4) {
+    await send(env, 'Формат: <code>/log update P4 800 20 15 5</code>\n(просмотры комментарии сохранения репосты)');
+    return;
+  }
+  const posts = await sfbPosts(env);
+  const post = posts.find(p => p.id.toLowerCase() === idArg.toLowerCase());
+  if (!post) { await send(env, `Не нашёл пост ${idArg}.`); return; }
+
+  const [views, comments, saves, shares] = numArgs.slice(0, 4).map(x => parseInt(x, 10) || 0);
+  post.metrics.push({ at: Date.now(), views, comments, saves, shares });
+  await sfbSavePosts(env, posts);
+
+  const growth = sfbGrowthPct(post);
+  await send(env, `📈 Обновил ${post.id}: 👁 ${views} · 💬 ${comments} · 🔖 ${saves} · 🔁 ${shares}${growth !== null ? `\nРост за последний интервал: ${growth > 0 ? '+' : ''}${growth}%` : ''}`);
+}
+
+function parseSfbLinkedId(text) {
+  const t = text.trim();
+  if (/^нет$/i.test(t)) return {};
+  const m = t.match(/^([ip])\s*(\d+)$/i);
+  if (!m) return {};
+  const id = (m[1].toLowerCase() === 'i' ? 'I' : 'P') + m[2];
+  return m[1].toLowerCase() === 'i' ? { ideaId: id } : { recycledFrom: id };
+}
+
+async function handleSfbLogText(env, session, text) {
+  const draft = session.draft;
+
+  if (session.state === 'sfb_log_magnet') {
+    draft.leadMagnet = text.trim();
+    await kset(env, 'session', { ...session, state: 'sfb_log_linked' });
+    await send(env, 'Связано с идеей/постом? Пришли <code>i3</code>, <code>p5</code> (если рекайкл) или «нет»:', { parse_mode: 'HTML' });
+    return;
+  }
+
+  if (session.state === 'sfb_log_linked') {
+    Object.assign(draft, parseSfbLinkedId(text));
+    await kset(env, 'session', { ...session, state: 'sfb_log_metrics' });
+    await send(env, 'Метрики на сейчас — через пробел: <code>просмотры комментарии сохранения репосты</code> (0 если 0):', { parse_mode: 'HTML' });
+    return;
+  }
+
+  if (session.state === 'sfb_log_metrics') {
+    await finalizeSfbLog(env, session, text);
+    return;
+  }
+}
+
+async function finalizeSfbLog(env, session, numsText) {
+  const parts = numsText.trim().split(/\s+/).map(x => parseInt(x, 10) || 0);
+  const [views, comments, saves, shares] = [parts[0] || 0, parts[1] || 0, parts[2] || 0, parts[3] || 0];
+
+  const posts = await sfbPosts(env);
+  const id = await sfbNextId(env, 'post');
+  const draft = session.draft;
+  const post = {
+    id: `P${id}`,
+    date: todayMSK(),
+    postedAt: Date.now(),
+    platform: draft.platform,
+    type: draft.type,
+    pillar: draft.pillar,
+    hookVariant: draft.hookVariant,
+    ctaUsed: !!draft.ctaUsed,
+    leadMagnet: draft.leadMagnet || null,
+    ideaId: draft.ideaId || null,
+    recycledFrom: draft.recycledFrom || null,
+    metrics: [{ at: Date.now(), views, comments, saves, shares }],
+    pushedToGrid: draft.type === 'grid',
+    pushedAt: draft.type === 'grid' ? Date.now() : null,
+  };
+  posts.push(post);
+  await sfbSavePosts(env, posts);
+
+  if (post.ideaId) {
+    const backlog = await sfbBacklog(env);
+    const idea = backlog.find(i => i.id.toLowerCase() === post.ideaId.toLowerCase());
+    if (idea && idea.status !== 'pushed to grid') {
+      idea.status = 'posted';
+      await sfbSaveBacklog(env, backlog);
+    }
+  }
+
+  await kset(env, 'session', { state: 'idle' });
+
+  let txt = `✅ Залогировано: <b>${post.id}</b>\n${post.platform} · ${post.type} · ${sfbPillarLabel(post.pillar)} · хук ${post.hookVariant}\n`;
+  txt += `CTA: ${post.ctaUsed ? `да (${post.leadMagnet})` : 'нет'}\n`;
+  txt += `👁 ${views} · 💬 ${comments} · 🔖 ${saves} · 🔁 ${shares}\n\n`;
+  txt += `Обнови метрики позже: <code>/log update ${post.id} 800 20 15 5</code>`;
+  if (post.type === 'trial reel') txt += `\nЕсли зайдёт — не забудь: <code>/log push ${post.id}</code> в течение 48ч.`;
+
+  await send(env, txt);
+}
+
+// ── /today: quota status + open hook tests ───────────────────────────────────
+
+async function handleSfbTodayCommand(env) {
+  const posts = await sfbPosts(env);
+  const today = todayMSK();
+  const weekAgo = daysAgoStr(7);
+
+  const trialToday = posts.filter(p => p.date === today && p.type === 'trial reel').length;
+  const trialWeek = posts.filter(p => p.date >= weekAgo && p.type === 'trial reel').length;
+  const gridWeek = posts.filter(p => p.date >= weekAgo && p.type === 'grid').length;
+
+  let txt = `📅 <b>Сегодня — ${today}</b>\n\n`;
+  txt += `🎬 Trial-рилсы сегодня: <b>${trialToday}</b> (потолок ${SFB_TRIAL_DAILY_CEILING}/день)\n`;
+  txt += `🎬 Trial-рилсы за неделю: <b>${trialWeek}</b> (цель ${SFB_TRIAL_WEEKLY_TARGET[0]}–${SFB_TRIAL_WEEKLY_TARGET[1]}/неделю)\n`;
+  txt += `📌 Grid-посты за неделю: <b>${gridWeek}/${SFB_GRID_WEEKLY_MIN}</b>${gridWeek >= SFB_GRID_WEEKLY_MIN ? ' ✅' : ''}\n`;
+
+  const backlog = await sfbBacklog(env);
+  const openHookTests = backlog.filter(i => i.status === 'hooks recorded');
+  if (openHookTests.length) {
+    txt += `\n🎣 <b>Открытые hook-тесты:</b>\n`;
+    for (const idea of openHookTests) {
+      const posted = posts.filter(p => p.ideaId === idea.id && ['A', 'B', 'C', 'D'].includes(p.hookVariant)).length;
+      txt += `${idea.id} — ${posted}/4 хуков выложено\n`;
+    }
+  }
+
+  await send(env, txt.trim());
+}
+
+// ── /winners: 48h + cooldown decision windows ────────────────────────────────
+
+function sfbWinnerStatusLine(post) {
+  const hours = (Date.now() - post.postedAt) / 3600000;
+  const growth = sfbGrowthPct(post);
+  if (growth !== null && growth < SFB_COOLDOWN_GROWTH_PCT) {
+    return { urgent: true, line: `🧊 Остывает (рост ${growth}%) — последний шанс запушить` };
+  }
+  if (hours >= SFB_PUSH_WINDOW_HOURS) {
+    return { urgent: true, line: `🚨 Окно 48ч закрылось (${Math.round(hours)}ч назад) — пуш даст меньше эффекта` };
+  }
+  return { urgent: false, line: `⏳ Осталось ~${Math.max(0, Math.round(SFB_PUSH_WINDOW_HOURS - hours))}ч до конца окна 48ч` };
+}
+
+async function handleSfbWinnersCommand(env) {
+  const posts = await sfbPosts(env);
+  const candidates = posts.filter(p => p.type === 'trial reel' && !p.pushedToGrid);
+  if (!candidates.length) {
+    await send(env, '🏆 Нет trial-рилсов, ожидающих решения о пуше.');
+    return;
+  }
+
+  let txt = `🏆 <b>Кандидаты на пуш в grid</b>\n\n`;
+  const keyboard = [];
+  for (const post of candidates) {
+    const growth = sfbGrowthPct(post);
+    const { line } = sfbWinnerStatusLine(post);
+    const lastMetric = post.metrics[post.metrics.length - 1];
+    txt += `<b>${post.id}</b> · ${post.platform} · ${sfbPillarLabel(post.pillar)} · хук ${post.hookVariant}\n`;
+    txt += `👁 ${lastMetric.views}${growth !== null ? ` (${growth > 0 ? '+' : ''}${growth}%)` : ''}\n${line}\n\n`;
+    keyboard.push([{ text: `✅ Пушнуть ${post.id}`, callback_data: `sfbpush:${post.id}` }]);
+  }
+
+  await send(env, txt.trim(), { reply_markup: { inline_keyboard: keyboard } });
+}
+
+// ── /week: content-ops weekly review (separate from the recording-streak one) ─
+
+async function buildSfbWeekReview(env) {
+  const posts = await sfbPosts(env);
+  const weekAgo = daysAgoStr(7);
+  const weekPosts = posts.filter(p => p.date >= weekAgo);
+
+  const byType = {};
+  for (const p of weekPosts) byType[p.type] = (byType[p.type] || 0) + 1;
+
+  const ranked = weekPosts
+    .map(p => ({ p, views: p.metrics[p.metrics.length - 1]?.views || 0 }))
+    .sort((a, b) => b.views - a.views)
+    .slice(0, 3);
+
+  const unpushed = posts.filter(p => p.type === 'trial reel' && !p.pushedToGrid && (Date.now() - p.postedAt) / 3600000 >= SFB_PUSH_WINDOW_HOURS);
+
+  const funnel = await sfbFunnel(env);
+  const funnelLog = await sfbFunnelLog(env);
+  const baseline = [...funnelLog].reverse().find(f => f.date <= weekAgo);
+
+  const ctaPosts = weekPosts.filter(p => p.ctaUsed);
+  const noCtaPosts = weekPosts.filter(p => !p.ctaUsed);
+  const avgViews = arr => arr.length ? Math.round(arr.reduce((s, p) => s + (p.metrics[p.metrics.length - 1]?.views || 0), 0) / arr.length) : 0;
+
+  const pillarComments = {};
+  for (const p of weekPosts) {
+    pillarComments[p.pillar] = (pillarComments[p.pillar] || 0) + (p.metrics[p.metrics.length - 1]?.comments || 0);
+  }
+  const topPillar = Object.entries(pillarComments).sort((a, b) => b[1] - a[1])[0];
+
+  let txt = `📊 <b>Недельный обзор — контент-система</b>\n\n`;
+  txt += `<b>Опубликовано:</b>\n${Object.entries(byType).map(([t, n]) => `• ${t}: ${n}`).join('\n') || '— ничего не залогировано'}\n\n`;
+
+  if (ranked.length) {
+    txt += `<b>Топ-3 поста:</b>\n`;
+    txt += ranked.map((r, i) => `${i + 1}. ${r.p.id} · ${sfbPillarLabel(r.p.pillar)} · 👁 ${r.views}${r.p.ctaUsed ? ' · CTA' : ''} · хук ${r.p.hookVariant}`).join('\n');
+    txt += '\n\n';
+  }
+
+  if (unpushed.length) txt += `🚨 <b>Победители мимо окна:</b> ${unpushed.map(p => p.id).join(', ')}\n\n`;
+
+  txt += `<b>CTA vs без CTA</b> (сред. просмотры): ${avgViews(ctaPosts)} vs ${avgViews(noCtaPosts)}\n\n`;
+
+  txt += `<b>Воронка:</b> 📧 ${funnel.emailSubs} · 🆓 TG ${funnel.tgFree} · 💰 TG paid ${funnel.tgPaid}`;
+  if (baseline) {
+    const d = (a, b) => `${a - b >= 0 ? '+' : ''}${a - b}`;
+    txt += ` (за неделю: 📧${d(funnel.emailSubs, baseline.emailSubs)} · 🆓${d(funnel.tgFree, baseline.tgFree)} · 💰${d(funnel.tgPaid, baseline.tgPaid)})`;
+  }
+  txt += '\n\n';
+
+  txt += topPillar ? `<b>Столп недели:</b> ${sfbPillarLabel(topPillar[0])} — больше всего комментариев, стоит удвоить.` : '<b>Столп недели:</b> пока недостаточно данных.';
+
+  return txt;
+}
+
+async function handleSfbWeekCommand(env) {
+  await send(env, await buildSfbWeekReview(env));
+}
+
+// ── /funnel: email → Telegram free → Telegram paid ───────────────────────────
+
+async function handleSfbFunnelCommand(env, text) {
+  const args = text.replace('/funnel', '').trim();
+  const funnel = await sfbFunnel(env);
+
+  if (!args) {
+    const funnelLog = await sfbFunnelLog(env);
+    const weekAgo = daysAgoStr(7);
+    const baseline = [...funnelLog].reverse().find(f => f.date <= weekAgo);
+    const d = (a, b) => `${a - b >= 0 ? '+' : ''}${a - b}`;
+
+    let txt = `🔻 <b>Воронка</b>\n\n📧 Email: <b>${funnel.emailSubs}</b>\n🆓 Telegram free: <b>${funnel.tgFree}</b>\n💰 Telegram paid: <b>${funnel.tgPaid}</b>`;
+    if (funnel.updatedAt) txt += `\n\n<i>обновлено ${funnel.updatedAt}</i>`;
+    if (baseline) txt += `\nЗа неделю: 📧${d(funnel.emailSubs, baseline.emailSubs)} · 🆓${d(funnel.tgFree, baseline.tgFree)} · 💰${d(funnel.tgPaid, baseline.tgPaid)}`;
+    txt += `\n\nОбновить: <code>/funnel 120 45 3</code> (email, TG free, TG paid)`;
+    await send(env, txt);
+    return;
+  }
+
+  const parts = args.split(/\s+/).map(x => parseInt(x, 10));
+  const updated = {
+    emailSubs: Number.isFinite(parts[0]) ? parts[0] : funnel.emailSubs,
+    tgFree: Number.isFinite(parts[1]) ? parts[1] : funnel.tgFree,
+    tgPaid: Number.isFinite(parts[2]) ? parts[2] : funnel.tgPaid,
+    updatedAt: todayMSK(),
+  };
+  await kset(env, 'sfb:funnel', updated);
+
+  const funnelLog = await sfbFunnelLog(env);
+  funnelLog.push({ date: todayMSK(), ...updated });
+  if (funnelLog.length > 200) funnelLog.shift();
+  await kset(env, 'sfb:funnelLog', funnelLog);
+
+  await send(env, `✅ Воронка обновлена:\n📧 ${updated.emailSubs} · 🆓 ${updated.tgFree} · 💰 ${updated.tgPaid}`);
+}
+
+// ── /streak: consecutive days with a logged post ─────────────────────────────
+
+async function handleSfbStreakCommand(env) {
+  const posts = await sfbPosts(env);
+  const datesWithPosts = new Set(posts.map(p => p.date));
+
+  let streak = 0;
+  let d = todayMSK();
+  if (!datesWithPosts.has(d)) d = prevDay(d);
+  while (datesWithPosts.has(d)) {
+    streak++;
+    d = prevDay(d);
+  }
+
+  const emoji = streak >= 7 ? '🔥' : streak >= 3 ? '⚡' : '📅';
+  const hint = datesWithPosts.has(todayMSK()) ? 'Сегодня уже залогировано 👍' : 'Сегодня ещё ничего не залогировано — самое время: /log';
+  await send(env, `${emoji} <b>Стрик публикаций:</b> ${streak} дн. подряд\n\n${hint}`);
+}
+
+// ── Automated nudges (cron) ───────────────────────────────────────────────────
+
+async function sfbDailyNudge(env) {
+  const posts = await sfbPosts(env);
+  const today = todayMSK();
+  const trialToday = posts.filter(p => p.date === today && p.type === 'trial reel').length;
+
+  let txt = `🔔 <b>Дневной чек-ин</b>\n\n🎬 Trial-рилсы сегодня: <b>${trialToday}</b>/${SFB_TRIAL_WEEKLY_TARGET[1]}\n`;
+
+  const candidates = posts.filter(p => p.type === 'trial reel' && !p.pushedToGrid);
+  const urgent = candidates
+    .map(p => ({ p, ...sfbWinnerStatusLine(p) }))
+    .filter(x => x.urgent);
+
+  if (urgent.length) {
+    txt += `\n🚨 <b>Требуют решения:</b>\n`;
+    txt += urgent.map(x => `${x.p.id} — ${x.line}`).join('\n');
+  } else if (trialToday === 0) {
+    txt += `\nЕщё не постил trial-рилс сегодня. Есть 15 минут на съёмку тела + 1 хук?`;
+  } else {
+    txt += `\nВсё в порядке, ничего не горит. 👍`;
+  }
+
+  await send(env, txt);
+}
+
+async function sfbWeeklyReviewNudge(env) {
+  await send(env, await buildSfbWeekReview(env));
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
