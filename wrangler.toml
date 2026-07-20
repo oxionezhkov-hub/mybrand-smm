@@ -10,6 +10,18 @@ id = "5ffa6fc542054098b122fb4f4c254076"
 [ai]
 binding = "AI"
 
+# All cron schedules the Worker's scheduled() handler dispatches on (see
+# handleScheduled in worker.js). Kept complete here so a `wrangler deploy`
+# doesn't drop schedules that existed only in the dashboard before.
+[triggers]
+crons = [
+  "0 4 * * *",  # 07:00 MSK daily — morning recording question
+  "0 10 * * *", # 13:00 MSK daily — daytime nudge if unanswered
+  "0 15 * * 0", # 18:00 MSK Sunday — weekly recording-streak reflection
+  "0 18 * * *", # 21:00 MSK daily — content-ops quota/48h/cooldown nudge
+  "0 17 * * 0", # 20:00 MSK Sunday — content-ops weekly review
+]
+
 # Static presentation deck (public/vebinar-slides/index.html) served at /vebinar-slides.
 # Matched assets are served directly by Cloudflare; everything else (webhook, /debug/morning, /)
 # falls through to the Worker script below.
