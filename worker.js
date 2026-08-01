@@ -245,6 +245,18 @@ async function mlUpdateFocusTask(env, dateKey, body) {
   return jsonResponse({ focus });
 }
 
+async function mlCreateProject(env, body) {
+  const projects = await kget(env, 'mylife:projects', mlDefaultProjects());
+  const name = (body.name || '').trim();
+  if (!name) return jsonResponse({ error: 'name required' }, 400);
+  const existing = projects.find(p => p.name.toLowerCase() === name.toLowerCase());
+  if (existing) return jsonResponse({ project: existing, projects });
+  const project = { id: crypto.randomUUID(), name, order: projects.length, createdAt: Date.now() };
+  projects.push(project);
+  await kset(env, 'mylife:projects', projects);
+  return jsonResponse({ project, projects });
+}
+
 async function mlDeleteProject(env, id) {
   if (id === MYLIFE_GENERAL_PROJECT) return jsonResponse({ error: 'cannot delete default project' }, 400);
 
@@ -2187,6 +2199,417 @@ async function sfbWeeklyReviewNudge(env) {
   await send(env, await buildSfbWeekReview(env));
 }
 
+// ── MCP server (Claude custom connector) ─────────────────────────────────────
+// Exposes MyLife (tasks/projects/priorities/habits/focus + a business-coach
+// chat) as a remote MCP server so Claude can read and edit everything and
+// give coaching advice grounded in the real data.
+// Auth: shared secret via `MYLIFE_MCP_TOKEN` (wrangler secret), passed as
+// either `Authorization: Bearer <token>` or `?token=<token>` on the URL that
+// goes into Claude's "Remote MCP server URL" field, e.g.
+//   https://<worker-domain>/mylife/mcp?token=<token>
+
+const MCP_PROTOCOL_VERSION = '2025-06-18';
+
+const MYLIFE_COACH_SYSTEM = `Ты — прямой и практичный бизнес-коуч и продуктивный ассистент пользователя в приложении MyLife (личный трекер задач, проектов, привычек и фокус-дня).
+Отвечай на языке пользователя (по умолчанию — русский), простым текстом или Markdown, без HTML-тегов.
+Опирайся на переданный ниже срез данных (задачи, проекты, приоритеты, привычки), если он есть — давай конкретные, выполнимые советы, помогай расставлять приоритеты, замечай риски (просроченные задачи, заброшенные привычки) и задавай не более одного уточняющего вопроса, только если это критично.
+Не лей воду, не извиняйся, не проси прощения за прошлые ответы.`;
+
+async function callClaudeCoach(env, { system, user }) {
+  const reqBody = {
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 1500,
+    system,
+    messages: [{ role: 'user', content: user }],
+  };
+  let attempts = 0;
+  while (attempts < 3) {
+    attempts++;
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': env.CLAUDE_API,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify(reqBody),
+      });
+      if (res.status === 429 && attempts < 3) {
+        await new Promise(r => setTimeout(r, 1000 * attempts));
+        continue;
+      }
+      if (!res.ok) throw new Error(`Claude ${res.status}: ${await res.text()}`);
+      const data = await res.json();
+      return (data.content?.filter(b => b.type === 'text')?.map(b => b.text)?.join('') ?? '').trim();
+    } catch (e) {
+      if (attempts >= 3) throw e;
+    }
+  }
+}
+
+function mlSnapshotSummary(snapshot) {
+  const { tasks, projects, priorities, habits } = snapshot;
+  const projectName = id => projects.find(p => p.id === id)?.name || id;
+  const priorityName = id => priorities.find(p => p.id === id)?.name || '—';
+  const active = tasks.filter(t => t.status === 'active').sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
+  const lines = [];
+  lines.push(`Проекты: ${projects.map(p => p.name).join(', ') || '—'}`);
+  lines.push(`Активные задачи (${active.length}):`);
+  for (const t of active.slice(0, 60)) {
+    lines.push(`- [${t.id}] "${t.title}" | проект: ${projectName(t.projectId)} | приоритет: ${priorityName(t.priorityId)} | срок: ${t.dueDate || '—'}`);
+  }
+  if (habits.length) {
+    lines.push(`Привычки: ${habits.map(h => h.name).join(', ')}`);
+  }
+  return lines.join('\n');
+}
+
+function mcpJson(obj, status = 200) {
+  return new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
+}
+
+function mcpResult(id, result) {
+  return mcpJson({ jsonrpc: '2.0', id, result });
+}
+
+function mcpError(id, code, message, status = 200) {
+  return mcpJson({ jsonrpc: '2.0', id: id ?? null, error: { code, message } }, status);
+}
+
+function mcpToolText(obj, isError = false) {
+  return { content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }], isError };
+}
+
+async function mcpResponseToToolResult(resPromise) {
+  const res = await resPromise;
+  let body;
+  try { body = await res.json(); } catch { body = {}; }
+  return mcpToolText(body, res.status >= 400);
+}
+
+const MCP_TOOLS = [
+  {
+    name: 'mylife_get_snapshot',
+    description: 'Get everything in MyLife: tasks, projects, priorities, habits, extra notes/logs and the focus-day plan. Use this first to see current state.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'mylife_list_tasks',
+    description: 'List tasks, optionally filtered by status and/or project.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', enum: ['active', 'done', 'archived'], description: 'Filter by status. Omit for all statuses.' },
+        projectId: { type: 'string', description: 'Filter by project id. Omit for all projects.' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'mylife_create_task',
+    description: 'Create a new task. If newProjectName is given and does not match an existing project, a new project is created for it.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        description: { type: 'string' },
+        projectId: { type: 'string', description: 'Existing project id. Defaults to the "general" project.' },
+        newProjectName: { type: 'string', description: 'Create (or reuse) a project with this name for the task.' },
+        priorityId: { type: 'string' },
+        dueDate: { type: 'string', description: 'YYYY-MM-DD' },
+      },
+      required: ['title'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'mylife_update_task',
+    description: 'Update fields on an existing task, including moving it between projects, changing status (active/done/archived), priority, due date, or planned minutes.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        projectId: { type: 'string' },
+        priorityId: { type: 'string' },
+        dueDate: { type: 'string', description: 'YYYY-MM-DD' },
+        status: { type: 'string', enum: ['active', 'done', 'archived'] },
+        plannedMinutes: { type: 'number' },
+      },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'mylife_delete_task',
+    description: 'Permanently delete a task.',
+    inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'], additionalProperties: false },
+  },
+  {
+    name: 'mylife_create_project',
+    description: 'Create a new project (or return the existing one if the name already matches).',
+    inputSchema: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'], additionalProperties: false },
+  },
+  {
+    name: 'mylife_delete_project',
+    description: 'Delete a project. Its tasks are reassigned to the default "general" project. The "general" project itself cannot be deleted.',
+    inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'], additionalProperties: false },
+  },
+  {
+    name: 'mylife_create_priority',
+    description: 'Create a new priority label (e.g. "Urgent") with an optional hex color.',
+    inputSchema: {
+      type: 'object',
+      properties: { name: { type: 'string' }, color: { type: 'string', description: 'Hex color, e.g. #F29AA3' } },
+      required: ['name'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'mylife_update_priority',
+    description: 'Rename or recolor an existing priority.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string' }, name: { type: 'string' }, color: { type: 'string' } },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'mylife_delete_priority',
+    description: 'Delete a priority label. Tasks using it are left without a priority.',
+    inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'], additionalProperties: false },
+  },
+  {
+    name: 'mylife_create_habit',
+    description: 'Create a recurring habit to track.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        periodDays: { type: 'number', enum: [1, 7, 30], description: 'How often it should repeat: daily(1)/weekly(7)/monthly(30).' },
+        daysOfWeek: { type: 'array', items: { type: 'integer', minimum: 0, maximum: 6 }, description: 'Optional specific weekdays, 0=Sunday.' },
+      },
+      required: ['name'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'mylife_update_habit',
+    description: 'Update a habit\'s name/schedule, or toggle its completion log for a specific date (pass toggleDate as YYYY-MM-DD to mark/unmark that day done).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        name: { type: 'string' },
+        periodDays: { type: 'number', enum: [1, 7, 30] },
+        daysOfWeek: { type: 'array', items: { type: 'integer', minimum: 0, maximum: 6 } },
+        toggleDate: { type: 'string', description: 'YYYY-MM-DD, toggles that date in the habit log' },
+      },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'mylife_delete_habit',
+    description: 'Delete a habit.',
+    inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'], additionalProperties: false },
+  },
+  {
+    name: 'mylife_add_note',
+    description: 'Add a free-form note/log entry (extra log) for a given date.',
+    inputSchema: {
+      type: 'object',
+      properties: { text: { type: 'string' }, dateKey: { type: 'string', description: 'YYYY-MM-DD, defaults to today' } },
+      required: ['text'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'mylife_delete_note',
+    description: 'Delete a note/log entry by id.',
+    inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'], additionalProperties: false },
+  },
+  {
+    name: 'mylife_set_focus_day',
+    description: 'Set (replace) the focus plan (up to 3 tasks) for a given day.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        dateKey: { type: 'string', description: 'YYYY-MM-DD' },
+        tasks: {
+          type: 'array',
+          maxItems: 3,
+          items: {
+            type: 'object',
+            properties: { name: { type: 'string' }, estimatedMinutes: { type: 'number' } },
+            required: ['name'],
+          },
+        },
+      },
+      required: ['dateKey', 'tasks'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'mylife_update_focus_task',
+    description: 'Update one task within a day\'s focus plan (e.g. status: pending/active/done, actualMinutes).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        dateKey: { type: 'string', description: 'YYYY-MM-DD' },
+        taskId: { type: 'string' },
+        status: { type: 'string' },
+        actualMinutes: { type: 'number' },
+      },
+      required: ['dateKey', 'taskId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'mylife_coach_chat',
+    description: 'Talk to your business/productivity coach. By default the coach sees a summary of your current active tasks, projects and habits so advice is grounded in reality.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string' },
+        includeContext: { type: 'boolean', description: 'Include a snapshot of tasks/projects/habits as context. Defaults to true.' },
+      },
+      required: ['message'],
+      additionalProperties: false,
+    },
+  },
+];
+
+async function mcpCallTool(env, name, args) {
+  args = args || {};
+  switch (name) {
+    case 'mylife_get_snapshot':
+      return mcpToolText(await mlLoadAll(env));
+    case 'mylife_list_tasks': {
+      const { tasks } = await mlLoadAll(env);
+      const filtered = tasks.filter(t =>
+        (!args.status || t.status === args.status) &&
+        (!args.projectId || t.projectId === args.projectId));
+      return mcpToolText({ tasks: filtered });
+    }
+    case 'mylife_create_task':
+      return mcpResponseToToolResult(mlCreateTask(env, args));
+    case 'mylife_update_task': {
+      if (!args.id) return mcpToolText({ error: 'id required' }, true);
+      const { id, ...patch } = args;
+      return mcpResponseToToolResult(mlUpdateTask(env, id, patch));
+    }
+    case 'mylife_delete_task':
+      if (!args.id) return mcpToolText({ error: 'id required' }, true);
+      return mcpResponseToToolResult(mlDeleteTask(env, args.id));
+    case 'mylife_create_project':
+      return mcpResponseToToolResult(mlCreateProject(env, args));
+    case 'mylife_delete_project':
+      if (!args.id) return mcpToolText({ error: 'id required' }, true);
+      return mcpResponseToToolResult(mlDeleteProject(env, args.id));
+    case 'mylife_create_priority':
+      return mcpResponseToToolResult(mlCreatePriority(env, args));
+    case 'mylife_update_priority': {
+      if (!args.id) return mcpToolText({ error: 'id required' }, true);
+      const { id, ...patch } = args;
+      return mcpResponseToToolResult(mlUpdatePriority(env, id, patch));
+    }
+    case 'mylife_delete_priority':
+      if (!args.id) return mcpToolText({ error: 'id required' }, true);
+      return mcpResponseToToolResult(mlDeletePriority(env, args.id));
+    case 'mylife_create_habit':
+      return mcpResponseToToolResult(mlCreateHabit(env, args));
+    case 'mylife_update_habit': {
+      if (!args.id) return mcpToolText({ error: 'id required' }, true);
+      const { id, ...patch } = args;
+      return mcpResponseToToolResult(mlUpdateHabit(env, id, patch));
+    }
+    case 'mylife_delete_habit':
+      if (!args.id) return mcpToolText({ error: 'id required' }, true);
+      return mcpResponseToToolResult(mlDeleteHabit(env, args.id));
+    case 'mylife_add_note':
+      return mcpResponseToToolResult(mlCreateExtraLog(env, args));
+    case 'mylife_delete_note':
+      if (!args.id) return mcpToolText({ error: 'id required' }, true);
+      return mcpResponseToToolResult(mlDeleteExtraLog(env, args.id));
+    case 'mylife_set_focus_day':
+      return mcpResponseToToolResult(mlSetFocusDay(env, args));
+    case 'mylife_update_focus_task': {
+      if (!args.dateKey || !args.taskId) return mcpToolText({ error: 'dateKey and taskId required' }, true);
+      const { dateKey, taskId, ...patch } = args;
+      return mcpResponseToToolResult(mlUpdateFocusTask(env, dateKey, { taskId, patch }));
+    }
+    case 'mylife_coach_chat': {
+      if (!args.message) return mcpToolText({ error: 'message required' }, true);
+      let system = MYLIFE_COACH_SYSTEM;
+      if (args.includeContext !== false) {
+        const snapshot = await mlLoadAll(env);
+        system += `\n\nТекущий срез данных пользователя:\n${mlSnapshotSummary(snapshot)}`;
+      }
+      const reply = await callClaudeCoach(env, { system, user: args.message });
+      return { content: [{ type: 'text', text: reply }] };
+    }
+    default:
+      return mcpToolText({ error: `Unknown tool: ${name}` }, true);
+  }
+}
+
+async function handleMylifeMcp(request, env, url) {
+  if (!env.MYLIFE_MCP_TOKEN) {
+    return mcpJson({ error: 'Server misconfigured: MYLIFE_MCP_TOKEN secret is not set.' }, 500);
+  }
+  const authHeader = request.headers.get('Authorization') || '';
+  const bearer = authHeader.match(/^Bearer\s+(.+)$/i)?.[1];
+  const token = bearer || url.searchParams.get('token');
+  if (token !== env.MYLIFE_MCP_TOKEN) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+  if (request.method !== 'POST') {
+    return new Response('Method not allowed', { status: 405 });
+  }
+
+  let rpc;
+  try {
+    rpc = await request.json();
+  } catch {
+    return mcpError(null, -32700, 'Parse error');
+  }
+
+  const { id, method, params } = rpc;
+
+  // JSON-RPC notifications (no id) get no response body.
+  if (id === undefined) {
+    return new Response(null, { status: 202 });
+  }
+
+  try {
+    switch (method) {
+      case 'initialize':
+        return mcpResult(id, {
+          protocolVersion: MCP_PROTOCOL_VERSION,
+          capabilities: { tools: {} },
+          serverInfo: { name: 'mylife', title: 'MyLife', version: '1.0.0' },
+        });
+      case 'ping':
+        return mcpResult(id, {});
+      case 'tools/list':
+        return mcpResult(id, { tools: MCP_TOOLS });
+      case 'tools/call': {
+        const result = await mcpCallTool(env, params?.name, params?.arguments);
+        return mcpResult(id, result);
+      }
+      default:
+        return mcpError(id, -32601, `Method not found: ${method}`);
+    }
+  } catch (e) {
+    console.error('MyLife MCP error:', e);
+    return mcpError(id, -32000, e.message || 'Internal error');
+  }
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 export default {
@@ -2200,6 +2623,10 @@ export default {
         console.error('MyLife API error:', e);
         return jsonResponse({ error: e.message }, 500);
       }
+    }
+
+    if (url.pathname === '/mylife/mcp') {
+      return handleMylifeMcp(request, env, url);
     }
 
     // Manual trigger for debugging scheduled jobs (secured with bot token as secret)
