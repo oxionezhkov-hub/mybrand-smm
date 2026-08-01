@@ -17,9 +17,9 @@ binding = "AI"
 crons = [
   "0 4 * * *",  # 07:00 MSK daily — morning recording question
   "0 10 * * *", # 13:00 MSK daily — daytime nudge if unanswered
-  "0 15 * * 0", # 18:00 MSK Sunday — weekly recording-streak reflection
+  "0 15 * * 1", # 18:00 MSK Sunday — weekly recording-streak reflection (Cloudflare: 1=Sunday)
   "0 18 * * *", # 21:00 MSK daily — content-ops quota/48h/cooldown nudge
-  "0 17 * * 0", # 20:00 MSK Sunday — content-ops weekly review
+  "0 17 * * 1", # 20:00 MSK Sunday — content-ops weekly review (Cloudflare: 1=Sunday)
 ]
 
 # Static presentation deck (public/vebinar-slides/index.html) served at /vebinar-slides.
