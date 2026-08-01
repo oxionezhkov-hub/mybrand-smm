@@ -747,92 +747,76 @@ async function transcribeVoice(env, fileUrl) {
 }
 
 // ── YouTube transcription ────────────────────────────────────────────────────
-// No yt-dlp/ffmpeg is available in a Worker, so we pull YouTube's own caption
-// tracks (manual or auto-generated) instead of downloading + transcribing audio.
+// YouTube blocks unauthenticated caption scraping from datacenter IPs (incl.
+// Cloudflare Workers) with a "sign in to confirm you're not a bot" wall, so we
+// use the Supadata API (https://supadata.ai) to fetch transcripts instead.
+// Title comes from YouTube's own oEmbed endpoint, which isn't gated.
 
 const YT_MAX_TRANSCRIPT_CHARS = 120000;
+const SUPADATA_POLL_ATTEMPTS = 20;
+const SUPADATA_POLL_DELAY_MS = 3000;
 
 function extractYouTubeId(text) {
   const m = text.match(/(?:youtube\.com\/watch\?v=|youtube\.com\/shorts\/|youtube\.com\/embed\/|youtu\.be\/|m\.youtube\.com\/watch\?v=)([A-Za-z0-9_-]{11})/);
   return m ? m[1] : null;
 }
 
-function extractBalancedJson(str, startIdx) {
-  let depth = 0;
-  let inStr = false;
-  let esc = false;
-  for (let i = startIdx; i < str.length; i++) {
-    const ch = str[i];
-    if (esc) { esc = false; continue; }
-    if (ch === '\\') { esc = true; continue; }
-    if (ch === '"') { inStr = !inStr; continue; }
-    if (inStr) continue;
-    if (ch === '{') depth++;
-    else if (ch === '}') {
-      depth--;
-      if (depth === 0) return str.slice(startIdx, i + 1);
-    }
-  }
-  return null;
-}
-
-function decodeHtmlEntities(str) {
-  return str
-    .replace(/&amp;/g, '&')
-    .replace(/&#39;/g, "'")
-    .replace(/&quot;/g, '"')
-    .replace(/&gt;/g, '>')
-    .replace(/&lt;/g, '<')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
-}
-
 function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-async function fetchYouTubeTranscript(videoId) {
-  const res = await fetch(`https://www.youtube.com/watch?v=${videoId}&hl=ru`, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
-    },
-  });
-  const html = await res.text();
-
-  const marker = 'ytInitialPlayerResponse = ';
-  const idx = html.indexOf(marker);
-  if (idx === -1) return null;
-  const braceIdx = html.indexOf('{', idx);
-  const jsonStr = extractBalancedJson(html, braceIdx);
-  if (!jsonStr) return null;
-
-  let player;
+async function fetchYouTubeTitle(videoId) {
   try {
-    player = JSON.parse(jsonStr);
+    const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}&format=json`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.title || null;
   } catch {
     return null;
   }
+}
 
-  const title = player?.videoDetails?.title || 'YouTube видео';
-  const tracks = player?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-  if (!tracks || !tracks.length) return { title, transcript: null };
+function supadataContentToText(data) {
+  if (typeof data?.content === 'string') return data.content;
+  if (Array.isArray(data?.content)) return data.content.map(c => c.text).join(' ');
+  return null;
+}
 
-  const track = tracks.find(t => t.languageCode === 'ru' && t.kind !== 'asr')
-    || tracks.find(t => t.languageCode === 'ru')
-    || tracks.find(t => t.languageCode?.startsWith('en') && t.kind !== 'asr')
-    || tracks.find(t => t.languageCode?.startsWith('en'))
-    || tracks[0];
+async function pollSupadataJob(env, jobId) {
+  for (let i = 0; i < SUPADATA_POLL_ATTEMPTS; i++) {
+    await new Promise(r => setTimeout(r, SUPADATA_POLL_DELAY_MS));
+    const res = await fetch(`https://api.supadata.ai/v1/transcript/${jobId}`, {
+      headers: { 'x-api-key': env.SUPADATA_API_KEY },
+    });
+    if (res.status === 202) continue;
+    if (!res.ok) return null;
+    return supadataContentToText(await res.json());
+  }
+  return null;
+}
 
-  const capRes = await fetch(track.baseUrl);
-  const xml = await capRes.text();
+async function fetchSupadataTranscript(env, videoUrl) {
+  const res = await fetch(`https://api.supadata.ai/v1/transcript?url=${encodeURIComponent(videoUrl)}&text=true&mode=auto`, {
+    headers: { 'x-api-key': env.SUPADATA_API_KEY },
+  });
 
-  const transcript = [...xml.matchAll(/<text[^>]*>([\s\S]*?)<\/text>/g)]
-    .map(m => decodeHtmlEntities(m[1]))
-    .join(' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  if (res.status === 202) {
+    const { jobId } = await res.json();
+    return pollSupadataJob(env, jobId);
+  }
+  if (!res.ok) {
+    console.error('Supadata transcript error:', res.status, await res.text().catch(() => ''));
+    return null;
+  }
+  return supadataContentToText(await res.json());
+}
 
-  return { title, transcript: transcript || null };
+async function fetchYouTubeTranscript(env, videoId) {
+  const [title, transcript] = await Promise.all([
+    fetchYouTubeTitle(videoId),
+    fetchSupadataTranscript(env, `https://www.youtube.com/watch?v=${videoId}`),
+  ]);
+  return { title: title || 'YouTube видео', transcript };
 }
 
 function truncateForClaude(transcript) {
@@ -853,13 +837,13 @@ async function handleYoutubeLink(env, videoId) {
 
   let data = null;
   try {
-    data = await fetchYouTubeTranscript(videoId);
+    data = await fetchYouTubeTranscript(env, videoId);
   } catch (e) {
     console.error('YouTube transcript fetch error:', e);
   }
 
   if (!data || !data.transcript) {
-    await editMsg(env, statusId, '⚠️ Не удалось получить субтитры этого видео — у него нет ни ручных, ни автоматических субтитров на YouTube, либо видео недоступно. Транскрибация по аудио в этом боте не поддерживается.');
+    await editMsg(env, statusId, '⚠️ Не удалось получить транскрипцию этого видео — у него нет субтитров, либо видео недоступно.');
     return;
   }
 
