@@ -91,13 +91,20 @@ function mlDefaultProjects() {
 }
 
 async function mlLoadAll(env) {
-  const [tasks, projects, priorities, habits, extraLogs, focus] = await Promise.all([
+  const [tasks, projects, priorities, habits, extraLogs, focus, focusBlocks, recommendations, knowledge, commProfile, wins, activityDays, checkins] = await Promise.all([
     kget(env, 'mylife:tasks', []),
     kget(env, 'mylife:projects', null),
     kget(env, 'mylife:priorities', null),
     kget(env, 'mylife:habits', []),
     kget(env, 'mylife:extra-logs', []),
     kget(env, 'mylife:focus', {}),
+    kget(env, 'mylife:focus-blocks', []),
+    kget(env, 'mylife:recommendations', []),
+    kget(env, 'mylife:knowledge', ''),
+    kget(env, 'mylife:comm-profile', ''),
+    kget(env, 'mylife:wins', []),
+    kget(env, 'mylife:activity-days', []),
+    kget(env, 'mylife:checkins', []),
   ]);
   let proj = projects;
   if (!proj) {
@@ -109,7 +116,11 @@ async function mlLoadAll(env) {
     pri = mlDefaultPriorities();
     await kset(env, 'mylife:priorities', pri);
   }
-  return { tasks, projects: proj, priorities: pri, habits, extraLogs, focus };
+  return {
+    tasks, projects: proj, priorities: pri, habits, extraLogs, focus,
+    focusBlocks, recommendations, knowledge, commProfile, wins, checkins,
+    activityDays, streak: mlComputeStreak(activityDays),
+  };
 }
 
 function jsonResponse(obj, status = 200) {
@@ -459,6 +470,146 @@ async function mlDeletePriority(env, id) {
   if (changed) await kset(env, 'mylife:tasks', tasks);
 
   return jsonResponse({ priorities: next });
+}
+
+// ── MyLife productivity extensions: focus blocks, streaks, check-ins, ──────────
+// recommendations, knowledge base, communication profile, wins, scratchpad.
+
+async function mlTouchActivity(env, dateKey) {
+  const days = await kget(env, 'mylife:activity-days', []);
+  if (!days.includes(dateKey)) {
+    days.push(dateKey);
+    await kset(env, 'mylife:activity-days', days);
+  }
+}
+
+function mlComputeStreak(days) {
+  const set = new Set(days);
+  let d = todayMSK();
+  if (!set.has(d)) d = prevDay(d); // today not logged yet shouldn't zero out an ongoing streak
+  let streak = 0;
+  while (set.has(d)) {
+    streak++;
+    d = prevDay(d);
+  }
+  return streak;
+}
+
+async function mlStartFocusBlock(env, body) {
+  const blocks = await kget(env, 'mylife:focus-blocks', []);
+  for (const b of blocks) {
+    if (b.status === 'active') { b.status = 'abandoned'; b.endedAt = Date.now(); }
+  }
+  const taskTitle = (body.taskTitle || '').trim();
+  if (!taskTitle) return jsonResponse({ error: 'taskTitle required' }, 400);
+  const block = {
+    id: crypto.randomUUID(),
+    taskTitle,
+    taskId: body.taskId || null,
+    durationMinutes: 90,
+    startedAt: Date.now(),
+    endedAt: null,
+    status: 'active',
+  };
+  blocks.push(block);
+  await kset(env, 'mylife:focus-blocks', blocks);
+  return jsonResponse({ block });
+}
+
+async function mlEndFocusBlock(env, body) {
+  const blocks = await kget(env, 'mylife:focus-blocks', []);
+  const block = body.id
+    ? blocks.find(b => b.id === body.id)
+    : [...blocks].reverse().find(b => b.status === 'active');
+  if (!block) return jsonResponse({ error: 'no matching focus block' }, 404);
+  block.status = body.status === 'abandoned' ? 'abandoned' : 'done';
+  block.endedAt = Date.now();
+  await kset(env, 'mylife:focus-blocks', blocks);
+  if (block.status === 'done') await mlTouchActivity(env, todayMSK());
+  return jsonResponse({ block });
+}
+
+const MYLIFE_CHECKIN_QUESTIONS = [
+  'Что сегодня получилось лучше всего?',
+  'Что сегодня забрало больше всего энергии?',
+  'Было ли сегодня ощущение потока? Когда именно?',
+  'Что я откладывал(а) сегодня и почему?',
+  'Как я оцениваю своё тело и энергию прямо сейчас, простыми словами?',
+  'Что я хочу отпустить перед сном?',
+  'За что я могу себя сегодня похвалить?',
+  'Что бы я хотел(а) завтра сделать иначе?',
+  'Какая мысль сейчас крутится в голове?',
+  'Что сегодня удивило?',
+];
+
+function mlPickCheckinQuestions(n = 3) {
+  const pool = [...MYLIFE_CHECKIN_QUESTIONS];
+  const picked = [];
+  while (picked.length < n && pool.length) {
+    picked.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  }
+  return picked;
+}
+
+async function mlSaveCheckin(env, body) {
+  const answers = Array.isArray(body.answers) ? body.answers.filter(a => a && a.question && a.answer) : [];
+  if (!answers.length) return jsonResponse({ error: 'answers required' }, 400);
+  const checkins = await kget(env, 'mylife:checkins', []);
+  const dateKey = isValidDateKey(body.dateKey) ? body.dateKey : todayMSK();
+  const entry = { id: crypto.randomUUID(), dateKey, answers, createdAt: Date.now() };
+  checkins.push(entry);
+  await kset(env, 'mylife:checkins', checkins);
+  await mlTouchActivity(env, dateKey);
+  return jsonResponse({ checkin: entry });
+}
+
+async function mlAddRecommendation(env, body) {
+  const text = (body.text || '').trim();
+  if (!text) return jsonResponse({ error: 'text required' }, 400);
+  const list = await kget(env, 'mylife:recommendations', []);
+  const entry = { id: crypto.randomUUID(), text, tag: body.tag || null, createdAt: Date.now() };
+  list.push(entry);
+  await kset(env, 'mylife:recommendations', list);
+  return jsonResponse({ recommendation: entry, recommendations: list });
+}
+
+async function mlGetTextBlob(env, key) {
+  return jsonResponse({ text: await kget(env, key, '') });
+}
+
+async function mlUpdateTextBlob(env, key, body) {
+  let text = await kget(env, key, '');
+  const addition = (body.text || '').trim();
+  text = body.mode === 'replace' || !text ? addition : `${text}\n\n${addition}`;
+  await kset(env, key, text);
+  return jsonResponse({ text });
+}
+
+async function mlAddWin(env, body) {
+  const text = (body.text || '').trim();
+  if (!text) return jsonResponse({ error: 'text required' }, 400);
+  const wins = await kget(env, 'mylife:wins', []);
+  const win = { id: crypto.randomUUID(), text, dateKey: isValidDateKey(body.dateKey) ? body.dateKey : todayMSK(), createdAt: Date.now() };
+  wins.push(win);
+  await kset(env, 'mylife:wins', wins);
+  return jsonResponse({ win, wins });
+}
+
+async function mlWeeklyReview(env) {
+  const snapshot = await mlLoadAll(env);
+  const cutoff = Date.now() - 7 * 86400000;
+  const completedTasks = snapshot.tasks.filter(t => t.status === 'done' && t.completedAt && t.completedAt >= cutoff);
+  const overdueTasks = snapshot.tasks.filter(t => t.status === 'active' && t.dueDate && t.dueDate < todayMSK());
+  const blocksThisWeek = snapshot.focusBlocks.filter(b => b.startedAt >= cutoff);
+  const doneBlocks = blocksThisWeek.filter(b => b.status === 'done');
+  const winsThisWeek = snapshot.wins.filter(w => w.createdAt >= cutoff);
+  return {
+    streak: snapshot.streak,
+    completedTasks: completedTasks.map(t => t.title),
+    overdueTasks: overdueTasks.map(t => t.title),
+    focusBlocks: { started: blocksThisWeek.length, completed: doneBlocks.length, totalMinutes: doneBlocks.length * 90 },
+    wins: winsThisWeek.map(w => w.text),
+  };
 }
 
 async function mlLinkPreview(env, targetUrl) {
@@ -2370,8 +2521,11 @@ const MCP_PROTOCOL_VERSION = '2025-06-18';
 
 const MYLIFE_COACH_SYSTEM = `Ты — прямой и практичный бизнес-коуч и продуктивный ассистент пользователя в приложении MyLife (личный трекер задач, проектов, привычек и фокус-дня).
 Отвечай на языке пользователя (по умолчанию — русский), простым текстом или Markdown, без HTML-тегов.
-Опирайся на переданный ниже срез данных (задачи, проекты, приоритеты, привычки), если он есть — давай конкретные, выполнимые советы, помогай расставлять приоритеты, замечай риски (просроченные задачи, заброшенные привычки) и задавай не более одного уточняющего вопроса, только если это критично.
+Опирайся на переданный ниже срез данных (задачи, проекты, приоритеты, привычки, база знаний, профиль общения, стрик, недавние победы и рекомендации), если он есть — давай конкретные, выполнимые советы, помогай расставлять приоритеты, замечай риски (просроченные задачи, заброшенные привычки) и задавай не более одного уточняющего вопроса, только если это критично.
+Если пользователь просит что-то запомнить о себе (стиль общения, что раздражает/помогает) — используй mylife_update_comm_profile с mode "append". Если хочешь зафиксировать важный вывод или рекомендацию, чтобы она не потерялась — используй mylife_add_recommendation.
 Не лей воду, не извиняйся, не проси прощения за прошлые ответы.`;
+
+const MYLIFE_STUCK_SYSTEM = `Пользователь застрял на задаче и не может сдвинуться с места. Не утешай и не читай мотивационные речи. Твоя единственная цель — предложить САМУЮ маленькую версию задачи, с которой можно начать прямо сейчас (буквально 2-10 минут действия). Дай один конкретный первый шаг и, если уместно, ещё один запасной вариант. Коротко, без воды.`;
 
 async function callClaudeCoach(env, { system, user }) {
   const reqBody = {
@@ -2407,11 +2561,12 @@ async function callClaudeCoach(env, { system, user }) {
 }
 
 function mlSnapshotSummary(snapshot) {
-  const { tasks, projects, priorities, habits } = snapshot;
+  const { tasks, projects, priorities, habits, knowledge, commProfile, streak, wins, recommendations } = snapshot;
   const projectName = id => projects.find(p => p.id === id)?.name || id;
   const priorityName = id => priorities.find(p => p.id === id)?.name || '—';
   const active = tasks.filter(t => t.status === 'active').sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
   const lines = [];
+  lines.push(`Стрик: ${streak} дн. подряд`);
   lines.push(`Проекты: ${projects.map(p => p.name).join(', ') || '—'}`);
   lines.push(`Активные задачи (${active.length}):`);
   for (const t of active.slice(0, 60)) {
@@ -2420,6 +2575,10 @@ function mlSnapshotSummary(snapshot) {
   if (habits.length) {
     lines.push(`Привычки: ${habits.map(h => h.name).join(', ')}`);
   }
+  if (knowledge) lines.push(`\nБаза знаний о проектах/жизни пользователя:\n${knowledge}`);
+  if (commProfile) lines.push(`\nКак лучше общаться с пользователем:\n${commProfile}`);
+  if (wins?.length) lines.push(`\nНедавние маленькие победы: ${wins.slice(-5).map(w => w.text).join('; ')}`);
+  if (recommendations?.length) lines.push(`\nПоследние сохранённые рекомендации: ${recommendations.slice(-5).map(r => r.text).join('; ')}`);
   return lines.join('\n');
 }
 
@@ -2628,16 +2787,132 @@ const MCP_TOOLS = [
   },
   {
     name: 'mylife_coach_chat',
-    description: 'Talk to your business/productivity coach. By default the coach sees a summary of your current active tasks, projects and habits so advice is grounded in reality.',
+    description: 'Talk to your business/productivity coach. By default the coach sees a summary of your current active tasks, projects, habits, knowledge base, communication profile, streak, recent wins and recommendations, so advice is grounded in reality.',
     inputSchema: {
       type: 'object',
       properties: {
         message: { type: 'string' },
-        includeContext: { type: 'boolean', description: 'Include a snapshot of tasks/projects/habits as context. Defaults to true.' },
+        includeContext: { type: 'boolean', description: 'Include a snapshot of tasks/projects/habits/knowledge as context. Defaults to true.' },
       },
       required: ['message'],
       additionalProperties: false,
     },
+  },
+  {
+    name: 'mylife_start_focus_block',
+    description: 'Start a 90-minute focus block on a single task. Any previously-active block is auto-marked abandoned. Ask the user which single task they will work on before calling this, then hold them to just that task for the block.',
+    inputSchema: {
+      type: 'object',
+      properties: { taskTitle: { type: 'string' }, taskId: { type: 'string', description: 'Optional matching MyLife task id.' } },
+      required: ['taskTitle'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'mylife_end_focus_block',
+    description: 'End a focus block: mark it done (counts toward the streak and weekly review) or abandoned. Omit id to end whichever block is currently active.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string' }, status: { type: 'string', enum: ['done', 'abandoned'] } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'mylife_list_focus_blocks',
+    description: 'List recent focus blocks (default last 7 days) with their status and duration.',
+    inputSchema: { type: 'object', properties: { days: { type: 'number', description: 'How many days back to look. Defaults to 7.' } }, additionalProperties: false },
+  },
+  {
+    name: 'mylife_get_evening_questions',
+    description: 'Get 2-3 varied, non-repetitive evening check-in questions (about energy, mood, what went well/hard today) to ask the user. Follow up with mylife_save_checkin once they answer.',
+    inputSchema: { type: 'object', properties: { count: { type: 'number', description: 'How many questions, 2-3. Defaults to 3.' } }, additionalProperties: false },
+  },
+  {
+    name: 'mylife_save_checkin',
+    description: 'Save the user\'s answers to an evening check-in. Counts as activity for the streak.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        dateKey: { type: 'string', description: 'YYYY-MM-DD, defaults to today' },
+        answers: {
+          type: 'array',
+          items: { type: 'object', properties: { question: { type: 'string' }, answer: { type: 'string' } }, required: ['question', 'answer'] },
+        },
+      },
+      required: ['answers'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'mylife_get_streak',
+    description: 'Get the current streak: consecutive days with at least one completed focus block, saved check-in, or coach chat.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'mylife_get_weekly_review',
+    description: 'Get a rollup of the last 7 days: tasks completed, overdue tasks, focus blocks started/completed and total focused minutes, wins logged, and the current streak.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'mylife_add_win',
+    description: 'Log a small win/accomplishment for the day, even a minor one — for later reassurance that the day wasn\'t empty.',
+    inputSchema: {
+      type: 'object',
+      properties: { text: { type: 'string' }, dateKey: { type: 'string', description: 'YYYY-MM-DD, defaults to today' } },
+      required: ['text'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'mylife_add_recommendation',
+    description: 'Save a recommendation, insight, or conclusion from this conversation so it is not lost. Retrieve later with mylife_get_snapshot or mylife_coach_chat context.',
+    inputSchema: {
+      type: 'object',
+      properties: { text: { type: 'string' }, tag: { type: 'string', description: 'Optional short category/tag.' } },
+      required: ['text'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'mylife_get_knowledge_base',
+    description: 'Get the free-form knowledge base about the user\'s projects, work, and life. Read this at the start of a new conversation to get oriented instead of asking the user to re-explain.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'mylife_update_knowledge_base',
+    description: 'Update the knowledge base about the user\'s projects/work/life.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string' },
+        mode: { type: 'string', enum: ['replace', 'append'], description: 'append adds to existing text; replace overwrites it. Defaults to append.' },
+      },
+      required: ['text'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'mylife_get_comm_profile',
+    description: 'Get the profile describing how best to communicate with this user: style, pet peeves, what helps, what to ask.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'mylife_update_comm_profile',
+    description: 'Update the communication profile — e.g. when the user says "remember that I don\'t like long lists in the morning", append that here so future conversations adapt.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string' },
+        mode: { type: 'string', enum: ['replace', 'append'], description: 'append adds to existing text; replace overwrites it. Defaults to append.' },
+      },
+      required: ['text'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'mylife_im_stuck',
+    description: 'Use when the user is stuck on a task and can\'t move forward. Returns the smallest possible next action to break the stall — not motivational advice.',
+    inputSchema: { type: 'object', properties: { task: { type: 'string', description: 'What they are stuck on.' } }, required: ['task'], additionalProperties: false },
   },
 ];
 
@@ -2708,6 +2983,48 @@ async function mcpCallTool(env, name, args) {
         system += `\n\nТекущий срез данных пользователя:\n${mlSnapshotSummary(snapshot)}`;
       }
       const reply = await callClaudeCoach(env, { system, user: args.message });
+      await mlTouchActivity(env, todayMSK());
+      return { content: [{ type: 'text', text: reply }] };
+    }
+    case 'mylife_start_focus_block':
+      return mcpResponseToToolResult(mlStartFocusBlock(env, args));
+    case 'mylife_end_focus_block':
+      return mcpResponseToToolResult(mlEndFocusBlock(env, args));
+    case 'mylife_list_focus_blocks': {
+      const all = await kget(env, 'mylife:focus-blocks', []);
+      const days = Number.isFinite(args.days) && args.days > 0 ? args.days : 7;
+      const cutoff = Date.now() - days * 86400000;
+      return mcpToolText({ focusBlocks: all.filter(b => b.startedAt >= cutoff) });
+    }
+    case 'mylife_get_evening_questions': {
+      const n = [2, 3].includes(args.count) ? args.count : 3;
+      return mcpToolText({ questions: mlPickCheckinQuestions(n) });
+    }
+    case 'mylife_save_checkin':
+      return mcpResponseToToolResult(mlSaveCheckin(env, args));
+    case 'mylife_get_streak': {
+      const days = await kget(env, 'mylife:activity-days', []);
+      return mcpToolText({ streak: mlComputeStreak(days) });
+    }
+    case 'mylife_get_weekly_review':
+      return mcpToolText(await mlWeeklyReview(env));
+    case 'mylife_add_win':
+      return mcpResponseToToolResult(mlAddWin(env, args));
+    case 'mylife_add_recommendation':
+      return mcpResponseToToolResult(mlAddRecommendation(env, args));
+    case 'mylife_get_knowledge_base':
+      return mcpResponseToToolResult(mlGetTextBlob(env, 'mylife:knowledge'));
+    case 'mylife_update_knowledge_base':
+      if (!args.text) return mcpToolText({ error: 'text required' }, true);
+      return mcpResponseToToolResult(mlUpdateTextBlob(env, 'mylife:knowledge', args));
+    case 'mylife_get_comm_profile':
+      return mcpResponseToToolResult(mlGetTextBlob(env, 'mylife:comm-profile'));
+    case 'mylife_update_comm_profile':
+      if (!args.text) return mcpToolText({ error: 'text required' }, true);
+      return mcpResponseToToolResult(mlUpdateTextBlob(env, 'mylife:comm-profile', args));
+    case 'mylife_im_stuck': {
+      if (!args.task) return mcpToolText({ error: 'task required' }, true);
+      const reply = await callClaudeCoach(env, { system: MYLIFE_STUCK_SYSTEM, user: args.task });
       return { content: [{ type: 'text', text: reply }] };
     }
     default:
