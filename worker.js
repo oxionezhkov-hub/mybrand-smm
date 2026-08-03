@@ -1943,6 +1943,8 @@ async function handleStatsCommand(env, text) {
 // ── Scheduled jobs ────────────────────────────────────────────────────────────
 
 async function handleScheduled(env, cron) {
+  if (env.MAILINGS_PAUSED === 'true') return;
+
   // 7:00 MSK = 4:00 UTC
   if (cron === '0 4 * * *') {
     await sendMorningQuestion(env);
