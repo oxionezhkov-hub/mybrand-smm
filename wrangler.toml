@@ -10,6 +10,10 @@ id = "5ffa6fc542054098b122fb4f4c254076"
 [ai]
 binding = "AI"
 
+[vars]
+# Set to "false" (or remove) to resume scheduled mailings.
+MAILINGS_PAUSED = "true"
+
 # All cron schedules the Worker's scheduled() handler dispatches on (see
 # handleScheduled in worker.js). Kept complete here so a `wrangler deploy`
 # doesn't drop schedules that existed only in the dashboard before.
