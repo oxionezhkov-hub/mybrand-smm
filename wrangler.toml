@@ -10,20 +10,29 @@ id = "5ffa6fc542054098b122fb4f4c254076"
 [ai]
 binding = "AI"
 
+# Secrets required (set via `wrangler secret put <name>`), not stored here:
+#   TG_TOKEN            — Telegram bot token
+#   OWNER_CHAT_ID        — Telegram chat id allowed to use the bot
+#   CLAUDE_API           — Anthropic API key
+#   SUPADATA_API_KEY     — YouTube transcript API key
+#   MYLIFE_MCP_TOKEN     — bearer token for the /mylife/mcp endpoint
+#   VAPID_PRIVATE_JWK    — JSON Web Key for browser push (see pushBroadcast in worker.js),
+#                          e.g. {"crv":"P-256","kty":"EC","x":"...","y":"...","d":"..."}
+#   VAPID_SUBJECT        — optional, e.g. "mailto:you@example.com" (defaults to a placeholder)
+
 [vars]
-# Set to "false" (or remove) to resume scheduled mailings.
-MAILINGS_PAUSED = "true"
+# Set to "true" to disable the morning Telegram summary and all three daily
+# browser push nudges.
+MAILINGS_PAUSED = "false"
 
 # All cron schedules the Worker's scheduled() handler dispatches on (see
 # handleScheduled in worker.js). Kept complete here so a `wrangler deploy`
 # doesn't drop schedules that existed only in the dashboard before.
 [triggers]
 crons = [
-  "0 4 * * *",  # 07:00 MSK daily — morning recording question
-  "0 10 * * *", # 13:00 MSK daily — daytime nudge if unanswered
-  "0 15 * * 1", # 18:00 MSK Sunday — weekly recording-streak reflection (Cloudflare: 1=Sunday)
-  "0 18 * * *", # 21:00 MSK daily — content-ops quota/48h/cooldown nudge
-  "0 17 * * 1", # 20:00 MSK Sunday — content-ops weekly review (Cloudflare: 1=Sunday)
+  "0 4 * * *",  # 07:00 MSK daily — Telegram task summary + "open your tasks" push
+  "0 10 * * *", # 13:00 MSK daily — "update your tasks" push
+  "0 18 * * *", # 21:00 MSK daily — "plan tomorrow" push
 ]
 
 # Static presentation deck (public/vebinar-slides/index.html) served at /vebinar-slides.
