@@ -135,6 +135,16 @@ async function handleMylifeApi(request, env, url) {
     }
     if (id === 'subscribe' && request.method === 'POST') return mlPushSubscribe(env, await readJson(request));
     if (id === 'unsubscribe' && request.method === 'POST') return mlPushUnsubscribe(env, await readJson(request));
+    if (id === 'test' && request.method === 'GET') {
+      const subs = await kget(env, 'mylife:push-subs', []);
+      await pushBroadcast(env, {
+        title: 'MyLife',
+        body: 'Тестовое уведомление — если видишь это, push работает 🎉',
+        tag: 'mylife-test',
+        url: '/mylife/',
+      });
+      return jsonResponse({ ok: true, subscriptions: subs.length });
+    }
   }
 
   return jsonResponse({ error: 'not found' }, 404);
