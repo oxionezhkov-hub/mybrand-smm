@@ -509,6 +509,20 @@
   }
   .pull-refresh-indicator.visible{display:block;}
 
+  #push-banner{
+    position:fixed;left:0;right:0;bottom:0;z-index:200;
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    background:#111111;color:#fff;padding:12px 16px;
+    box-shadow:0 -8px 24px rgba(0,0,0,.18);
+  }
+  .push-banner-text{flex:1 1 240px;font-size:13px;line-height:1.4;}
+  .push-banner-actions{display:flex;gap:8px;flex:0 0 auto;}
+  .push-banner-btn{
+    background:#fff;color:#111;border:none;border-radius:10px;
+    padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;
+  }
+  .push-banner-btn:hover{background:#eee;}
+
   @media (max-width:860px){
     #canvas-viewport{display:none;}
     #mobile-list{display:block;padding-top:78px;}
@@ -685,6 +699,96 @@ const api = {
     return r.json();
   },
 };
+
+// ───────────────────────────── Push notifications ─────────────────────────────
+// Nags the user on every visit until browser notifications are enabled, then
+// subscribes to Web Push so the worker's morning/day/evening crons can reach them.
+
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
+async function subscribeToPush(){
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const keyRes = await fetch('/mylife/api/push/vapid-key');
+    if (!keyRes.ok) return false;
+    const { key } = await keyRes.json();
+    if (!key) return false;
+
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub){
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(key),
+      });
+    }
+    await fetch('/mylife/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription: sub.toJSON() }),
+    });
+    return true;
+  } catch (e){
+    console.warn('Push subscribe failed:', e);
+    return false;
+  }
+}
+
+function showPushBanner(){
+  if ($('#push-banner')) return;
+  const denied = Notification.permission === 'denied';
+
+  const banner = el('div', '');
+  banner.id = 'push-banner';
+  banner.appendChild(el('div', 'push-banner-text', denied
+    ? 'Уведомления заблокированы браузером. Разреши их в настройках сайта (значок замка в адресной строке), чтобы получать напоминания о задачах.'
+    : 'Включи уведомления, чтобы получать напоминания о задачах утром, днём и вечером.'));
+
+  const actions = el('div', 'push-banner-actions');
+  if (!denied){
+    const btn = el('button', 'push-banner-btn', 'Разрешить уведомления');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted'){
+        await subscribeToPush();
+        banner.remove();
+      } else {
+        btn.disabled = false;
+        banner.remove();
+        showPushBanner();
+      }
+    });
+    actions.appendChild(btn);
+  }
+  banner.appendChild(actions);
+  document.body.appendChild(banner);
+}
+
+async function initPushNotifications(){
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return;
+
+  try {
+    await navigator.serviceWorker.register('/mylife/sw.js');
+  } catch (e){
+    console.warn('Service worker registration failed:', e);
+    return;
+  }
+
+  if (Notification.permission === 'granted'){
+    await subscribeToPush();
+    return;
+  }
+
+  // Not granted yet (default, or blocked) — nag on every visit until resolved.
+  showPushBanner();
+}
 
 // ───────────────────────────── Utils ─────────────────────────────
 
@@ -2759,12 +2863,20 @@ function tomorrowKey(){
 let focusLockActive = false;
 let focusTimerInterval = null;
 
+function isFocusDayDismissed(dateKey){
+  try { return localStorage.getItem('mylife:focusDismissed:' + dateKey) === '1'; } catch { return false; }
+}
+function dismissFocusDay(dateKey){
+  try { localStorage.setItem('mylife:focusDismissed:' + dateKey, '1'); } catch {}
+}
+
 function checkFocusFlow(){
   const todayKey = toDateKey(new Date());
   const todayFocus = state.focus[todayKey];
-  const todayDone = todayFocus && todayFocus.tasks.length > 0 && todayFocus.tasks.every(t => t.status === 'done');
+  const todayResolved = todayFocus && todayFocus.tasks.length > 0
+    && todayFocus.tasks.every(t => t.status === 'done' || t.status === 'skipped');
 
-  if (!todayFocus || !todayDone){
+  if (!isFocusDayDismissed(todayKey) && (!todayFocus || !todayResolved)){
     renderMorningLock(todayKey, todayFocus || null);
     return;
   }
@@ -2873,7 +2985,11 @@ function renderMorningLock(dateKey, dayData){
     root.appendChild(buildFocusEntryForm({
       title: 'Какие 3 задачи в приоритете сегодня утром?',
       submitLabel: 'Начать',
-      allowSkip: false,
+      allowSkip: true,
+      onSkip: () => {
+        dismissFocusDay(dateKey);
+        closeFocusLock();
+      },
       onSubmit: async (tasks) => {
         const { focus } = await api.setFocusDay(dateKey, tasks);
         state.focus = focus;
@@ -2886,6 +3002,7 @@ function renderMorningLock(dateKey, dayData){
 }
 
 function focusHistoryLine(t){
+  if (t.status === 'skipped') return `⊘ ${escapeHtml(t.name)} — пропущено`;
   const pause = t.pausedMinutes ? `, пауза ${t.pausedMinutes} мин` : '';
   return `✓ ${escapeHtml(t.name)} — ${t.actualMinutes ?? '?'} мин${t.estimatedMinutes ? ` (план ${t.estimatedMinutes})` : ''}${pause}`;
 }
@@ -2945,11 +3062,12 @@ function renderFocusExecution(root, dateKey, dayData){
   if (focusTimerInterval){ clearInterval(focusTimerInterval); focusTimerInterval = null; }
 
   const tasks = dayData.tasks;
-  const activeIdx = tasks.findIndex(t => t.status !== 'done');
+  const activeIdx = tasks.findIndex(t => t.status !== 'done' && t.status !== 'skipped');
 
   if (activeIdx === -1){
+    const allDone = tasks.every(t => t.status === 'done');
     const wrap = el('div', 'focus-done');
-    wrap.appendChild(el('div', 'focus-done-title', 'Отлично! Все 3 задачи выполнены 💪'));
+    wrap.appendChild(el('div', 'focus-done-title', allDone ? 'Отлично! Все 3 задачи выполнены 💪' : 'Готово на сегодня'));
     const list = el('div', 'focus-history');
     for (const t of tasks) list.appendChild(el('div', 'focus-history-item', focusHistoryLine(t)));
     wrap.appendChild(list);
@@ -2962,6 +3080,15 @@ function renderFocusExecution(root, dateKey, dayData){
   }
 
   const card = el('div', 'focus-card');
+
+  const closeBtn = el('button', 'focus-entry-skip', 'Закрыть на сегодня');
+  closeBtn.style.cssText = 'display:block;margin:-4px 0 4px auto;';
+  closeBtn.addEventListener('click', () => {
+    dismissFocusDay(dateKey);
+    closeFocusLock();
+  });
+  card.appendChild(closeBtn);
+
   card.appendChild(el('div', 'focus-progress', `Задача ${activeIdx + 1} из ${tasks.length}`));
 
   if (activeIdx > 0){
@@ -2982,14 +3109,23 @@ function renderFocusExecution(root, dateKey, dayData){
 
   const actionsRow = el('div', 'focus-actions-row');
   const pauseBtn = el('button', 'focus-pause-btn');
+  const skipBtn = el('button', 'focus-pause-btn', 'Пропустить');
   const actionBtn = el('button', 'focus-action-btn');
   actionsRow.appendChild(pauseBtn);
+  actionsRow.appendChild(skipBtn);
   actionsRow.appendChild(actionBtn);
   card.appendChild(actionsRow);
 
   card.appendChild(buildFocusSideCapture(dateKey));
 
   root.appendChild(card);
+
+  skipBtn.addEventListener('click', async () => {
+    clearInterval(focusTimerInterval); focusTimerInterval = null;
+    current.status = 'skipped';
+    await api.updateFocusTask(dateKey, current.id, { status: 'skipped', pausedAt: null });
+    renderFocusExecution(root, dateKey, dayData);
+  });
 
   function updateTimerDisplay(){
     const pausedMs = current.pausedMs || 0;
@@ -3153,6 +3289,7 @@ async function loadData(){
 async function init(){
   await loadData();
   runTimerLoop();
+  initPushNotifications();
 }
 
 init();
