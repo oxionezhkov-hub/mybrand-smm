@@ -137,13 +137,25 @@ async function handleMylifeApi(request, env, url) {
     if (id === 'unsubscribe' && request.method === 'POST') return mlPushUnsubscribe(env, await readJson(request));
     if (id === 'test' && request.method === 'GET') {
       const subs = await kget(env, 'mylife:push-subs', []);
-      await pushBroadcast(env, {
-        title: 'MyLife',
-        body: 'Тестовое уведомление — если видишь это, push работает 🎉',
-        tag: 'mylife-test',
-        url: '/mylife/',
-      });
-      return jsonResponse({ ok: true, subscriptions: subs.length });
+      const results = [];
+      for (const sub of subs) {
+        let entry = { endpointHost: null, status: null, error: null };
+        try {
+          entry.endpointHost = new URL(sub.endpoint).host;
+          const res = await sendWebPush(env, sub, {
+            title: 'MyLife',
+            body: 'Тестовое уведомление — если видишь это, push работает 🎉',
+            tag: 'mylife-test',
+            url: '/mylife/',
+          });
+          entry.status = res.status;
+          if (res.status >= 400) entry.error = await res.text().catch(() => null);
+        } catch (e) {
+          entry.error = e.message || String(e);
+        }
+        results.push(entry);
+      }
+      return jsonResponse({ ok: true, subscriptions: subs.length, results });
     }
   }
 
