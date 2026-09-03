@@ -143,8 +143,8 @@ async function handleMylifeApi(request, env, url) {
         try {
           entry.endpointHost = new URL(sub.endpoint).host;
           const res = await sendWebPush(env, sub, {
-            title: 'MyLife',
-            body: 'Тестовое уведомление — если видишь это, push работает 🎉',
+            title: 'Тест уведомлений',
+            body: 'Если видишь это — push работает 🎉',
             tag: 'mylife-test',
             url: '/mylife/',
           });
@@ -1182,8 +1182,8 @@ async function handleScheduled(env, cron) {
   if (cron === '0 4 * * *') {
     await send(env, await mlMorningBriefText(env));
     await pushBroadcast(env, {
-      title: 'MyLife',
-      body: 'Доброе утро! Загляни в задачи на сегодня.',
+      title: 'Доброе утро',
+      body: 'Загляни в задачи на сегодня.',
       tag: 'mylife-morning',
       url: '/mylife/',
     });
@@ -1193,7 +1193,7 @@ async function handleScheduled(env, cron) {
   // 13:00 MSK = 10:00 UTC — daytime browser push: update task statuses
   if (cron === '0 10 * * *') {
     await pushBroadcast(env, {
-      title: 'MyLife',
+      title: 'Обновление задач',
       body: 'Проверь и обнови статусы задач.',
       tag: 'mylife-day',
       url: '/mylife/',
@@ -1204,7 +1204,7 @@ async function handleScheduled(env, cron) {
   // 21:00 MSK = 18:00 UTC — evening browser push: plan tomorrow
   if (cron === '0 18 * * *') {
     await pushBroadcast(env, {
-      title: 'MyLife',
+      title: 'План на завтра',
       body: 'Спланируй, что сделать завтра.',
       tag: 'mylife-evening',
       url: '/mylife/',
@@ -2086,7 +2086,7 @@ export default {
       if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
       try {
         await send(env, await mlMorningBriefText(env));
-        await pushBroadcast(env, { title: 'MyLife', body: 'Доброе утро! Загляни в задачи на сегодня.', tag: 'mylife-morning', url: '/mylife/' });
+        await pushBroadcast(env, { title: 'Доброе утро', body: 'Загляни в задачи на сегодня.', tag: 'mylife-morning', url: '/mylife/' });
         return new Response('Sent');
       } catch (e) {
         console.error('Manual trigger failed:', e);
