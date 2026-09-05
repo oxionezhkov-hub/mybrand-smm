@@ -16,6 +16,7 @@ binding = "AI"
 #   CLAUDE_API           — Anthropic API key
 #   SUPADATA_API_KEY     — YouTube transcript API key
 #   MYLIFE_MCP_TOKEN     — bearer token for the /mylife/mcp endpoint
+#   VIDEO_MCP_TOKEN      — bearer token for the /video/mcp endpoint (video transcription connector)
 #   VAPID_PRIVATE_JWK    — JSON Web Key for browser push (see pushBroadcast in worker.js),
 #                          e.g. {"crv":"P-256","kty":"EC","x":"...","y":"...","d":"..."}
 #   VAPID_SUBJECT        — optional, e.g. "mailto:you@example.com" (defaults to a placeholder)

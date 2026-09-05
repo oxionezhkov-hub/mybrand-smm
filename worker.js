@@ -2009,14 +2009,17 @@ async function mcpCallTool(env, name, args) {
   }
 }
 
-async function handleMylifeMcp(request, env, url) {
-  if (!env.MYLIFE_MCP_TOKEN) {
-    return mcpJson({ error: 'Server misconfigured: MYLIFE_MCP_TOKEN secret is not set.' }, 500);
+// Generic JSON-RPC/MCP request handler shared by every remote MCP endpoint
+// this Worker exposes (MyLife, video transcription, ...). Each endpoint just
+// supplies its own token, tool list, tool dispatcher and serverInfo.
+async function handleMcpRequest(request, env, url, { token, tokenEnvName, tools, callTool, serverInfo }) {
+  if (!token) {
+    return mcpJson({ error: `Server misconfigured: ${tokenEnvName} secret is not set.` }, 500);
   }
   const authHeader = request.headers.get('Authorization') || '';
   const bearer = authHeader.match(/^Bearer\s+(.+)$/i)?.[1];
-  const token = bearer || url.searchParams.get('token');
-  if (token !== env.MYLIFE_MCP_TOKEN) {
+  const reqToken = bearer || url.searchParams.get('token');
+  if (reqToken !== token) {
     return new Response('Unauthorized', { status: 401 });
   }
   if (request.method !== 'POST') {
@@ -2043,23 +2046,96 @@ async function handleMylifeMcp(request, env, url) {
         return mcpResult(id, {
           protocolVersion: MCP_PROTOCOL_VERSION,
           capabilities: { tools: {} },
-          serverInfo: { name: 'mylife', title: 'MyLife', version: '1.0.0' },
+          serverInfo,
         });
       case 'ping':
         return mcpResult(id, {});
       case 'tools/list':
-        return mcpResult(id, { tools: MCP_TOOLS });
+        return mcpResult(id, { tools });
       case 'tools/call': {
-        const result = await mcpCallTool(env, params?.name, params?.arguments);
+        const result = await callTool(env, params?.name, params?.arguments);
         return mcpResult(id, result);
       }
       default:
         return mcpError(id, -32601, `Method not found: ${method}`);
     }
   } catch (e) {
-    console.error('MyLife MCP error:', e);
+    console.error(`${serverInfo.name} MCP error:`, e);
     return mcpError(id, -32000, e.message || 'Internal error');
   }
+}
+
+async function handleMylifeMcp(request, env, url) {
+  return handleMcpRequest(request, env, url, {
+    token: env.MYLIFE_MCP_TOKEN,
+    tokenEnvName: 'MYLIFE_MCP_TOKEN',
+    tools: MCP_TOOLS,
+    callTool: mcpCallTool,
+    serverInfo: { name: 'mylife', title: 'MyLife', version: '1.0.0' },
+  });
+}
+
+// ── Video transcription MCP server (Claude custom connector) ────────────────
+// Standalone connector so it can be added in Claude separately from MyLife.
+// Auth: shared secret via `VIDEO_MCP_TOKEN` (wrangler secret), passed as
+// either `Authorization: Bearer <token>` or `?token=<token>` on the URL that
+// goes into Claude's "Remote MCP server URL" field, e.g.
+//   https://<worker-domain>/video/mcp?token=<token>
+
+const VIDEO_MCP_TOOLS = [
+  {
+    name: 'transcribe_video',
+    description: 'Fetches the transcript of an online video by URL (YouTube watch/shorts/youtu.be links, and other platforms Supadata supports) so its full text can be read and discussed. Returns the video title (when available) and the full transcript.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'URL of the video, e.g. https://www.youtube.com/watch?v=... or https://youtu.be/...' },
+      },
+      required: ['url'],
+    },
+  },
+];
+
+async function mcpCallVideoTool(env, name, args) {
+  switch (name) {
+    case 'transcribe_video': {
+      const videoUrl = args?.url;
+      if (!videoUrl) return mcpToolText({ error: 'url required' }, true);
+
+      let title = null;
+      let transcript = null;
+      try {
+        const youtubeId = extractYouTubeId(videoUrl);
+        if (youtubeId) {
+          ({ title, transcript } = await fetchYouTubeTranscript(env, youtubeId));
+        } else {
+          transcript = await fetchSupadataTranscript(env, videoUrl);
+        }
+      } catch (e) {
+        console.error('transcribe_video error:', e);
+        return mcpToolText({ error: 'Failed to fetch transcript: ' + e.message }, true);
+      }
+
+      if (!transcript) {
+        return mcpToolText({ error: 'No transcript available for this video — it may have no captions, or the URL/platform is not supported.' }, true);
+      }
+
+      const truncated = transcript.length > YT_MAX_TRANSCRIPT_CHARS;
+      return mcpToolText({ title, url: videoUrl, truncated, transcript: truncateForClaude(transcript) });
+    }
+    default:
+      return mcpToolText({ error: `Unknown tool: ${name}` }, true);
+  }
+}
+
+async function handleVideoMcp(request, env, url) {
+  return handleMcpRequest(request, env, url, {
+    token: env.VIDEO_MCP_TOKEN,
+    tokenEnvName: 'VIDEO_MCP_TOKEN',
+    tools: VIDEO_MCP_TOOLS,
+    callTool: mcpCallVideoTool,
+    serverInfo: { name: 'video-transcription', title: 'Video Transcription', version: '1.0.0' },
+  });
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -2079,6 +2155,10 @@ export default {
 
     if (url.pathname === '/mylife/mcp') {
       return handleMylifeMcp(request, env, url);
+    }
+
+    if (url.pathname === '/video/mcp') {
+      return handleVideoMcp(request, env, url);
     }
 
     // Manual trigger for debugging scheduled jobs (secured with bot token as secret)
