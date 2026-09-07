@@ -1319,7 +1319,7 @@ async function matchTaskReport(env, text, activeTasks) {
   const taskList = activeTasks.slice(0, 80).map(t => `${t.id}: ${t.title}`).join('\n');
   const result = await callClaude(env, {
     system: 'Ты классифицируешь сообщения пользователя в личном трекере задач. Отвечай только валидным JSON.',
-    user: `Активные задачи (id: название):\n${taskList || '(нет задач)'}\n\nСообщение пользователя: "${text}"\n\nЭто сообщение о том, что пользователь ТОЛЬКО ЧТО ЗАВЕРШИЛ какую-то работу (законченное действие в прошедшем времени, например "сделал", "закончил", "отправил"), или это что-то другое (вопрос, обсуждение, планирование, статус дня)?\n\nЕсли это про завершённую работу — сопоставь по смыслу (не только по точному совпадению слов) с одной из активных задач. Если подходящей задачи нет — предложи короткое название (3-6 слов) для новой задачи по этому сообщению.\n\nВерни строго JSON без пояснений:\n{"isTaskReport": true|false, "matchedTaskId": "id или null", "suggestedTitle": "название или null"}`,
+    user: `Активные задачи (id: название):\n${taskList || '(нет задач)'}\n\nСообщение пользователя: "${text}"\n\nПользователь часто пишет о сделанной работе в сжатом стиле трекера задач — короткой фразой действие+объект, БЕЗ явного прошедшего времени (например "Ответить Софии по МБА" значит то же самое, что "Ответил Софии по МБА"). Такие короткие фразы-отчёты тоже нужно засчитывать как отчёт о выполненной работе.\n\nЭто отчёт о сделанной/законченной работе (в любой форме — с прошедшим временем или без), или это вопрос к тебе, просьба о совете, обсуждение, планирование будущего, или статус дня (начал работу/отдыхаю/проснулся/сплю)? Вопросы и просьбы о помощи — НЕ отчёт о работе, даже если упоминают задачи.\n\nЕсли это отчёт о работе — сопоставь по смыслу (тот же клиент/тема/действие, не только точное совпадение слов) с одной из активных задач. Если подходящей задачи нет — предложи короткое название (3-6 слов) для новой задачи, в том же сжатом стиле, что писал пользователь.\n\nВерни строго JSON без пояснений:\n{"isTaskReport": true|false, "matchedTaskId": "id или null", "suggestedTitle": "название или null"}`,
     json: true,
   });
   return result || { isTaskReport: false, matchedTaskId: null, suggestedTitle: null };
@@ -1374,10 +1374,21 @@ async function handleCallback(env, query) {
 async function handleChat(env, text) {
   const msgId = await sendGetId(env, '…');
   const snapshot = await mlLoadAll(env);
-  await callClaudeStreaming(env, {
+
+  const history = await kget(env, 'conv:history', []);
+  history.push({ role: 'user', content: text });
+  const historyText = history.slice(-12)
+    .map(m => `${m.role === 'user' ? 'Пользователь' : 'Коуч'}: ${m.content}`)
+    .join('\n');
+
+  const reply = await callClaudeStreaming(env, {
     system: `${MYLIFE_COACH_SYSTEM}\n\nТекущий срез данных пользователя:\n${mlSnapshotSummary(snapshot)}`,
-    user: text,
+    user: `История переписки (для контекста, отвечай на последнее сообщение пользователя):\n${historyText}`,
   }, msgId);
+
+  history.push({ role: 'assistant', content: reply });
+  if (history.length > 30) history.splice(0, history.length - 30);
+  await kset(env, 'conv:history', history);
   await mlTouchActivity(env, todayMSK());
 }
 
