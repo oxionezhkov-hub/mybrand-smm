@@ -894,122 +894,36 @@ async function callLlamaStreaming(env, { system = '', user }, msgId) {
   return fullText.trim();
 }
 
-// Non-streaming Claude call — for JSON parsing, short utility calls
-async function callClaude(env, { system = '', user, search = false, json = false } = {}) {
+// Non-streaming AI call — for JSON parsing, short utility calls.
+// TEMPORARILY routed through the free Cloudflare Workers AI Llama model
+// instead of paid Claude, per owner's request — CLAUDE_API/api.anthropic.com
+// is unused while this stands; see git history for the previous Claude body
+// to switch back.
+async function callClaude(env, { system = '', user, json = false } = {}) {
   const fullSystem = system ? `${CLAUDE_BASE_SYSTEM}\n\n${system}` : CLAUDE_BASE_SYSTEM;
-  const reqBody = {
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 2048,
-    system: fullSystem,
-    messages: [{ role: 'user', content: user }],
-  };
+  const result = await env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+    messages: [
+      { role: 'system', content: fullSystem },
+      { role: 'user', content: user },
+    ],
+  });
+  const text = (result?.response ?? '').trim();
 
-  if (search) {
-    reqBody.tools = [{ type: 'web_search_20260209', name: 'web_search' }];
-  }
-
-  let attempts = 0;
-  while (attempts < 3) {
-    attempts++;
+  if (json) {
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': env.CLAUDE_API,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify(reqBody),
-      });
-
-      if (res.status === 429 && attempts < 3) {
-        await new Promise(r => setTimeout(r, 1000 * attempts));
-        continue;
-      }
-
-      if (!res.ok) throw new Error(`Claude ${res.status}`);
-
-      const data = await res.json();
-      const text = data.content
-        ?.filter(b => b.type === 'text')
-        ?.map(b => b.text)
-        ?.join('') ?? '';
-
-      if (json) {
-        try {
-          return JSON.parse(text.replace(/```json\n?|\n?```/g, '').trim());
-        } catch {
-          return null;
-        }
-      }
-      return text.trim();
-    } catch (e) {
-      if (attempts >= 3) throw e;
+      return JSON.parse(text.replace(/```json\n?|\n?```/g, '').trim());
+    } catch {
+      return null;
     }
   }
+  return text;
 }
 
-// Streaming Claude call with Llama fallback on error
+// Streaming AI call. TEMPORARILY just delegates to Llama (see callClaude above
+// for why); kept as its own function so call sites don't need to change either
+// way this gets switched.
 async function callClaudeStreaming(env, { system = '', user }, msgId) {
-  const fullSystem = system ? `${CLAUDE_BASE_SYSTEM}\n\n${system}` : CLAUDE_BASE_SYSTEM;
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': env.CLAUDE_API,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2048,
-        stream: true,
-        system: fullSystem,
-        messages: [{ role: 'user', content: user }],
-      }),
-    });
-
-    if (!res.ok) throw new Error(`Claude ${res.status}`);
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let fullText = '';
-    let lastEditAt = 0;
-    let buf = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const lines = buf.split('\n');
-      buf = lines.pop();
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const payload = line.slice(6).trim();
-        if (payload === '[DONE]' || !payload) continue;
-        try {
-          const ev = JSON.parse(payload);
-          if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
-            fullText += ev.delta.text;
-            const now = Date.now();
-            if (msgId && now - lastEditAt > 1200) {
-              lastEditAt = now;
-              await tgEdit(env, msgId, fullText + ' ▍');
-            }
-          }
-        } catch {}
-      }
-    }
-
-    if (msgId && fullText) await tgEdit(env, msgId, fullText);
-    return fullText.trim();
-
-  } catch (e) {
-    console.error('Claude failed, switching to Llama:', e.message);
-    if (msgId) await tgEdit(env, msgId, '⚠️ <i>Claude недоступен, переключаюсь на резервную модель…</i>');
-    else await send(env, '⚠️ <i>Claude недоступен, переключаюсь на резервную модель…</i>');
-    return callLlamaStreaming(env, { system, user }, msgId);
-  }
+  return callLlamaStreaming(env, { system, user }, msgId);
 }
 
 // ── YouTube transcription ────────────────────────────────────────────────────
@@ -1635,37 +1549,15 @@ const MYLIFE_COACH_SYSTEM = `Ты — прямой и практичный би�
 
 const MYLIFE_STUCK_SYSTEM = `Пользователь застрял на задаче и не может сдвинуться с места. Не утешай и не читай мотивационные речи. Твоя единственная цель — предложить САМУЮ маленькую версию задачи, с которой можно начать прямо сейчас (буквально 2-10 минут действия). Дай один конкретный первый шаг и, если уместно, ещё один запасной вариант. Коротко, без воды.`;
 
+// TEMPORARILY routed through Llama, same as callClaude/callClaudeStreaming above.
 async function callClaudeCoach(env, { system, user }) {
-  const reqBody = {
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 1500,
-    system,
-    messages: [{ role: 'user', content: user }],
-  };
-  let attempts = 0;
-  while (attempts < 3) {
-    attempts++;
-    try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': env.CLAUDE_API,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify(reqBody),
-      });
-      if (res.status === 429 && attempts < 3) {
-        await new Promise(r => setTimeout(r, 1000 * attempts));
-        continue;
-      }
-      if (!res.ok) throw new Error(`Claude ${res.status}: ${await res.text()}`);
-      const data = await res.json();
-      return (data.content?.filter(b => b.type === 'text')?.map(b => b.text)?.join('') ?? '').trim();
-    } catch (e) {
-      if (attempts >= 3) throw e;
-    }
-  }
+  const result = await env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+  });
+  return (result?.response ?? '').trim();
 }
 
 function mlSnapshotSummary(snapshot) {

@@ -13,7 +13,10 @@ binding = "AI"
 # Secrets required (set via `wrangler secret put <name>`), not stored here:
 #   TG_TOKEN            — Telegram bot token
 #   OWNER_CHAT_ID        — Telegram chat id allowed to use the bot
-#   CLAUDE_API           — Anthropic API key
+#   CLAUDE_API           — Anthropic API key (currently unused — the worker is
+#                          temporarily routed entirely through the free Llama
+#                          model on Workers AI; see callClaude/callClaudeStreaming/
+#                          callClaudeCoach in worker.js)
 #   SUPADATA_API_KEY     — YouTube transcript API key
 #   MYLIFE_MCP_TOKEN     — bearer token for the /mylife/mcp endpoint
 #   VIDEO_MCP_TOKEN      — bearer token for the /video/mcp endpoint (video transcription connector)
