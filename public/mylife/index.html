@@ -448,6 +448,11 @@
   .duration-chip{padding:6px 10px;border-radius:10px;font-size:12px;color:var(--text-secondary);background:var(--bg);cursor:pointer;}
   .duration-chip:hover{background:var(--border);color:var(--text);}
 
+  .status-chip-row{display:flex;flex-direction:column;gap:6px;padding:2px;}
+  .status-chip{padding:10px 12px;border-radius:12px;font-size:14px;color:var(--text);background:var(--bg);cursor:pointer;text-align:left;}
+  .status-chip:hover{background:var(--border);}
+  .status-confirm{padding:18px 8px;text-align:center;font-size:13px;color:var(--text-secondary);}
+
   /* Editor meta controls (priority + date pickers on an existing task) */
   .meta-control{
     display:flex;align-items:center;justify-content:center;cursor:pointer;
@@ -557,6 +562,9 @@
     </button>
     <button class="rail-btn" id="btn-smart-pick" title="Что сделать сейчас">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>
+    </button>
+    <button class="rail-btn" id="btn-status" title="Статус дня">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5l4 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
   </div>
 
@@ -696,6 +704,10 @@ const api = {
   },
   async linkPreview(url){
     const r = await fetch('/mylife/api/link-preview', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url }) });
+    return r.json();
+  },
+  async logStatus(statusType){
+    const r = await fetch('/mylife/api/status-log', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ statusType }) });
     return r.json();
   },
 };
@@ -841,6 +853,11 @@ function pluralDays(n){
 function daysActiveLabel(fromTs, toTs){
   const n = Math.floor(((toTs ?? Date.now()) - fromTs) / 86400000);
   return n <= 0 ? 'сегодня' : pluralDays(n);
+}
+function fmtTime(ts){
+  if (!ts) return '';
+  const d = new Date(ts);
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
 function isMobile(){
   return window.matchMedia('(max-width: 860px)').matches;
@@ -2401,6 +2418,56 @@ btnTimer.addEventListener('click', (e) => {
   openTimerPopover(btnTimer);
 });
 
+// ───────────────────────────── Day status ─────────────────────────────
+// Not tasks — just timestamped "started work / break / woke up / went to
+// sleep" markers, mirroring the same four quick actions available in the
+// Telegram bot. Logged into the same timeline shown in the Progress panel.
+
+const STATUS_OPTIONS = [
+  { statusType: 'work_start', label: '🟢 Начал работу' },
+  { statusType: 'break', label: '☕ Ушёл отдыхать' },
+  { statusType: 'wake', label: '🌅 Проснулся' },
+  { statusType: 'sleep', label: '😴 Лёг спать' },
+];
+
+function openStatusPopover(anchorEl){
+  const veil = el('div', 'veil');
+  veil.addEventListener('pointerdown', closeAllPopovers);
+  document.body.appendChild(veil);
+
+  const pop = el('div', 'popover');
+  pop.dataset.kind = 'status';
+  pop.style.minWidth = '200px';
+  pop.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+  const row = el('div', 'status-chip-row');
+  STATUS_OPTIONS.forEach(opt => {
+    const chip = el('button', 'status-chip', opt.label);
+    chip.addEventListener('click', async () => {
+      chip.disabled = true;
+      const { elapsedText, extraLogs } = await api.logStatus(opt.statusType);
+      if (extraLogs) state.extraLogs = extraLogs;
+      pop.innerHTML = '';
+      pop.appendChild(el('div', 'status-confirm', `Записал: ${opt.label}${elapsedText ? `<br>${escapeHtml(elapsedText)}` : ''}`));
+      if (state.panelOpen === 'progress') renderPanel();
+      setTimeout(closeAllPopovers, 1400);
+    });
+    row.appendChild(chip);
+  });
+  pop.appendChild(row);
+
+  document.body.appendChild(pop);
+  positionPopover(pop, anchorEl);
+}
+
+const btnStatus = $('#btn-status');
+btnStatus.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if ($('.popover[data-kind="status"]')) { closeAllPopovers(); return; }
+  closeAllPopovers();
+  openStatusPopover(btnStatus);
+});
+
 // ───────────────────────────── Right panel ─────────────────────────────
 
 $all('.rail-btn[data-panel]').forEach(btn => {
@@ -2803,6 +2870,7 @@ function buildProgressDayGroup(dateObj, dateKey, doneTasks, extraEntries){
 function buildExtraLogLine(entry){
   const line = el('div', 'panel-task-line');
   line.appendChild(el('span', 'panel-task-title', escapeHtml(entry.text)));
+  if (entry.createdAt) line.appendChild(el('span', 'panel-task-age', fmtTime(entry.createdAt)));
   const del = el('div', 'panel-restore', '&times;');
   del.title = 'Удалить';
   del.addEventListener('click', async (e) => {
@@ -2820,7 +2888,8 @@ function buildPanelTaskLine(task, { showAge, showRestore }){
   line.appendChild(el('span', 'panel-task-title', escapeHtml(task.title)));
 
   if (showAge){
-    line.appendChild(el('span', 'panel-task-age', daysActiveLabel(task.createdAt, task.completedAt)));
+    const timeLabel = task.completedAt ? fmtTime(task.completedAt) : '';
+    line.appendChild(el('span', 'panel-task-age', timeLabel || daysActiveLabel(task.createdAt, task.completedAt)));
   }
 
   if (showRestore){

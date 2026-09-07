@@ -117,6 +117,13 @@ async function handleMylifeApi(request, env, url) {
     if (request.method === 'DELETE' && id) return mlDeleteExtraLog(env, id);
   }
 
+  if (resource === 'status-log' && request.method === 'POST') {
+    const body = await readJson(request);
+    const result = await mlLogStatusEvent(env, body.statusType);
+    if (!result) return jsonResponse({ error: 'invalid statusType' }, 400);
+    return jsonResponse({ ...result, extraLogs: await kget(env, 'mylife:extra-logs', []) });
+  }
+
   if (resource === 'focus') {
     if (request.method === 'POST') return mlSetFocusDay(env, await readJson(request));
     if (request.method === 'PATCH' && id) return mlUpdateFocusTask(env, id, await readJson(request));
@@ -170,6 +177,8 @@ async function mlCreateExtraLog(env, body) {
     id: crypto.randomUUID(),
     dateKey: /^\d{4}-\d{2}-\d{2}$/.test(body.dateKey || '') ? body.dateKey : new Date().toISOString().slice(0, 10),
     text,
+    kind: body.kind === 'status' ? 'status' : null,
+    statusType: STATUS_EVENTS[body.statusType] ? body.statusType : null,
     createdAt: Date.now(),
   };
   logs.push(entry);
@@ -182,6 +191,68 @@ async function mlDeleteExtraLog(env, id) {
   const next = logs.filter(l => l.id !== id);
   await kset(env, 'mylife:extra-logs', next);
   return jsonResponse({ extraLogs: next });
+}
+
+// ── Day status pings (started work / break / woke up / went to sleep) ──────────
+// Not tasks — just timestamped markers, shown in the same Progress timeline as
+// completed tasks and free-form notes, so the day's rhythm is visible at a glance.
+
+const STATUS_EVENTS = {
+  work_start: { emoji: '🟢', label: 'Начал работу' },
+  break: { emoji: '☕', label: 'Ушёл отдыхать' },
+  wake: { emoji: '🌅', label: 'Проснулся' },
+  sleep: { emoji: '😴', label: 'Лёг спать' },
+};
+
+const STATUS_PATTERNS = [
+  { statusType: 'work_start', re: /^(начал\s*(работу|работать)|приступ(ил|аю)|начинаю\s*работу|за работу)/i },
+  { statusType: 'break', re: /^(ушел|ушёл|ушла|иду)?\s*(отдыхать|на перерыв|перерыв\b|отдых\b)/i },
+  { statusType: 'wake', re: /^(проснул(ся|ась)|встал|встала|доброе утро)/i },
+  { statusType: 'sleep', re: /^(лёг|лег|легла|пошел|пошёл|пошла|иду)?\s*спать|ложусь\s*спать|спокойной\s*ночи/i },
+];
+
+function detectStatusEvent(text) {
+  const t = text.replace(/^[^\p{L}]+/u, '').trim();
+  for (const p of STATUS_PATTERNS) {
+    if (p.re.test(t)) return p.statusType;
+  }
+  return null;
+}
+
+function formatDuration(totalMinutes) {
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (h && m) return `${h} ч ${m} мин`;
+  if (h) return `${h} ч`;
+  return `${Math.max(m, 1)} мин`;
+}
+
+async function mlLogStatusEvent(env, statusType) {
+  const meta = STATUS_EVENTS[statusType];
+  if (!meta) return null;
+
+  const logs = await kget(env, 'mylife:extra-logs', []);
+  const prevStatus = [...logs].reverse().find(l => l.kind === 'status');
+  const now = Date.now();
+
+  const entry = {
+    id: crypto.randomUUID(),
+    dateKey: todayMSK(),
+    text: `${meta.emoji} ${meta.label}`,
+    kind: 'status',
+    statusType,
+    createdAt: now,
+  };
+  logs.push(entry);
+  await kset(env, 'mylife:extra-logs', logs);
+  await mlTouchActivity(env, todayMSK());
+
+  let elapsedText = null;
+  if (prevStatus) {
+    const prevMeta = STATUS_EVENTS[prevStatus.statusType];
+    elapsedText = `С «${prevMeta?.label ?? prevStatus.text}» прошло ${formatDuration(Math.round((now - prevStatus.createdAt) / 60000))}.`;
+  }
+  return { entry, elapsedText };
 }
 
 function isValidDateKey(s) {
@@ -403,6 +474,30 @@ async function mlDeleteTask(env, id) {
   const next = tasks.filter(t => t.id !== id);
   await kset(env, 'mylife:tasks', next);
   return jsonResponse({ ok: true });
+}
+
+// Marks an existing task done (by id) or creates a new one already done — used
+// by the Telegram bot when the user reports work they just finished. Returns
+// the task itself; its completedAt is what the Progress panel timelines on,
+// so no separate log entry is needed.
+async function mlLogTaskDone(env, { taskId, title, projectId, newProjectName }) {
+  let tasks;
+  let task;
+  if (taskId) {
+    tasks = await kget(env, 'mylife:tasks', []);
+    task = tasks.find(t => t.id === taskId);
+    if (!task) return null;
+  } else {
+    const createRes = await mlCreateTask(env, { title, projectId, newProjectName });
+    const { task: created } = await createRes.json();
+    tasks = await kget(env, 'mylife:tasks', []);
+    task = tasks.find(t => t.id === created.id);
+  }
+  task.status = 'done';
+  task.completedAt = Date.now();
+  await kset(env, 'mylife:tasks', tasks);
+  await mlTouchActivity(env, todayMSK());
+  return task;
 }
 
 // ── Bulk task operations — one KV round trip for many tasks at once, so a
@@ -1113,6 +1208,15 @@ async function typing(env) {
 
 // ── Main message handler ──────────────────────────────────────────────────────
 
+const STATUS_KEYBOARD = {
+  keyboard: [
+    ['🟢 Начал работу', '☕ Ушёл отдыхать'],
+    ['🌅 Проснулся', '😴 Лёг спать'],
+  ],
+  resize_keyboard: true,
+  is_persistent: true,
+};
+
 async function handleMessage(env, msg) {
   const chatId = String(msg.chat?.id);
 
@@ -1146,7 +1250,9 @@ async function handleMessage(env, msg) {
   }
 
   if (text === '/start' || text === '/help') {
-    await send(env, `<b>MyLife-бот</b>\n\nПришли ссылку на YouTube-видео — верну файл с транскрипцией и саммари. Ответь на сообщение с саммари вопросом — отвечу по содержанию видео.\n\nЛюбое другое сообщение — это разговор с твоим MyLife-коучем, который видит твои актуальные задачи, проекты и привычки.\n\n/today — саммари задач на сегодня\n/help — справка`);
+    await send(env, `<b>MyLife-бот</b>\n\nПришли ссылку на YouTube-видео — верну файл с транскрипцией и саммари. Ответь на сообщение с саммари вопросом — отвечу по содержанию видео.\n\n<b>Задачи:</b> напиши, что ты сделал (например «сделал дизайн лендинга») — найду похожую задачу в трекере и предложу отметить выполненной, а если не найду — спрошу, в какой проект добавить.\n\n<b>Статус дня:</b> кнопки ниже (или просто напиши) — «начал работу» / «ушёл отдыхать» / «проснулся» / «лёг спать». Это не задачи, а метки времени — помогают понять, сколько ты работаешь.\n\nЛюбое другое сообщение — это разговор с твоим MyLife-коучем, который видит твои актуальные задачи, проекты и привычки.\n\n/today — саммари задач на сегодня\n/help — справка`, {
+      reply_markup: STATUS_KEYBOARD,
+    });
     return;
   }
 
@@ -1160,7 +1266,109 @@ async function handleMessage(env, msg) {
     return;
   }
 
+  // Day status ping (started work / break / woke up / went to sleep) — not a task
+  const statusType = detectStatusEvent(text);
+  if (statusType) {
+    const { elapsedText } = await mlLogStatusEvent(env, statusType);
+    const meta = STATUS_EVENTS[statusType];
+    await send(env, `${meta.emoji} Записал: ${meta.label}${elapsedText ? `\n<i>${elapsedText}</i>` : ''}`);
+    return;
+  }
+
+  // Otherwise, check whether this reports a task the user just finished
+  const { tasks, projects } = await mlLoadAll(env);
+  const active = tasks.filter(t => t.status === 'active');
+  let match = null;
+  try {
+    match = await matchTaskReport(env, text, active);
+  } catch (e) {
+    console.error('matchTaskReport failed:', e);
+  }
+
+  if (match?.isTaskReport) {
+    const matchedTask = match.matchedTaskId ? active.find(t => t.id === match.matchedTaskId) : null;
+    const fallbackTitle = (match.suggestedTitle || text).slice(0, 80);
+
+    if (matchedTask) {
+      await kset(env, 'session', { state: 'awaiting_task_confirm', taskId: matchedTask.id, rawText: text, suggestedTitle: fallbackTitle });
+      await send(env, `Похоже, это задача: <b>${escapeHtml(matchedTask.title)}</b>\nОтметить выполненной?`, {
+        reply_markup: { inline_keyboard: [[
+          { text: '✅ Да, отметить', callback_data: 'taskdone:yes' },
+          { text: '✖️ Нет, это другое', callback_data: 'taskdone:no' },
+        ]] },
+      });
+      return;
+    }
+
+    await kset(env, 'session', { state: 'awaiting_task_project', rawText: text, suggestedTitle: fallbackTitle });
+    await send(env, `Не нашёл подходящую задачу в трекере. К какому проекту отнести «${escapeHtml(fallbackTitle)}»?`, {
+      reply_markup: { inline_keyboard: [
+        ...projects.map(p => [{ text: p.name, callback_data: `taskproj:${p.id}` }]),
+        [{ text: '✖️ Не добавлять', callback_data: 'taskproj:cancel' }],
+      ] },
+    });
+    return;
+  }
+
   await handleChat(env, text);
+}
+
+// Classifies a free-text message: does it report a task the user just finished,
+// and if so which active task (if any) it most likely matches.
+async function matchTaskReport(env, text, activeTasks) {
+  const taskList = activeTasks.slice(0, 80).map(t => `${t.id}: ${t.title}`).join('\n');
+  const result = await callClaude(env, {
+    system: 'Ты классифицируешь сообщения пользователя в личном трекере задач. Отвечай только валидным JSON.',
+    user: `Активные задачи (id: название):\n${taskList || '(нет задач)'}\n\nСообщение пользователя: "${text}"\n\nЭто сообщение о том, что пользователь ТОЛЬКО ЧТО ЗАВЕРШИЛ какую-то работу (законченное действие в прошедшем времени, например "сделал", "закончил", "отправил"), или это что-то другое (вопрос, обсуждение, планирование, статус дня)?\n\nЕсли это про завершённую работу — сопоставь по смыслу (не только по точному совпадению слов) с одной из активных задач. Если подходящей задачи нет — предложи короткое название (3-6 слов) для новой задачи по этому сообщению.\n\nВерни строго JSON без пояснений:\n{"isTaskReport": true|false, "matchedTaskId": "id или null", "suggestedTitle": "название или null"}`,
+    json: true,
+  });
+  return result || { isTaskReport: false, matchedTaskId: null, suggestedTitle: null };
+}
+
+// ── Callback handler ──────────────────────────────────────────────────────────
+
+async function handleCallback(env, query) {
+  const data = query.data;
+  await tgReq(env, 'answerCallbackQuery', { callback_query_id: query.id });
+
+  if (data === 'taskdone:yes') {
+    const session = await kget(env, 'session', {});
+    if (session.state !== 'awaiting_task_confirm') return;
+    await kset(env, 'session', { state: 'idle' });
+    const task = await mlLogTaskDone(env, { taskId: session.taskId });
+    if (task) await send(env, `✅ Отметил выполненной: <b>${escapeHtml(task.title)}</b>`);
+    return;
+  }
+
+  if (data === 'taskdone:no') {
+    const session = await kget(env, 'session', {});
+    if (session.state !== 'awaiting_task_confirm') return;
+    const { projects } = await mlLoadAll(env);
+    await kset(env, 'session', { state: 'awaiting_task_project', rawText: session.rawText, suggestedTitle: session.suggestedTitle });
+    await send(env, `Хорошо. К какому проекту отнести «${escapeHtml(session.suggestedTitle)}»?`, {
+      reply_markup: { inline_keyboard: [
+        ...projects.map(p => [{ text: p.name, callback_data: `taskproj:${p.id}` }]),
+        [{ text: '✖️ Не добавлять', callback_data: 'taskproj:cancel' }],
+      ] },
+    });
+    return;
+  }
+
+  if (data.startsWith('taskproj:')) {
+    const session = await kget(env, 'session', {});
+    if (session.state !== 'awaiting_task_project') return;
+    await kset(env, 'session', { state: 'idle' });
+
+    const projectId = data.replace('taskproj:', '');
+    if (projectId === 'cancel') {
+      await send(env, 'Ок, не добавляю.');
+      return;
+    }
+
+    const task = await mlLogTaskDone(env, { title: session.suggestedTitle, projectId });
+    if (task) await send(env, `✅ Добавил и отметил выполненной: <b>${escapeHtml(task.title)}</b>`);
+    return;
+  }
 }
 
 async function handleChat(env, text) {
@@ -2184,6 +2392,8 @@ export default {
       const body = await request.json();
       if (body.message) {
         await handleMessage(env, body.message);
+      } else if (body.callback_query) {
+        await handleCallback(env, body.callback_query);
       }
     } catch (e) {
       console.error('Worker error:', e);
