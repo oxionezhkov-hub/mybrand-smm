@@ -2380,6 +2380,22 @@ export default {
       return handleVideoMcp(request, env, url);
     }
 
+    // Manual check that the Llama fallback (Cloudflare Workers AI) responds,
+    // independent of Claude/CLAUDE_API — same model callClaudeStreaming falls
+    // back to on Claude failure. No side effects (doesn't message Telegram or
+    // touch stored data), so unlike /debug/morning it needs no token.
+    if (url.pathname === '/debug/llama') {
+      try {
+        const result = await env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+          messages: [{ role: 'user', content: 'Ответь одним словом: работаешь?' }],
+        });
+        return jsonResponse({ ok: true, response: result?.response ?? null });
+      } catch (e) {
+        console.error('Llama debug check failed:', e);
+        return jsonResponse({ ok: false, error: e.message || String(e) }, 500);
+      }
+    }
+
     // Manual trigger for debugging scheduled jobs (secured with bot token as secret)
     if (url.pathname === '/debug/morning') {
       if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
