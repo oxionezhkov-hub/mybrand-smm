@@ -2315,9 +2315,17 @@ async function getZoomAccessToken(env, account) {
   return data.access_token;
 }
 
-async function downloadZoomFile(downloadUrl, token) {
-  const res = await fetch(downloadUrl, { headers: { Authorization: `Bearer ${token}` } });
-  if (!res.ok) throw new Error(`Zoom file download ${res.status}`);
+// Zoom recording file downloads work with either the account's S2S OAuth
+// bearer token or the short-lived `download_token` that comes in the same
+// webhook payload (as `payload.download_token`) — the latter is the
+// documented/recommended way and is what actually works for some accounts
+// where the OAuth bearer gets rejected for file downloads specifically, so
+// prefer it when the webhook included one.
+async function downloadZoomFile(downloadUrl, token, downloadToken) {
+  const res = downloadToken
+    ? await fetch(`${downloadUrl}?access_token=${encodeURIComponent(downloadToken)}`)
+    : await fetch(downloadUrl, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error(`Zoom file download ${res.status}: ${await res.text().catch(() => '')}`);
   return res.text();
 }
 
@@ -2335,7 +2343,23 @@ function vttToText(vtt) {
   return out.join('\n');
 }
 
-async function handleZoomTranscriptCompleted(env, account, obj) {
+// Zoom's Report/Dashboard participant-list APIs need a Business+ plan, so on
+// Pro accounts the only source of speaker names is the transcript itself —
+// its cues are normally "Speaker Name: text", so pull the unique names out.
+function extractSpeakers(text) {
+  const names = [];
+  const seen = new Set();
+  for (const line of text.split('\n')) {
+    const m = line.match(/^([^:<>]{1,60}):\s/);
+    if (m && !seen.has(m[1])) {
+      seen.add(m[1]);
+      names.push(m[1].trim());
+    }
+  }
+  return names;
+}
+
+async function handleZoomTranscriptCompleted(env, account, obj, downloadToken) {
   const meetingUuid = obj.uuid;
   const dedupKey = `zoom:done:${account.label}:${meetingUuid}`;
   if (await env.KV.get(dedupKey)) return;
@@ -2353,19 +2377,21 @@ async function handleZoomTranscriptCompleted(env, account, obj) {
   if (obj.password) lines.push(`Пароль: <code>${escapeHtml(obj.password)}</code>`);
   if (!transcriptFile) lines.push('⚠️ Транскрипт недоступен для этой записи.');
 
-  await send(env, lines.join('\n'), {}, chatId);
+  await send(env, lines.join('\n'), { link_preview_options: { is_disabled: true }, disable_web_page_preview: true }, chatId);
   if (!transcriptFile) return;
 
   try {
     const token = await getZoomAccessToken(env, account);
-    const vtt = await downloadZoomFile(transcriptFile.download_url, token);
+    const vtt = await downloadZoomFile(transcriptFile.download_url, token, downloadToken);
     const text = vttToText(vtt);
+    const speakers = extractSpeakers(text);
     const safeTopic = topic.replace(/[^\p{L}\p{N} _-]/gu, '').trim().slice(0, 60) || 'meeting';
     const dateStamp = startTime ? startTime.toISOString().slice(0, 10) : todayMSK();
-    await sendDocument(env, `${safeTopic}_${dateStamp}.txt`, text, { caption: `📄 Транскрипт: ${topic}` }, chatId);
+    const caption = `📄 Транскрипт: ${topic}` + (speakers.length ? `\n👥 Участники: ${speakers.join(', ')}` : '');
+    await sendDocument(env, `${safeTopic}_${dateStamp}.txt`, text, { caption }, chatId);
   } catch (e) {
     console.error(`Zoom transcript download failed (${account.label}/${meetingUuid}):`, e);
-    await send(env, '⚠️ Не удалось скачать транскрипт. Ссылка на запись — выше.', {}, chatId);
+    await send(env, `⚠️ Не удалось скачать транскрипт (${e.message}). Ссылка на запись — выше.`, {}, chatId);
   }
 }
 
@@ -2397,7 +2423,7 @@ async function handleZoomWebhook(request, env, label) {
   if (body.event === 'recording.completed') {
     console.log(`Zoom recording.completed (${account.label}): ${obj?.uuid}`);
   } else if (body.event === 'recording.transcript_completed' && obj) {
-    await handleZoomTranscriptCompleted(env, account, obj);
+    await handleZoomTranscriptCompleted(env, account, obj, body.payload?.download_token);
   }
 
   return new Response('OK');
