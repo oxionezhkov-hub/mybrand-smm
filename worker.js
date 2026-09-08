@@ -2270,13 +2270,20 @@ async function handleVideoMcp(request, env, url) {
 // just logged (useful for wrangler tail while wiring up a new account).
 
 function getZoomAccounts(env) {
-  if (!env.ZOOM_ACCOUNTS_JSON) return [];
+  return parseZoomAccounts(env).accounts;
+}
+
+// Returns both the parsed accounts and, on failure, why — used by getZoomAccounts
+// (which only needs the list) and by /debug/zoom-accounts (which needs the reason).
+function parseZoomAccounts(env) {
+  if (!env.ZOOM_ACCOUNTS_JSON) return { accounts: [], error: 'ZOOM_ACCOUNTS_JSON secret is not set' };
   try {
     const arr = JSON.parse(env.ZOOM_ACCOUNTS_JSON);
-    return Array.isArray(arr) ? arr : [];
+    if (!Array.isArray(arr)) return { accounts: [], error: 'ZOOM_ACCOUNTS_JSON must be a JSON array' };
+    return { accounts: arr, error: null };
   } catch (e) {
     console.error('Invalid ZOOM_ACCOUNTS_JSON:', e);
-    return [];
+    return { accounts: [], error: 'Invalid JSON: ' + e.message };
   }
 }
 
@@ -2442,6 +2449,25 @@ export default {
         console.error('Llama debug check failed:', e);
         return jsonResponse({ ok: false, error: e.message || String(e) }, 500);
       }
+    }
+
+    // Manual check of ZOOM_ACCOUNTS_JSON — reports parsed account labels
+    // (never secrets) so a "/zoom/webhook/<label> -> Unknown account" report
+    // can be diagnosed (missing/invalid secret vs. a label typo/mismatch).
+    if (url.pathname === '/debug/zoom-accounts') {
+      const { accounts, error } = parseZoomAccounts(env);
+      return jsonResponse({
+        error,
+        count: accounts.length,
+        accounts: accounts.map(a => ({
+          label: a.label ?? null,
+          hasAccountId: !!a.account_id,
+          hasClientId: !!a.client_id,
+          hasClientSecret: !!a.client_secret,
+          hasWebhookSecretToken: !!a.webhook_secret_token,
+          chatId: a.chat_id ?? null,
+        })),
+      });
     }
 
     // Manual trigger for debugging scheduled jobs (secured with bot token as secret)
