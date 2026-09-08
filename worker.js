@@ -2321,12 +2321,27 @@ async function getZoomAccessToken(env, account) {
 // documented/recommended way and is what actually works for some accounts
 // where the OAuth bearer gets rejected for file downloads specifically, so
 // prefer it when the webhook included one.
+//
+// Zoom's own devforum guidance for the resulting intermittent 401 (errorCode
+// 300 "Forbidden"): the file can lag behind the webhook by a few seconds on
+// their end, so retry with a short delay instead of treating it as fatal.
+const ZOOM_DOWNLOAD_RETRY_DELAYS_MS = [0, 5000, 10000, 15000];
+
 async function downloadZoomFile(downloadUrl, token, downloadToken) {
-  const res = downloadToken
-    ? await fetch(`${downloadUrl}?access_token=${encodeURIComponent(downloadToken)}`)
-    : await fetch(downloadUrl, { headers: { Authorization: `Bearer ${token}` } });
-  if (!res.ok) throw new Error(`Zoom file download ${res.status}: ${await res.text().catch(() => '')}`);
-  return res.text();
+  let lastError;
+  for (const delay of ZOOM_DOWNLOAD_RETRY_DELAYS_MS) {
+    if (delay) await new Promise(r => setTimeout(r, delay));
+    try {
+      const res = downloadToken
+        ? await fetch(`${downloadUrl}?access_token=${encodeURIComponent(downloadToken)}`)
+        : await fetch(downloadUrl, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) return res.text();
+      lastError = new Error(`Zoom file download ${res.status}: ${await res.text().catch(() => '')}`);
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError;
 }
 
 // Strips VTT cue numbers/timestamps/tags, keeping just the spoken text (Zoom's
@@ -2395,7 +2410,7 @@ async function handleZoomTranscriptCompleted(env, account, obj, downloadToken) {
   }
 }
 
-async function handleZoomWebhook(request, env, label) {
+async function handleZoomWebhook(request, env, label, ctx) {
   const account = getZoomAccounts(env).find(a => a.label === label);
   if (!account) return new Response('Unknown account', { status: 404 });
 
@@ -2423,7 +2438,15 @@ async function handleZoomWebhook(request, env, label) {
   if (body.event === 'recording.completed') {
     console.log(`Zoom recording.completed (${account.label}): ${obj?.uuid}`);
   } else if (body.event === 'recording.transcript_completed' && obj) {
-    await handleZoomTranscriptCompleted(env, account, obj, body.payload?.download_token);
+    // Downloading can take up to ~30s (Zoom's own fix for a known file-lag
+    // race — see downloadZoomFile), well past what Zoom waits for a webhook
+    // response before treating it as failed and retrying delivery. Ack Zoom
+    // immediately and let the retries run in the background via waitUntil,
+    // which — unlike code left running after an awaited call returns —
+    // Cloudflare guarantees to complete even after the response is sent.
+    const work = handleZoomTranscriptCompleted(env, account, obj, body.payload?.download_token);
+    if (ctx?.waitUntil) ctx.waitUntil(work);
+    else await work; // no execution context (e.g. local test) — fall back to awaiting inline
   }
 
   return new Response('OK');
@@ -2432,12 +2455,12 @@ async function handleZoomWebhook(request, env, label) {
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     if (url.pathname.startsWith('/zoom/webhook/')) {
       try {
-        return await handleZoomWebhook(request, env, url.pathname.slice('/zoom/webhook/'.length));
+        return await handleZoomWebhook(request, env, url.pathname.slice('/zoom/webhook/'.length), ctx);
       } catch (e) {
         console.error('Zoom webhook error:', e);
         return new Response('Error: ' + e.message, { status: 500 });
