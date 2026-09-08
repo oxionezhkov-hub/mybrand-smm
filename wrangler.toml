@@ -23,6 +23,19 @@ binding = "AI"
 #   VAPID_PRIVATE_JWK    — JSON Web Key for browser push (see pushBroadcast in worker.js),
 #                          e.g. {"crv":"P-256","kty":"EC","x":"...","y":"...","d":"..."}
 #   VAPID_SUBJECT        — optional, e.g. "mailto:you@example.com" (defaults to a placeholder)
+#   ZOOM_ACCOUNTS_JSON   — JSON array configuring the Zoom → Telegram recording/transcript
+#                          forwarder (see "Zoom → Telegram" in worker.js). One entry per
+#                          Zoom account, each with its own Server-to-Server OAuth app and
+#                          its own webhook Secret Token:
+#                          [{"label":"account-1","account_id":"...","client_id":"...",
+#                            "client_secret":"...","webhook_secret_token":"...",
+#                            "chat_id":"-100xxxxxxxxx"}, ...]
+#                          `chat_id` is optional per account — omit it to send to OWNER_CHAT_ID.
+#                          In each Zoom account's app, set Event Subscriptions' endpoint URL to
+#                          https://<worker-domain>/zoom/webhook/<label> (label must match, and
+#                          must be unique/URL-safe) and subscribe to "Recording Completed" and
+#                          "All Recordings have completed Transcription". Not set = feature is
+#                          simply inert (getZoomAccounts returns an empty list).
 
 [vars]
 # Set to "true" to disable the morning Telegram summary and all three daily

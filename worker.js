@@ -1067,9 +1067,9 @@ async function tgReq(env, method, params = {}) {
   return res.json();
 }
 
-async function send(env, text, extra = {}) {
+async function send(env, text, extra = {}, chatId = env.OWNER_CHAT_ID) {
   return tgReq(env, 'sendMessage', {
-    chat_id: env.OWNER_CHAT_ID,
+    chat_id: chatId,
     text,
     parse_mode: 'HTML',
     ...extra,
@@ -1082,9 +1082,9 @@ async function sendGetId(env, text, extra = {}) {
   return res?.result?.message_id ?? null;
 }
 
-async function sendDocument(env, filename, content, extra = {}) {
+async function sendDocument(env, filename, content, extra = {}, chatId = env.OWNER_CHAT_ID) {
   const form = new FormData();
-  form.append('chat_id', env.OWNER_CHAT_ID);
+  form.append('chat_id', chatId);
   if (extra.caption) form.append('caption', extra.caption);
   form.append('document', new Blob([content], { type: 'text/plain; charset=utf-8' }), filename);
   const res = await fetch(`https://api.telegram.org/bot${env.TG_TOKEN}/sendDocument`, {
@@ -2249,11 +2249,167 @@ async function handleVideoMcp(request, env, url) {
   });
 }
 
+// ── Zoom → Telegram (recording + transcript) ─────────────────────────────────
+// One or more independent Zoom accounts, each with its own Server-to-Server
+// OAuth app and its own webhook Secret Token, all feeding the same Telegram
+// bot. Configured entirely via the ZOOM_ACCOUNTS_JSON secret — no code
+// changes needed to add/remove an account. See wrangler.toml for the format
+// and for what to put in each Zoom app's Event Subscriptions.
+//
+// Per account, Event Subscriptions' endpoint URL must be:
+//   https://<worker-domain>/zoom/webhook/<label>
+// (a separate URL per account, matching that account's `label` — this is how
+// the worker knows which webhook_secret_token to verify the request with,
+// including during Zoom's URL-validation handshake).
+// Subscribe to: "Recording Completed" and "All Recordings have completed
+// Transcription" (recording.transcript_completed).
+//
+// Only recording.transcript_completed actually sends to Telegram — its
+// payload already carries every recording file, transcript included, so
+// there's no need to correlate two separate events. recording.completed is
+// just logged (useful for wrangler tail while wiring up a new account).
+
+function getZoomAccounts(env) {
+  if (!env.ZOOM_ACCOUNTS_JSON) return [];
+  try {
+    const arr = JSON.parse(env.ZOOM_ACCOUNTS_JSON);
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) {
+    console.error('Invalid ZOOM_ACCOUNTS_JSON:', e);
+    return [];
+  }
+}
+
+function bytesToHex(bytes) {
+  return [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function hmacHex(secret, message) {
+  const enc = new TextEncoder();
+  return bytesToHex(await hmacSha256(enc.encode(secret), enc.encode(message)));
+}
+
+async function getZoomAccessToken(env, account) {
+  const cacheKey = `zoom:token:${account.label}`;
+  const cached = await kget(env, cacheKey, null);
+  if (cached && cached.expiresAt > Date.now() + 60000) return cached.token;
+
+  const basic = btoa(`${account.client_id}:${account.client_secret}`);
+  const res = await fetch(`https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${encodeURIComponent(account.account_id)}`, {
+    method: 'POST',
+    headers: { Authorization: `Basic ${basic}` },
+  });
+  if (!res.ok) throw new Error(`Zoom OAuth ${res.status}: ${await res.text().catch(() => '')}`);
+
+  const data = await res.json();
+  const expiresIn = data.expires_in || 3600;
+  const expiresAt = Date.now() + expiresIn * 1000;
+  await kset(env, cacheKey, { token: data.access_token, expiresAt }, { expirationTtl: Math.max(60, expiresIn - 60) });
+  return data.access_token;
+}
+
+async function downloadZoomFile(downloadUrl, token) {
+  const res = await fetch(downloadUrl, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error(`Zoom file download ${res.status}`);
+  return res.text();
+}
+
+// Strips VTT cue numbers/timestamps/tags, keeping just the spoken text (Zoom's
+// transcript cues are usually already "Speaker Name: text").
+function vttToText(vtt) {
+  const out = [];
+  for (const rawLine of vtt.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line === 'WEBVTT') continue;
+    if (/^\d+$/.test(line)) continue; // cue index
+    if (line.includes('-->')) continue; // timestamp range
+    out.push(line.replace(/<[^>]+>/g, ''));
+  }
+  return out.join('\n');
+}
+
+async function handleZoomTranscriptCompleted(env, account, obj) {
+  const meetingUuid = obj.uuid;
+  const dedupKey = `zoom:done:${account.label}:${meetingUuid}`;
+  if (await env.KV.get(dedupKey)) return;
+  await env.KV.put(dedupKey, '1', { expirationTtl: 172800 }); // 48h — covers Zoom's webhook retries
+
+  const chatId = account.chat_id || env.OWNER_CHAT_ID;
+  const topic = obj.topic || 'Zoom-встреча';
+  const startTime = obj.start_time ? new Date(obj.start_time) : null;
+  const dateLabel = startTime ? startTime.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : '';
+  const transcriptFile = (obj.recording_files || []).find(f => f.file_type === 'TRANSCRIPT' || f.recording_type === 'audio_transcript');
+
+  const lines = [`🎥 <b>${escapeHtml(topic)}</b>`];
+  if (dateLabel) lines.push(dateLabel);
+  if (obj.share_url) lines.push(`Запись: ${obj.share_url}`);
+  if (obj.password) lines.push(`Пароль: <code>${escapeHtml(obj.password)}</code>`);
+  if (!transcriptFile) lines.push('⚠️ Транскрипт недоступен для этой записи.');
+
+  await send(env, lines.join('\n'), {}, chatId);
+  if (!transcriptFile) return;
+
+  try {
+    const token = await getZoomAccessToken(env, account);
+    const vtt = await downloadZoomFile(transcriptFile.download_url, token);
+    const text = vttToText(vtt);
+    const safeTopic = topic.replace(/[^\p{L}\p{N} _-]/gu, '').trim().slice(0, 60) || 'meeting';
+    const dateStamp = startTime ? startTime.toISOString().slice(0, 10) : todayMSK();
+    await sendDocument(env, `${safeTopic}_${dateStamp}.txt`, text, { caption: `📄 Транскрипт: ${topic}` }, chatId);
+  } catch (e) {
+    console.error(`Zoom transcript download failed (${account.label}/${meetingUuid}):`, e);
+    await send(env, '⚠️ Не удалось скачать транскрипт. Ссылка на запись — выше.', {}, chatId);
+  }
+}
+
+async function handleZoomWebhook(request, env, label) {
+  const account = getZoomAccounts(env).find(a => a.label === label);
+  if (!account) return new Response('Unknown account', { status: 404 });
+
+  const bodyText = await request.text();
+  let body;
+  try {
+    body = JSON.parse(bodyText);
+  } catch {
+    return new Response('Bad JSON', { status: 400 });
+  }
+
+  // Zoom's one-time endpoint validation handshake — no signature to check yet.
+  if (body.event === 'endpoint.url_validation') {
+    const plainToken = body.payload?.plainToken;
+    if (!plainToken) return new Response('Missing plainToken', { status: 400 });
+    return jsonResponse({ plainToken, encryptedToken: await hmacHex(account.webhook_secret_token, plainToken) });
+  }
+
+  const signature = request.headers.get('x-zm-signature') || '';
+  const timestamp = request.headers.get('x-zm-request-timestamp') || '';
+  const expected = `v0=${await hmacHex(account.webhook_secret_token, `v0:${timestamp}:${bodyText}`)}`;
+  if (signature !== expected) return new Response('Invalid signature', { status: 401 });
+
+  const obj = body.payload?.object;
+  if (body.event === 'recording.completed') {
+    console.log(`Zoom recording.completed (${account.label}): ${obj?.uuid}`);
+  } else if (body.event === 'recording.transcript_completed' && obj) {
+    await handleZoomTranscriptCompleted(env, account, obj);
+  }
+
+  return new Response('OK');
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (url.pathname.startsWith('/zoom/webhook/')) {
+      try {
+        return await handleZoomWebhook(request, env, url.pathname.slice('/zoom/webhook/'.length));
+      } catch (e) {
+        console.error('Zoom webhook error:', e);
+        return new Response('Error: ' + e.message, { status: 500 });
+      }
+    }
 
     if (url.pathname.startsWith('/mylife/api/')) {
       try {
