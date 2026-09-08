@@ -1309,6 +1309,14 @@ async function handleChat(env, text) {
 // ── Scheduled jobs ────────────────────────────────────────────────────────────
 
 async function handleScheduled(env, cron) {
+  // Every 5 minutes — Zoom transcript polling fallback (see checkPendingZoomTranscripts).
+  // Kept outside the MAILINGS_PAUSED gate below: pausing the daily task-summary/push
+  // mailings shouldn't also stop recordings from reaching Telegram.
+  if (cron === '*/5 * * * *') {
+    await checkPendingZoomTranscripts(env);
+    return;
+  }
+
   if (env.MAILINGS_PAUSED === 'true') return;
 
   // 7:00 MSK = 4:00 UTC — morning task summary in Telegram + browser push
@@ -2410,6 +2418,64 @@ async function handleZoomTranscriptCompleted(env, account, obj, downloadToken) {
   }
 }
 
+// Fallback for recording.transcript_completed simply not firing (a known Zoom
+// gap) — polls the Recordings API for meetings queued by recording.completed
+// (see handleZoomWebhook) until a transcript file shows up or ~20 minutes pass.
+const ZOOM_PENDING_GIVE_UP_MINUTES = 20;
+
+async function checkPendingZoomTranscripts(env) {
+  const list = await env.KV.list({ prefix: 'zoom:pending:' });
+  const accounts = getZoomAccounts(env);
+
+  for (const key of list.keys) {
+    const pending = await kget(env, key.name, null);
+    if (!pending) {
+      await env.KV.delete(key.name);
+      continue;
+    }
+
+    const account = accounts.find(a => a.label === pending.accountLabel);
+    if (!account) {
+      await env.KV.delete(key.name);
+      continue;
+    }
+
+    // The real webhook already handled this meeting — nothing left to poll for.
+    if (await env.KV.get(`zoom:done:${account.label}:${pending.meetingUuid}`)) {
+      await env.KV.delete(key.name);
+      continue;
+    }
+
+    try {
+      const token = await getZoomAccessToken(env, account);
+      // Zoom's API wants a UUID that starts with / or contains // double-encoded.
+      const uuidPath = encodeURIComponent(encodeURIComponent(pending.meetingUuid));
+      const res = await fetch(`https://api.zoom.us/v2/meetings/${uuidPath}/recordings`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const hasTranscript = (data.recording_files || []).some(f => f.file_type === 'TRANSCRIPT' || f.recording_type === 'audio_transcript');
+        if (hasTranscript) {
+          await handleZoomTranscriptCompleted(env, account, data, null);
+          await env.KV.delete(key.name);
+          continue;
+        }
+      } else if (res.status !== 404) {
+        console.error(`Zoom pending-transcript poll ${res.status} (${pending.accountLabel}/${pending.meetingUuid}):`, await res.text().catch(() => ''));
+      }
+    } catch (e) {
+      console.error(`Zoom pending-transcript poll failed (${pending.accountLabel}/${pending.meetingUuid}):`, e);
+    }
+
+    if (Date.now() - pending.firstSeenAt >= ZOOM_PENDING_GIVE_UP_MINUTES * 60000) {
+      const chatId = account.chat_id || env.OWNER_CHAT_ID;
+      await send(env, `⚠️ Транскрипт для встречи «${escapeHtml(pending.topic)}» так и не появился за ${ZOOM_PENDING_GIVE_UP_MINUTES} минут. Ссылка на запись — в более раннем сообщении.`, {}, chatId);
+      await env.KV.delete(key.name);
+    }
+  }
+}
+
 async function handleZoomWebhook(request, env, label, ctx) {
   const account = getZoomAccounts(env).find(a => a.label === label);
   if (!account) return new Response('Unknown account', { status: 404 });
@@ -2435,8 +2501,20 @@ async function handleZoomWebhook(request, env, label, ctx) {
   if (signature !== expected) return new Response('Invalid signature', { status: 401 });
 
   const obj = body.payload?.object;
-  if (body.event === 'recording.completed') {
-    console.log(`Zoom recording.completed (${account.label}): ${obj?.uuid}`);
+  if (body.event === 'recording.completed' && obj) {
+    console.log(`Zoom recording.completed (${account.label}): ${obj.uuid}`);
+    // recording.transcript_completed is the one that actually sends to Telegram, but
+    // it doesn't always fire (a known Zoom gap). Queue this meeting for the every-5-minute
+    // cron (checkPendingZoomTranscripts) to poll for a transcript as a fallback, in case
+    // the webhook never shows up. Harmless if it does show up — that path's own KV dedup
+    // (zoom:done:...) makes whichever one runs first win, and the poller drops the queue
+    // entry as soon as it sees that key set.
+    await kset(env, `zoom:pending:${account.label}:${obj.uuid}`, {
+      accountLabel: account.label,
+      meetingUuid: obj.uuid,
+      topic: obj.topic || 'Zoom-встреча',
+      firstSeenAt: Date.now(),
+    }, { expirationTtl: 3600 });
   } else if (body.event === 'recording.transcript_completed' && obj) {
     // Downloading can take up to ~30s (Zoom's own fix for a known file-lag
     // race — see downloadZoomFile), well past what Zoom waits for a webhook
@@ -2517,6 +2595,25 @@ export default {
           chatId: a.chat_id ?? null,
         })),
       });
+    }
+
+    // Manually run the every-5-minute Zoom transcript poll right now (instead of
+    // waiting for the cron) and report what's still queued afterward. No side
+    // effects beyond what the real cron already does, so no token needed.
+    if (url.pathname === '/debug/zoom-poll') {
+      try {
+        await checkPendingZoomTranscripts(env);
+        const list = await env.KV.list({ prefix: 'zoom:pending:' });
+        const pending = [];
+        for (const k of list.keys) {
+          const p = await kget(env, k.name, null);
+          if (p) pending.push(p);
+        }
+        return jsonResponse({ ok: true, pending });
+      } catch (e) {
+        console.error('Zoom poll debug check failed:', e);
+        return jsonResponse({ ok: false, error: e.message || String(e) }, 500);
+      }
     }
 
     // Manual trigger for debugging scheduled jobs (secured with bot token as secret)
