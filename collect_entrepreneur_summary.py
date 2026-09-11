@@ -147,10 +147,8 @@ def summarize_content(client: Anthropic, title: str, content: str) -> str:
         return content[:200]
 
 
-def send_to_telegram(
-    worker_url: str, token: str, message: str
-) -> bool:
-    """Send message to Telegram via bot worker API."""
+def send_via_mylife_api(worker_url: str, token: str, message: str) -> bool:
+    """Send message via MyLife API (which forwards to Telegram)."""
     try:
         response = requests.post(
             f"{worker_url}/api/send-summary",
@@ -159,10 +157,10 @@ def send_to_telegram(
             timeout=10,
         )
         response.raise_for_status()
-        print("✅ Message sent to Telegram successfully")
+        print("✅ Message sent via MyLife connector to Telegram")
         return True
     except Exception as e:
-        print(f"❌ Error sending to Telegram: {e}")
+        print(f"❌ Error sending via MyLife API: {e}")
         return False
 
 
@@ -265,7 +263,7 @@ def main():
     if args.dry_run:
         print("✅ Dry run complete (message not sent)")
     else:
-        if send_to_telegram(args.worker_url, args.token, message):
+        if send_via_mylife_api(args.worker_url, args.token, message):
             print("✅ Done!")
         else:
             sys.exit(1)
