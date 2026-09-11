@@ -999,6 +999,46 @@ async function fetchYouTubeTranscript(env, videoId) {
   return { title: title || 'YouTube видео', transcript };
 }
 
+// Verbose variant used by the transcribe_video MCP tool: unlike
+// fetchSupadataTranscript (which collapses every failure to `null` for the
+// Telegram bot's generic "couldn't get it" message), this surfaces *why* —
+// missing/invalid API key, a Supadata error, or a job that timed out — so
+// that failures are actually diagnosable from the tool result.
+async function pollSupadataJobVerbose(env, jobId) {
+  for (let i = 0; i < SUPADATA_POLL_ATTEMPTS; i++) {
+    await new Promise(r => setTimeout(r, SUPADATA_POLL_DELAY_MS));
+    const res = await fetch(`https://api.supadata.ai/v1/transcript/${jobId}`, {
+      headers: { 'x-api-key': env.SUPADATA_API_KEY },
+    });
+    if (res.status === 202) continue;
+    if (!res.ok) {
+      return { transcript: null, errorDetail: `Supadata job error ${res.status}: ${(await res.text().catch(() => '')).slice(0, 500)}` };
+    }
+    return { transcript: supadataContentToText(await res.json()), errorDetail: null };
+  }
+  return { transcript: null, errorDetail: `Supadata transcription job for this video did not finish within ${(SUPADATA_POLL_ATTEMPTS * SUPADATA_POLL_DELAY_MS) / 1000}s — it may be a long video still processing; try again in a minute.` };
+}
+
+async function fetchSupadataTranscriptVerbose(env, videoUrl) {
+  if (!env.SUPADATA_API_KEY) {
+    return { transcript: null, errorDetail: 'SUPADATA_API_KEY secret is not set on the Worker.' };
+  }
+  const res = await fetch(`https://api.supadata.ai/v1/transcript?url=${encodeURIComponent(videoUrl)}&text=true&mode=auto`, {
+    headers: { 'x-api-key': env.SUPADATA_API_KEY },
+  });
+
+  if (res.status === 202) {
+    const { jobId } = await res.json();
+    return pollSupadataJobVerbose(env, jobId);
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    console.error('Supadata transcript error:', res.status, body);
+    return { transcript: null, errorDetail: `Supadata error ${res.status}: ${body.slice(0, 500)}` };
+  }
+  return { transcript: supadataContentToText(await res.json()), errorDetail: null };
+}
+
 function truncateForClaude(transcript) {
   return transcript.length > YT_MAX_TRANSCRIPT_CHARS
     ? transcript.slice(0, YT_MAX_TRANSCRIPT_CHARS) + '\n[транскрипция обрезана]'
@@ -2353,25 +2393,23 @@ async function mcpCallVideoTool(env, name, args) {
       if (!videoUrl) return mcpToolText({ error: 'url required' }, true);
 
       let title = null;
-      let transcript = null;
+      let result;
       try {
         const youtubeId = extractYouTubeId(videoUrl);
-        if (youtubeId) {
-          ({ title, transcript } = await fetchYouTubeTranscript(env, youtubeId));
-        } else {
-          transcript = await fetchSupadataTranscript(env, videoUrl);
-        }
+        const canonicalUrl = youtubeId ? `https://www.youtube.com/watch?v=${youtubeId}` : videoUrl;
+        if (youtubeId) title = await fetchYouTubeTitle(youtubeId);
+        result = await fetchSupadataTranscriptVerbose(env, canonicalUrl);
       } catch (e) {
         console.error('transcribe_video error:', e);
         return mcpToolText({ error: 'Failed to fetch transcript: ' + e.message }, true);
       }
 
-      if (!transcript) {
-        return mcpToolText({ error: 'No transcript available for this video — it may have no captions, or the URL/platform is not supported.' }, true);
+      if (!result.transcript) {
+        return mcpToolText({ error: result.errorDetail || 'No transcript available for this video — it may have no captions, or the URL/platform is not supported.' }, true);
       }
 
-      const truncated = transcript.length > YT_MAX_TRANSCRIPT_CHARS;
-      return mcpToolText({ title, url: videoUrl, truncated, transcript: truncateForClaude(transcript) });
+      const truncated = result.transcript.length > YT_MAX_TRANSCRIPT_CHARS;
+      return mcpToolText({ title, url: videoUrl, truncated, transcript: truncateForClaude(result.transcript) });
     }
     default:
       return mcpToolText({ error: `Unknown tool: ${name}` }, true);
