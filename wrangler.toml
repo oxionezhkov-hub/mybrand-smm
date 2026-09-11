@@ -50,7 +50,6 @@ crons = [
   "0 4 * * *",   # 07:00 MSK daily — Telegram task summary + "open your tasks" push
   "0 10 * * *",  # 13:00 MSK daily — "update your tasks" push
   "0 18 * * *",  # 21:00 MSK daily — "plan tomorrow" push
-  "0 6 * * *",   # 09:00 MSK daily — Entrepreneur content summary
   "*/5 * * * *", # every 5 min — Zoom transcript-polling fallback (checkPendingZoomTranscripts),
                  # for meetings whose recording.transcript_completed webhook never fires
 ]

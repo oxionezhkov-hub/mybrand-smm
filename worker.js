@@ -1319,12 +1319,6 @@ async function handleScheduled(env, cron) {
 
   if (env.MAILINGS_PAUSED === 'true') return;
 
-  // 9:00 MSK = 6:00 UTC — entrepreneur content summary
-  if (cron === '0 6 * * *') {
-    await sendEntrepreneurSummary(env);
-    return;
-  }
-
   // 7:00 MSK = 4:00 UTC — morning task summary in Telegram + browser push
   if (cron === '0 4 * * *') {
     await send(env, await mlMorningBriefText(env));
@@ -1360,130 +1354,6 @@ async function handleScheduled(env, cron) {
   }
 }
 
-// ── Entrepreneur Content Summary (RSS/YouTube aggregation + AI summarization) ──
-
-const ENTREPRENEUR_SOURCES = [
-  { type: 'rss', name: 'Paul Graham Essays', url: 'http://www.aaronsw.com/2002/feeds/pgessays.xml' },
-  { type: 'rss', name: 'Y Combinator News', url: 'https://news.ycombinator.com/rss' },
-  { type: 'rss', name: 'Indie Hackers', url: 'https://www.indiehackers.com/feed.xml' },
-  { type: 'rss', name: 'Sam Altman Blog', url: 'https://blog.samaltman.com/feed' },
-  { type: 'youtube', name: 'Startup content', channels: ['UC8uY2Ti-cEOr_1N9F1DJIA'] }, // Technics
-];
-
-async function fetchRSSFeed(url) {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const text = await res.text();
-
-    const items = [];
-    const itemMatches = text.match(/<item>[\s\S]*?<\/item>/g) || [];
-
-    for (const itemText of itemMatches.slice(0, 5)) {
-      const titleMatch = itemText.match(/<title>(?:<!\[CDATA\[([\s\S]*?)\]\]>|([^<]*?))<\/title>/);
-      const linkMatch = itemText.match(/<link>(?:<!\[CDATA\[([\s\S]*?)\]\]>|([^<]*?))<\/link>/);
-      const descMatch = itemText.match(/<description>(?:<!\[CDATA\[([\s\S]*?)\]\]>|([^<]*?))<\/description>/);
-
-      const title = titleMatch ? (titleMatch[1] || titleMatch[2]) : '';
-      const link = linkMatch ? (linkMatch[1] || linkMatch[2]) : '';
-      const desc = descMatch ? (descMatch[1] || descMatch[2]) : '';
-
-      if (title && link) {
-        items.push({ title: title.trim(), url: link.trim(), description: desc.trim().slice(0, 500) });
-      }
-    }
-    return items;
-  } catch {
-    return [];
-  }
-}
-
-async function summarizeContent(env, content) {
-  const prompt = `Дай краткий саммари (2-3 предложения) о ключевых идеях из следующего контента для предпринимателя:
-
-"${content}"
-
-Фокусируйся на практичных идеях и уроках, которые можно применить в бизнесе.`;
-
-  return callClaude(env, { user: prompt });
-}
-
-async function fetchEntrepreneurContent(env) {
-  const allContent = [];
-
-  for (const source of ENTREPRENEUR_SOURCES) {
-    if (source.type === 'rss') {
-      try {
-        const items = await fetchRSSFeed(source.url);
-        for (const item of items) {
-          allContent.push({
-            source: source.name,
-            title: item.title,
-            url: item.url,
-            snippet: item.description,
-            id: `${source.name}:${item.url}`,
-          });
-        }
-      } catch (e) {
-        console.error(`Error fetching RSS from ${source.name}:`, e);
-      }
-    }
-  }
-
-  return allContent;
-}
-
-async function sendEntrepreneurSummary(env) {
-  try {
-    // Get recently fetched content that hasn't been summarized yet
-    const allContent = await fetchEntrepreneurContent(env);
-    const processedIds = await kget(env, 'entrepreneur:processed-ids', {});
-
-    const newContent = allContent.filter(c => !processedIds[c.id]);
-
-    if (newContent.length === 0) {
-      return;
-    }
-
-    // Summarize each new piece of content
-    const summaries = [];
-    for (const content of newContent.slice(0, 5)) {
-      try {
-        const summary = await summarizeContent(env, `${content.title}\n\n${content.snippet}`);
-        summaries.push({
-          source: content.source,
-          title: content.title,
-          url: content.url,
-          summary,
-        });
-        processedIds[content.id] = Date.now();
-      } catch (e) {
-        console.error(`Error summarizing content from ${content.source}:`, e);
-      }
-    }
-
-    // Save processed IDs
-    await kset(env, 'entrepreneur:processed-ids', processedIds, { expirationTtl: 7 * 24 * 60 * 60 }); // Keep for 7 days
-
-    // Send summaries via Telegram if we have any
-    if (summaries.length > 0) {
-      const lines = ['📚 <b>Новые идеи от предпринимателей</b>', ''];
-
-      for (const item of summaries) {
-        lines.push(`<b>${escapeHtml(item.title)}</b>`);
-        lines.push(`<i>${escapeHtml(item.source)}</i>`);
-        lines.push(escapeHtml(item.summary));
-        lines.push(`<a href="${escapeHtml(item.url)}">Читать полностью</a>`);
-        lines.push('');
-      }
-
-      const message = lines.join('\n').slice(0, 4096);
-      await send(env, message);
-    }
-  } catch (e) {
-    console.error('Error in sendEntrepreneurSummary:', e);
-  }
-}
 
 async function mlMorningBriefText(env) {
   const snapshot = await mlLoadAll(env);
@@ -2757,6 +2627,21 @@ export default {
       } catch (e) {
         console.error('Manual trigger failed:', e);
         return new Response('Error: ' + e.message, { status: 500 });
+      }
+    }
+
+    // API endpoint for Claude Code to send entrepreneur summary to Telegram
+    if (url.pathname === '/api/send-summary' && request.method === 'POST') {
+      if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
+      try {
+        const body = await readJson(request);
+        const text = body.text || body.message || '';
+        if (!text) return jsonResponse({ error: 'text or message field required' }, 400);
+        await send(env, text);
+        return jsonResponse({ ok: true, message: 'Summary sent to Telegram' });
+      } catch (e) {
+        console.error('Send summary error:', e);
+        return jsonResponse({ error: e.message }, 500);
       }
     }
 
