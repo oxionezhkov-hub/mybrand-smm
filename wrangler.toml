@@ -13,13 +13,15 @@ binding = "AI"
 # Secrets required (set via `wrangler secret put <name>`), not stored here:
 #   TG_TOKEN            — Telegram bot token
 #   OWNER_CHAT_ID        — Telegram chat id allowed to use the bot
-#   CLAUDE_API           — Anthropic API key. Most AI calls are temporarily
-#                          routed through the free Llama model on Workers AI
-#                          (see callClaude/callClaudeStreaming/callClaudeCoach
-#                          in worker.js) — CLAUDE_API is unused there. It IS
-#                          used by callClaudeReal for meeting-transcript
-#                          summaries (uploaded .txt/.vtt/.srt files), where
-#                          quality matters more than cost.
+#   CLAUDE_API           — Anthropic API key (currently unused — the worker is
+#                          temporarily routed entirely through the free Llama
+#                          model on Workers AI; see callClaude/callClaudeStreaming/
+#                          callClaudeCoach in worker.js)
+#   CCR_TRIGGER_URL      — "Call via API" endpoint URL for the Claude Code
+#                          Remote Routine "Zoom transcript → decisions summary"
+#                          (see handleTranscriptDocument in worker.js). Find it
+#                          on the Routine's trigger settings at claude.ai/code.
+#   CCR_TRIGGER_TOKEN    — bearer token for that same "Call via API" trigger.
 #   SUPADATA_API_KEY     — YouTube transcript API key
 #   MYLIFE_MCP_TOKEN     — bearer token for the /mylife/mcp endpoint
 #   VIDEO_MCP_TOKEN      — bearer token for the /video/mcp endpoint (video transcription connector)
