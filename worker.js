@@ -2634,7 +2634,7 @@ async function handleTranscriptDocument(env, msg, origin) {
     if (!res.ok) throw new Error(`CCR trigger ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`);
   } catch (e) {
     console.error('Failed to fire CCR routine:', e);
-    await send(env, '⚠️ Не смог запустить саммари-рутину.', {}, chatId);
+    await send(env, `⚠️ Не смог запустить саммари-рутину: <code>${escapeHtml((e.message || String(e)).slice(0, 500))}</code>`, {}, chatId);
     return;
   }
 
@@ -2910,6 +2910,35 @@ export default {
       } catch (e) {
         console.error('Manual trigger failed:', e);
         return new Response('Error: ' + e.message, { status: 500 });
+      }
+    }
+
+    // Manual check that CCR_TRIGGER_URL/CCR_TRIGGER_TOKEN actually reach the
+    // Routine's "Call via API" trigger — reports the raw status/body instead
+    // of guessing, since a bad URL/token/payload shape all fail differently.
+    if (url.pathname === '/debug/ccr-trigger') {
+      if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
+      if (!env.CCR_TRIGGER_URL || !env.CCR_TRIGGER_TOKEN) {
+        return jsonResponse({ ok: false, error: 'CCR_TRIGGER_URL or CCR_TRIGGER_TOKEN secret not set' });
+      }
+      try {
+        const res = await fetch(env.CCR_TRIGGER_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${env.CCR_TRIGGER_TOKEN}`,
+          },
+          body: JSON.stringify({
+            transcript_url: `${url.origin}/transcript-fetch/debug-test`,
+            chat_id: 'debug-test',
+            callback_url: `${url.origin}/transcript-callback/debug-test`,
+            callback_secret: 'debug-test',
+          }),
+        });
+        const bodyText = await res.text().catch(() => '');
+        return jsonResponse({ ok: res.ok, status: res.status, body: bodyText.slice(0, 2000) });
+      } catch (e) {
+        return jsonResponse({ ok: false, error: e.message || String(e) });
       }
     }
 
