@@ -2578,6 +2578,29 @@ function randomToken() {
   return crypto.randomUUID().replace(/-/g, '');
 }
 
+// The Routine's "Call via API" trigger is a Messages-API-compatible endpoint
+// (same request/error shape as api.anthropic.com/v1/messages) — it needs the
+// standard anthropic-version header, and the payload goes in as the content
+// of a user message rather than as an arbitrary top-level JSON body. The
+// Routine's own prompt is written to expect that message content to be a
+// JSON string with transcript_url/chat_id/callback_url/callback_secret.
+async function fireCcrRoutine(env, payload) {
+  const res = await fetch(env.CCR_TRIGGER_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${env.CCR_TRIGGER_TOKEN}`,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-5',
+      max_tokens: 1024,
+      messages: [{ role: 'user', content: JSON.stringify(payload) }],
+    }),
+  });
+  return res;
+}
+
 async function tgGetFileText(env, fileId) {
   const fileRes = await tgReq(env, 'getFile', { file_id: fileId });
   const filePath = fileRes?.result?.file_path;
@@ -2618,18 +2641,11 @@ async function handleTranscriptDocument(env, msg, origin) {
   await kset(env, `transcript-cb:${key}`, { secret: callbackSecret, chatId }, { expirationTtl: TRANSCRIPT_TTL_SECONDS });
 
   try {
-    const res = await fetch(env.CCR_TRIGGER_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${env.CCR_TRIGGER_TOKEN}`,
-      },
-      body: JSON.stringify({
-        transcript_url: `${origin}/transcript-fetch/${key}`,
-        chat_id: chatId,
-        callback_url: `${origin}/transcript-callback/${key}`,
-        callback_secret: callbackSecret,
-      }),
+    const res = await fireCcrRoutine(env, {
+      transcript_url: `${origin}/transcript-fetch/${key}`,
+      chat_id: chatId,
+      callback_url: `${origin}/transcript-callback/${key}`,
+      callback_secret: callbackSecret,
     });
     if (!res.ok) throw new Error(`CCR trigger ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`);
   } catch (e) {
@@ -2922,18 +2938,11 @@ export default {
         return jsonResponse({ ok: false, error: 'CCR_TRIGGER_URL or CCR_TRIGGER_TOKEN secret not set' });
       }
       try {
-        const res = await fetch(env.CCR_TRIGGER_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${env.CCR_TRIGGER_TOKEN}`,
-          },
-          body: JSON.stringify({
-            transcript_url: `${url.origin}/transcript-fetch/debug-test`,
-            chat_id: 'debug-test',
-            callback_url: `${url.origin}/transcript-callback/debug-test`,
-            callback_secret: 'debug-test',
-          }),
+        const res = await fireCcrRoutine(env, {
+          transcript_url: `${url.origin}/transcript-fetch/debug-test`,
+          chat_id: 'debug-test',
+          callback_url: `${url.origin}/transcript-callback/debug-test`,
+          callback_secret: 'debug-test',
         });
         const bodyText = await res.text().catch(() => '');
         return jsonResponse({ ok: res.ok, status: res.status, body: bodyText.slice(0, 2000) });
