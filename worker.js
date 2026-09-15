@@ -1171,7 +1171,7 @@ const STATUS_KEYBOARD = {
   is_persistent: true,
 };
 
-async function handleMessage(env, msg) {
+async function handleMessage(env, msg, origin) {
   const chatId = String(msg.chat?.id);
 
   // Owner-only guard
@@ -1184,6 +1184,12 @@ async function handleMessage(env, msg) {
   const dedupKey = `dedup:${msg.message_id}`;
   if (await env.KV.get(dedupKey)) return;
   await env.KV.put(dedupKey, '1', { expirationTtl: 300 });
+
+  // Uploaded file = meeting transcript (Zoom, etc.) → decisions-format summary
+  if (msg.document) {
+    await handleTranscriptDocument(env, msg, origin);
+    return;
+  }
 
   const text = msg.text || msg.caption || '';
 
@@ -1204,7 +1210,7 @@ async function handleMessage(env, msg) {
   }
 
   if (text === '/start' || text === '/help') {
-    await send(env, `<b>MyLife-бот</b>\n\nПришли ссылку на YouTube-видео — верну файл с транскрипцией и саммари. Ответь на сообщение с саммари вопросом — отвечу по содержанию видео.\n\n<b>Задачи:</b> напиши, что ты сделал (например «сделал дизайн лендинга») — найду похожую задачу в трекере и предложу отметить выполненной, а если не найду — спрошу, в какой проект добавить.\n\n<b>Статус дня:</b> кнопки ниже (или просто напиши) — «начал работу» / «ушёл отдыхать» / «проснулся» / «лёг спать». Это не задачи, а метки времени — помогают понять, сколько ты работаешь.\n\nЛюбое другое сообщение — это разговор с твоим MyLife-коучем, который видит твои актуальные задачи, проекты и привычки.\n\n/today — саммари задач на сегодня\n/help — справка`, {
+    await send(env, `<b>MyLife-бот</b>\n\nПришли ссылку на YouTube-видео — верну файл с транскрипцией и саммари. Ответь на сообщение с саммари вопросом — отвечу по содержанию видео.\n\n<b>Транскрипция встречи:</b> пришли файлом .txt/.vtt/.srt (например транскрипт из Zoom) — сделаю саммари решений в формате «Имя — решения (дата)».\n\n<b>Задачи:</b> напиши, что ты сделал (например «сделал дизайн лендинга») — найду похожую задачу в трекере и предложу отметить выполненной, а если не найду — спрошу, в какой проект добавить.\n\n<b>Статус дня:</b> кнопки ниже (или просто напиши) — «начал работу» / «ушёл отдыхать» / «проснулся» / «лёг спать». Это не задачи, а метки времени — помогают понять, сколько ты работаешь.\n\nЛюбое другое сообщение — это разговор с твоим MyLife-коучем, который видит твои актуальные задачи, проекты и привычки.\n\n/today — саммари задач на сегодня\n/help — справка`, {
       reply_markup: STATUS_KEYBOARD,
     });
     return;
@@ -2551,6 +2557,115 @@ function extractSpeakers(text) {
   return names;
 }
 
+// ── Meeting transcript → decisions summary via Claude Code Routine ──────────
+// A document sent to the bot (e.g. a Zoom transcript .txt/.vtt downloaded and
+// re-uploaded, or forwarded from another chat) fires a Claude Code Remote
+// Routine (its "Call via API" trigger — see Routine "Zoom transcript →
+// decisions summary" on claude.ai/code) that does the actual summarizing
+// into the "Имя — решения (дд.мм.гггг)" protocol format itself — no
+// Anthropic API key needed on the Worker side. The Worker's job is just
+// plumbing: stash the transcript behind a short-lived fetch URL, fire the
+// Routine with that URL plus a callback URL + one-time secret, and relay
+// whatever the Routine posts back to Telegram.
+//
+// Secrets required: CCR_TRIGGER_URL, CCR_TRIGGER_TOKEN — the endpoint URL and
+// bearer token shown on that Routine's "Call via API" trigger settings.
+
+const TRANSCRIPT_EXT_RE = /\.(txt|vtt|srt)$/i;
+const TRANSCRIPT_TTL_SECONDS = 900; // 15 min — plenty for the Routine to fetch + summarize
+
+function randomToken() {
+  return crypto.randomUUID().replace(/-/g, '');
+}
+
+async function tgGetFileText(env, fileId) {
+  const fileRes = await tgReq(env, 'getFile', { file_id: fileId });
+  const filePath = fileRes?.result?.file_path;
+  if (!filePath) throw new Error(fileRes?.description || 'getFile failed');
+  const res = await fetch(`https://api.telegram.org/file/bot${env.TG_TOKEN}/${filePath}`);
+  if (!res.ok) throw new Error(`file download ${res.status}`);
+  return res.text();
+}
+
+async function handleTranscriptDocument(env, msg, origin) {
+  const chatId = String(msg.chat.id);
+  const filename = msg.document.file_name || '';
+
+  if (!TRANSCRIPT_EXT_RE.test(filename) && msg.document.mime_type !== 'text/plain') {
+    await send(env, '📎 Файл получил, но саммари делаю только из текстовых транскрипций (.txt / .vtt / .srt).', {}, chatId);
+    return;
+  }
+
+  if (!env.CCR_TRIGGER_URL || !env.CCR_TRIGGER_TOKEN) {
+    await send(env, '⚠️ Саммари встреч не настроено — нет секретов CCR_TRIGGER_URL / CCR_TRIGGER_TOKEN.', {}, chatId);
+    return;
+  }
+
+  let text;
+  try {
+    text = await tgGetFileText(env, msg.document.file_id);
+  } catch (e) {
+    console.error('Transcript file download failed:', e);
+    await send(env, '⚠️ Не смог скачать файл.', {}, chatId);
+    return;
+  }
+
+  const clean = /^WEBVTT/.test(text.trim()) ? vttToText(text) : text;
+
+  const key = randomToken();
+  const callbackSecret = randomToken();
+  await env.KV.put(`transcript:${key}`, clean, { expirationTtl: TRANSCRIPT_TTL_SECONDS });
+  await kset(env, `transcript-cb:${key}`, { secret: callbackSecret, chatId }, { expirationTtl: TRANSCRIPT_TTL_SECONDS });
+
+  try {
+    const res = await fetch(env.CCR_TRIGGER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.CCR_TRIGGER_TOKEN}`,
+      },
+      body: JSON.stringify({
+        transcript_url: `${origin}/transcript-fetch/${key}`,
+        chat_id: chatId,
+        callback_url: `${origin}/transcript-callback/${key}`,
+        callback_secret: callbackSecret,
+      }),
+    });
+    if (!res.ok) throw new Error(`CCR trigger ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`);
+  } catch (e) {
+    console.error('Failed to fire CCR routine:', e);
+    await send(env, '⚠️ Не смог запустить саммари-рутину.', {}, chatId);
+    return;
+  }
+
+  await send(env, '🧠 Отправил транскрипт в рутину Claude Code — саммари придёт сюда, как будет готово.', {}, chatId);
+}
+
+async function handleTranscriptFetch(env, key) {
+  const text = await env.KV.get(`transcript:${key}`);
+  if (text === null) return new Response('Not found or expired', { status: 404 });
+  return new Response(text, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+}
+
+async function handleTranscriptCallback(request, env, key) {
+  const meta = await kget(env, `transcript-cb:${key}`, null);
+  if (!meta) return new Response('Not found or expired', { status: 404 });
+
+  const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+  if (token !== meta.secret) return new Response('Unauthorized', { status: 401 });
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response('Bad JSON', { status: 400 });
+  }
+
+  await send(env, body.summary || '⚠️ Рутина не вернула текст саммари.', {}, meta.chatId);
+  await env.KV.delete(`transcript-cb:${key}`); // single use
+  return new Response('OK');
+}
+
 async function handleZoomTranscriptCompleted(env, account, obj, downloadToken) {
   const meetingUuid = obj.uuid;
   const dedupKey = `zoom:done:${account.label}:${meetingUuid}`;
@@ -2798,6 +2913,14 @@ export default {
       }
     }
 
+    if (url.pathname.startsWith('/transcript-fetch/')) {
+      return handleTranscriptFetch(env, url.pathname.slice('/transcript-fetch/'.length));
+    }
+
+    if (url.pathname.startsWith('/transcript-callback/')) {
+      return handleTranscriptCallback(request, env, url.pathname.slice('/transcript-callback/'.length));
+    }
+
     if (request.method !== 'POST') return new Response('OK');
 
     if (url.pathname !== '/webhook' && url.pathname !== '/') {
@@ -2807,7 +2930,7 @@ export default {
     try {
       const body = await request.json();
       if (body.message) {
-        await handleMessage(env, body.message);
+        await handleMessage(env, body.message, url.origin);
       } else if (body.callback_query) {
         await handleCallback(env, body.callback_query);
       }
