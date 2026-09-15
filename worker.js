@@ -2578,12 +2578,14 @@ function randomToken() {
   return crypto.randomUUID().replace(/-/g, '');
 }
 
-// The Routine's "Call via API" trigger is a Messages-API-compatible endpoint
-// (same request/error shape as api.anthropic.com/v1/messages) — it needs the
-// standard anthropic-version header, and the payload goes in as the content
-// of a user message rather than as an arbitrary top-level JSON body. The
-// Routine's own prompt is written to expect that message content to be a
-// JSON string with transcript_url/chat_id/callback_url/callback_secret.
+// The Routine's "Call via API" trigger is a dedicated fire endpoint
+// (POST /v1/claude_code/routines/<id>/fire), not a Messages-API call — it
+// takes a single {"text": "..."} body appended as an extra user turn after
+// the Routine's stored prompt (same semantics as the MCP fire_trigger tool's
+// `text` param), and requires the anthropic-beta header shown in the UI's
+// own curl example alongside anthropic-version. The Routine's stored prompt
+// is written to expect that appended text to be a JSON string with
+// transcript_url/chat_id/callback_url/callback_secret.
 async function fireCcrRoutine(env, payload) {
   const res = await fetch(env.CCR_TRIGGER_URL, {
     method: 'POST',
@@ -2591,12 +2593,9 @@ async function fireCcrRoutine(env, payload) {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${env.CCR_TRIGGER_TOKEN}`,
       'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'experimental-cc-routine-2026-04-01',
     },
-    body: JSON.stringify({
-      model: 'claude-sonnet-5',
-      max_tokens: 1024,
-      messages: [{ role: 'user', content: JSON.stringify(payload) }],
-    }),
+    body: JSON.stringify({ text: JSON.stringify(payload) }),
   });
   return res;
 }
