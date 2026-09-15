@@ -1185,6 +1185,12 @@ async function handleMessage(env, msg) {
   if (await env.KV.get(dedupKey)) return;
   await env.KV.put(dedupKey, '1', { expirationTtl: 300 });
 
+  // Uploaded file = meeting transcript (Zoom, etc.) → decisions-format summary
+  if (msg.document) {
+    await handleTranscriptDocument(env, msg);
+    return;
+  }
+
   const text = msg.text || msg.caption || '';
 
   // Reply to a YouTube summary = follow-up question about that video's transcript
@@ -1204,7 +1210,7 @@ async function handleMessage(env, msg) {
   }
 
   if (text === '/start' || text === '/help') {
-    await send(env, `<b>MyLife-бот</b>\n\nПришли ссылку на YouTube-видео — верну файл с транскрипцией и саммари. Ответь на сообщение с саммари вопросом — отвечу по содержанию видео.\n\n<b>Задачи:</b> напиши, что ты сделал (например «сделал дизайн лендинга») — найду похожую задачу в трекере и предложу отметить выполненной, а если не найду — спрошу, в какой проект добавить.\n\n<b>Статус дня:</b> кнопки ниже (или просто напиши) — «начал работу» / «ушёл отдыхать» / «проснулся» / «лёг спать». Это не задачи, а метки времени — помогают понять, сколько ты работаешь.\n\nЛюбое другое сообщение — это разговор с твоим MyLife-коучем, который видит твои актуальные задачи, проекты и привычки.\n\n/today — саммари задач на сегодня\n/help — справка`, {
+    await send(env, `<b>MyLife-бот</b>\n\nПришли ссылку на YouTube-видео — верну файл с транскрипцией и саммари. Ответь на сообщение с саммари вопросом — отвечу по содержанию видео.\n\n<b>Транскрипция встречи:</b> пришли файлом .txt/.vtt/.srt (например транскрипт из Zoom) — сделаю саммари решений в формате «Имя — решения (дата)».\n\n<b>Задачи:</b> напиши, что ты сделал (например «сделал дизайн лендинга») — найду похожую задачу в трекере и предложу отметить выполненной, а если не найду — спрошу, в какой проект добавить.\n\n<b>Статус дня:</b> кнопки ниже (или просто напиши) — «начал работу» / «ушёл отдыхать» / «проснулся» / «лёг спать». Это не задачи, а метки времени — помогают понять, сколько ты работаешь.\n\nЛюбое другое сообщение — это разговор с твоим MyLife-коучем, который видит твои актуальные задачи, проекты и привычки.\n\n/today — саммари задач на сегодня\n/help — справка`, {
       reply_markup: STATUS_KEYBOARD,
     });
     return;
@@ -2549,6 +2555,125 @@ function extractSpeakers(text) {
     }
   }
   return names;
+}
+
+// ── Meeting transcript → decisions summary (manually uploaded files) ────────
+// A document sent to the bot (e.g. a Zoom transcript .txt/.vtt downloaded and
+// re-uploaded, or forwarded from another chat) gets summarized into the
+// "Имя — решения (дд.мм.гггг)" protocol format the owner uses for meeting
+// notes. Uses real Claude (CLAUDE_API), not the Llama route callClaude uses
+// for everything else, since summary quality matters here.
+
+const TRANSCRIPT_EXT_RE = /\.(txt|vtt|srt)$/i;
+const TRANSCRIPT_MAX_CHARS = 150000;
+
+const MEETING_SUMMARY_SYSTEM = `Ты делаешь саммари транскрипции рабочей встречи в фиксированном формате протокола решений для Telegram.
+
+Формат вывода — только HTML для Telegram (<b>, <i>), без markdown-звёздочек, решёток и другого markdown-синтаксиса. Пункты списка начинай с "• ".
+
+Структура вывода:
+<b>Имя — решения (дд.мм.гггг):</b>
+
+• Решение 1: краткая суть и, если она звучала, причина/обоснование.
+• Решение 2: ...
+• (если по итогам встречи есть отдельная договорённость о следующих шагах — отдельным последним пунктом, начиная с "Договорились: ...")
+
+Правила:
+- В шапке вместо "Имя" укажи имя человека, чьи это решения — обычно того, кто их принимает/утверждает по ходу встречи; оно почти всегда звучит в транскрипте. Если непонятно, чьи это решения, вместо имени возьми тему встречи.
+- Дату в шапке возьми из подсказки пользователя, если она дана; иначе используй дату, которую передадут отдельно.
+- Каждый пункт — только про решения и договорённости, а не пересказ обсуждения или процесса. Пиши конкретно: с цифрами, названиями, сроками, если они звучали в транскрипте.
+- Не выдумывай решения, которых не было в транскрипте.
+- Если решений почти нет — так и напиши одним пунктом, не растягивай на весь список.
+- Никакого вступления, заключения или пояснений от себя — только шапка и пункты.`;
+
+async function callClaudeReal(env, { system = '', user, maxTokens = 4096 } = {}) {
+  if (!env.CLAUDE_API) return null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': env.CLAUDE_API,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        max_tokens: maxTokens,
+        system,
+        messages: [{ role: 'user', content: user }],
+      }),
+    });
+
+    if (res.status === 429 && attempt < 3) {
+      await new Promise(r => setTimeout(r, 1000 * attempt));
+      continue;
+    }
+    if (!res.ok) {
+      console.error('Claude API error:', res.status, await res.text().catch(() => ''));
+      return null;
+    }
+    const data = await res.json();
+    return (data.content?.filter(b => b.type === 'text').map(b => b.text).join('') ?? '').trim() || null;
+  }
+  return null;
+}
+
+function todayMSKDisplay() {
+  const [y, m, d] = todayMSK().split('-');
+  return `${d}.${m}.${y}`;
+}
+
+async function tgGetFileText(env, fileId) {
+  const fileRes = await tgReq(env, 'getFile', { file_id: fileId });
+  const filePath = fileRes?.result?.file_path;
+  if (!filePath) throw new Error(fileRes?.description || 'getFile failed');
+  const res = await fetch(`https://api.telegram.org/file/bot${env.TG_TOKEN}/${filePath}`);
+  if (!res.ok) throw new Error(`file download ${res.status}`);
+  return res.text();
+}
+
+async function summarizeMeetingTranscript(env, { text, hint }) {
+  const clean = /^WEBVTT/.test(text.trim()) ? vttToText(text) : text;
+  const truncated = clean.length > TRANSCRIPT_MAX_CHARS
+    ? clean.slice(0, TRANSCRIPT_MAX_CHARS) + '\n[транскрипция обрезана]'
+    : clean;
+
+  return callClaudeReal(env, {
+    system: MEETING_SUMMARY_SYSTEM,
+    user: `Сегодняшняя дата: ${todayMSKDisplay()}${hint ? `\nПодсказка от пользователя: ${hint}` : ''}\n\nТранскрипция встречи:\n${truncated}`,
+  });
+}
+
+async function handleTranscriptDocument(env, msg) {
+  const chatId = String(msg.chat.id);
+  const filename = msg.document.file_name || '';
+
+  if (!TRANSCRIPT_EXT_RE.test(filename) && msg.document.mime_type !== 'text/plain') {
+    await send(env, '📎 Файл получил, но саммари делаю только из текстовых транскрипций (.txt / .vtt / .srt).', {}, chatId);
+    return;
+  }
+
+  const statusId = await sendGetId(env, '🧠 Делаю саммари встречи…');
+
+  let text;
+  try {
+    text = await tgGetFileText(env, msg.document.file_id);
+  } catch (e) {
+    console.error('Transcript file download failed:', e);
+    await editMsg(env, statusId, '⚠️ Не смог скачать файл.');
+    return;
+  }
+
+  const summary = await summarizeMeetingTranscript(env, { text, hint: msg.caption || '' });
+
+  await tgReq(env, 'deleteMessage', { chat_id: chatId, message_id: statusId }).catch(() => {});
+
+  if (!summary) {
+    await send(env, '⚠️ Не удалось сделать саммари (проверь, что настроен секрет CLAUDE_API).', {}, chatId);
+    return;
+  }
+
+  await send(env, summary, {}, chatId);
 }
 
 async function handleZoomTranscriptCompleted(env, account, obj, downloadToken) {
