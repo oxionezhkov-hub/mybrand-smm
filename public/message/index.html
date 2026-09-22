@@ -120,6 +120,13 @@
   .bubble img.media{max-width:100%;border-radius:10px;display:block;margin-bottom:4px;cursor:pointer;}
   .bubble video.media, .bubble audio.media{max-width:100%;display:block;margin-bottom:4px;}
   .bubble .file-link{display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;font-size:13px;}
+  .bubble.msg-deleted{opacity:.55;}
+  .msg-flags{display:flex;gap:10px;margin-top:4px;}
+  .msg-flag{font-size:10.5px;color:var(--text-secondary);background:none;border:none;padding:0;font-family:inherit;}
+  button.msg-flag{cursor:pointer;text-decoration:underline;}
+  .edit-history{display:none;flex-direction:column;gap:4px;margin-top:6px;padding-top:6px;border-top:1px dashed var(--border-strong);}
+  .edit-history-item{font-size:11.5px;color:var(--text-secondary);}
+  .eh-time{font-weight:600;margin-right:6px;}
   .day-sep{align-self:center;font-size:11px;color:var(--text-secondary);background:var(--card);border:1px solid var(--border);padding:3px 12px;border-radius:20px;margin:14px 0 8px;}
 
   #composer{padding:14px 20px;border-top:1px solid var(--border);background:var(--card);display:flex;gap:10px;align-items:flex-end;}
@@ -598,6 +605,18 @@
     if (m.text) html += '<div>'+escapeHtml(m.text)+'</div>';
     else if (!m.fileId) html += '<div>'+escapeHtml(TYPE_LABEL[m.type] || m.text || '')+'</div>';
     else if (m.type === 'sticker') html += '<div>'+escapeHtml(m.text || 'Стикер')+'</div>';
+
+    var flags = '';
+    if (m.editHistory && m.editHistory.length) flags += '<button type="button" class="msg-flag edit-flag">✎ изменено</button>';
+    if (m.deletedAt) flags += '<span class="msg-flag">🗑 удалено · ' + new Date(m.deletedAt).toLocaleString('ru-RU',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) + '</span>';
+    if (flags) html += '<div class="msg-flags">'+flags+'</div>';
+
+    if (m.editHistory && m.editHistory.length) {
+      html += '<div class="edit-history" style="display:none">' + m.editHistory.slice().reverse().map(function(h){
+        var t = h.text || TYPE_LABEL[h.type] || '(пусто)';
+        return '<div class="edit-history-item"><span class="eh-time">' + new Date(h.at).toLocaleString('ru-RU',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}) + '</span><span class="eh-text">' + escapeHtml(t) + '</span></div>';
+      }).join('') + '</div>';
+    }
     return html;
   }
 
@@ -623,8 +642,22 @@
       });
     }
 
-    var newOnes = list.filter(function(m){ return !state.messages.some(function(e){ return e.id === m.id; }); });
-    if (!newOnes.length && !isInitial) return;
+    // A message keeps the same id across an edit or a deletion, so a plain
+    // "already seen" filter would never pick up those changes on a re-poll —
+    // update matching entries in place instead of just filtering them out.
+    var newOnes = [];
+    var changed = false;
+    list.forEach(function(m){
+      var idx = state.messages.findIndex(function(e){ return e.id === m.id; });
+      if (idx === -1) {
+        newOnes.push(m);
+        changed = true;
+      } else if (JSON.stringify(state.messages[idx]) !== JSON.stringify(m)) {
+        state.messages[idx] = m;
+        changed = true;
+      }
+    });
+    if (!changed && !isInitial) return;
 
     var merged = prepend ? newOnes.concat(state.messages) : state.messages.concat(newOnes);
     state.messages = merged;
@@ -648,8 +681,15 @@
       var row = document.createElement('div');
       row.className = 'msg-row ' + m.direction;
       var bubble = document.createElement('div');
-      bubble.className = 'bubble';
+      bubble.className = 'bubble' + (m.deletedAt ? ' msg-deleted' : '');
       bubble.innerHTML = bubbleContent(m) + '<span class="time">' + new Date(m.at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}) + '</span>';
+      var editFlag = bubble.querySelector('.edit-flag');
+      if (editFlag) {
+        editFlag.addEventListener('click', function(){
+          var hist = bubble.querySelector('.edit-history');
+          if (hist) hist.style.display = hist.style.display === 'none' ? 'flex' : 'none';
+        });
+      }
       row.appendChild(bubble);
       wrap.appendChild(row);
     });

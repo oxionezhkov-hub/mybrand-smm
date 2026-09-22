@@ -2623,6 +2623,66 @@ async function inboxIngestMessage(env, msg, { isBusiness = false } = {}) {
   }
 }
 
+// An edited version of a message we (should) already have. Keeps the
+// previous content in `editHistory` rather than discarding it, so the page
+// can show "изменено" plus what it used to say.
+async function inboxIngestEdit(env, msg, { isBusiness = false } = {}) {
+  const chatId = String(msg.chat.id);
+  const messages = await inboxLoadMessages(env, chatId);
+  const idx = messages.findIndex(m => m.tgMessageId === msg.message_id);
+  if (idx === -1) {
+    // We never saw the original (e.g. it predates this feature) — log the
+    // edited version as a normal message rather than losing it entirely.
+    await inboxIngestMessage(env, msg, { isBusiness });
+    return;
+  }
+
+  const entry = messages[idx];
+  const classified = inboxClassifyMessage(msg);
+  const editedAt = msg.edit_date ? msg.edit_date * 1000 : Date.now();
+  entry.editHistory = entry.editHistory || [];
+  entry.editHistory.push({ text: entry.text, type: entry.type, fileId: entry.fileId, fileName: entry.fileName, at: entry.editedAt || entry.at });
+  Object.assign(entry, classified);
+  entry.editedAt = editedAt;
+  await inboxSaveMessages(env, chatId, messages);
+
+  if (idx === messages.length - 1) {
+    const conversations = await inboxLoadConversations(env);
+    const conv = conversations.find(c => c.chatId === chatId);
+    if (conv) {
+      conv.lastMessagePreview = (entry.text || INBOX_TYPE_LABEL[entry.type] || '').slice(0, 200);
+      await inboxSaveConversations(env, conversations);
+    }
+  }
+}
+
+// `msg` here is a Telegram BusinessMessagesDeleted object: { chat, message_ids }.
+// Entries are kept (marked `deleted`), never removed — an archive that
+// survives the other side deleting their copy is the whole point.
+async function inboxHandleDeletedMessages(env, msg) {
+  const chatId = String(msg.chat.id);
+  const messages = await inboxLoadMessages(env, chatId);
+  const ids = new Set(msg.message_ids || []);
+  if (!ids.size) return;
+  let touchedLast = false;
+  messages.forEach((m, idx) => {
+    if (ids.has(m.tgMessageId)) {
+      m.deletedAt = Date.now();
+      if (idx === messages.length - 1) touchedLast = true;
+    }
+  });
+  await inboxSaveMessages(env, chatId, messages);
+
+  if (touchedLast) {
+    const conversations = await inboxLoadConversations(env);
+    const conv = conversations.find(c => c.chatId === chatId);
+    if (conv) {
+      conv.lastMessagePreview = '🗑 Сообщение удалено';
+      await inboxSaveConversations(env, conversations);
+    }
+  }
+}
+
 async function handleInboxWebhook(request, env) {
   if (env.INBOX_TG_WEBHOOK_SECRET) {
     const hdr = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
@@ -2639,6 +2699,12 @@ async function handleInboxWebhook(request, env) {
       await inboxIngestMessage(env, body.message);
     } else if (body.business_message) {
       await inboxIngestMessage(env, body.business_message, { isBusiness: true });
+    } else if (body.edited_message) {
+      await inboxIngestEdit(env, body.edited_message);
+    } else if (body.edited_business_message) {
+      await inboxIngestEdit(env, body.edited_business_message, { isBusiness: true });
+    } else if (body.deleted_business_messages) {
+      await inboxHandleDeletedMessages(env, body.deleted_business_messages);
     } else if (body.business_connection) {
       // Connection created/updated/revoked (Telegram → Settings → Business →
       // Chatbots). Nothing to persist — each business_message already
@@ -3269,7 +3335,7 @@ export default {
       if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
       if (!env.INBOX_TG_TOKEN) return jsonResponse({ ok: false, error: 'INBOX_TG_TOKEN secret not set' });
       try {
-        const params = { url: `${url.origin}/inbox/webhook`, allowed_updates: ['message', 'business_connection', 'business_message'] };
+        const params = { url: `${url.origin}/inbox/webhook`, allowed_updates: ['message', 'edited_message', 'business_connection', 'business_message', 'edited_business_message', 'deleted_business_messages'] };
         if (env.INBOX_TG_WEBHOOK_SECRET) params.secret_token = env.INBOX_TG_WEBHOOK_SECRET;
         const res = await inboxTgReq(env, 'setWebhook', params);
         return jsonResponse(res);
