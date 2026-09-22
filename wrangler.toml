@@ -28,6 +28,17 @@ binding = "AI"
 #   VAPID_PRIVATE_JWK    — JSON Web Key for browser push (see pushBroadcast in worker.js),
 #                          e.g. {"crv":"P-256","kty":"EC","x":"...","y":"...","d":"..."}
 #   VAPID_SUBJECT        — optional, e.g. "mailto:you@example.com" (defaults to a placeholder)
+#   INBOX_TG_TOKEN       — second Telegram bot's token (from @BotFather), used by the
+#                          /message inbox (see "Inbox (second Telegram bot)" in worker.js).
+#                          Unlike the main bot above, this bot is NOT owner-only — anyone
+#                          who messages it gets captured. After setting it, register its
+#                          webhook once by visiting /debug/inbox-setwebhook?token=<TG_TOKEN>.
+#   INBOX_TG_WEBHOOK_SECRET — optional random string; if set, verified against Telegram's
+#                          secret_token header on /inbox/webhook (also auto-sent to
+#                          setWebhook by /debug/inbox-setwebhook).
+#   INBOX_ACCESS_TOKEN   — required to use the /message page and its API at all (fails
+#                          closed if unset). Any long random string — the page asks for
+#                          it once and remembers it in the browser (localStorage).
 #   ZOOM_ACCOUNTS_JSON   — JSON array configuring the Zoom → Telegram recording/transcript
 #                          forwarder (see "Zoom → Telegram" in worker.js). One entry per
 #                          Zoom account, each with its own Server-to-Server OAuth app and
