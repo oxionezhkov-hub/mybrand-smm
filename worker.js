@@ -2740,6 +2740,14 @@ async function handleInboxApi(request, env, url) {
 
     if (!chatId && request.method === 'GET') {
       const conversations = await inboxLoadConversations(env);
+      // Self-heal stale unread counts left over from before replying by
+      // hand cleared them (see inboxIngestMessage) — if the owner sent the
+      // last message, nothing is actually waiting on them.
+      let healed = false;
+      for (const c of conversations) {
+        if (c.lastDirection === 'out' && c.unread) { c.unread = 0; healed = true; }
+      }
+      if (healed) await inboxSaveConversations(env, conversations);
       const q = (url.searchParams.get('q') || '').trim().toLowerCase();
       let list = conversations;
       if (q) {
