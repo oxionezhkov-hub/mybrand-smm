@@ -2432,6 +2432,344 @@ async function handleVideoMcp(request, env, url) {
   });
 }
 
+// ── Inbox (second Telegram bot) ───────────────────────────────────────────────
+// A separate bot (its own token, `INBOX_TG_TOKEN`) that anyone can message —
+// unlike the main bot above it is NOT owner-only. Every incoming message is
+// captured into KV so nothing scrolls away, and the /message page (a static
+// page under public/message/) lets the owner browse every conversation, tag
+// it to a project, leave notes, and reply — replies go out through this same
+// bot via plain sendMessage, with no added prefix/signature.
+//
+// Setup: `wrangler secret put INBOX_TG_TOKEN` with the second bot's token
+// from @BotFather, `wrangler secret put INBOX_ACCESS_TOKEN` with any long
+// random string (this guards the /message page + its API — the page will
+// ask for it once and remember it in the browser), then hit
+// `/debug/inbox-setwebhook?token=<TG_TOKEN>` once to register the webhook.
+// Optionally also set INBOX_TG_WEBHOOK_SECRET (any random string) — if set,
+// it's verified against Telegram's secret_token header and is also sent to
+// setWebhook automatically.
+//
+// Limitation inherent to the Telegram Bot API: a bot only ever receives
+// messages sent *after* its webhook is registered — there is no way to pull
+// a user's message history from before that point, even if they'd written
+// to this bot earlier under a different integration. So conversations start
+// capturing from the moment the webhook goes live.
+
+const INBOX_MAX_MESSAGES_PER_CHAT = 4000;
+
+async function inboxTgReq(env, method, params = {}) {
+  const res = await fetch(`https://api.telegram.org/bot${env.INBOX_TG_TOKEN}/${method}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  return res.json();
+}
+
+function inboxAuthOk(request, env, url) {
+  if (!env.INBOX_ACCESS_TOKEN) return false;
+  const authHeader = request.headers.get('Authorization') || '';
+  const bearer = authHeader.match(/^Bearer\s+(.+)$/i)?.[1];
+  const token = bearer || url.searchParams.get('token');
+  return token === env.INBOX_ACCESS_TOKEN;
+}
+
+async function inboxLoadConversations(env) {
+  return kget(env, 'inbox:conversations', []);
+}
+
+async function inboxSaveConversations(env, list) {
+  await kset(env, 'inbox:conversations', list);
+}
+
+async function inboxLoadMessages(env, chatId) {
+  return kget(env, `inbox:msgs:${chatId}`, []);
+}
+
+async function inboxSaveMessages(env, chatId, messages) {
+  const trimmed = messages.length > INBOX_MAX_MESSAGES_PER_CHAT
+    ? messages.slice(messages.length - INBOX_MAX_MESSAGES_PER_CHAT)
+    : messages;
+  await kset(env, `inbox:msgs:${chatId}`, trimmed);
+}
+
+function inboxDisplayName(chat, from) {
+  if (chat?.title) return chat.title; // group/channel
+  const first = from?.first_name || chat?.first_name || '';
+  const last = from?.last_name || chat?.last_name || '';
+  const name = `${first} ${last}`.trim();
+  return name || from?.username || chat?.username || 'Без имени';
+}
+
+// Classifies a Telegram message into what the inbox UI needs: a short text
+// preview plus (for media) the file_id to fetch it through the proxy below.
+function inboxClassifyMessage(msg) {
+  if (msg.text) return { type: 'text', text: msg.text };
+  if (msg.photo?.length) {
+    const largest = msg.photo[msg.photo.length - 1];
+    return { type: 'photo', text: msg.caption || '', fileId: largest.file_id };
+  }
+  if (msg.document) return { type: 'document', text: msg.caption || '', fileId: msg.document.file_id, fileName: msg.document.file_name || '', mimeType: msg.document.mime_type || '' };
+  if (msg.voice) return { type: 'voice', text: '', fileId: msg.voice.file_id, mimeType: msg.voice.mime_type || 'audio/ogg' };
+  if (msg.audio) return { type: 'audio', text: msg.caption || '', fileId: msg.audio.file_id, fileName: msg.audio.file_name || '', mimeType: msg.audio.mime_type || 'audio/mpeg' };
+  if (msg.video) return { type: 'video', text: msg.caption || '', fileId: msg.video.file_id, mimeType: msg.video.mime_type || 'video/mp4' };
+  if (msg.video_note) return { type: 'video_note', text: '', fileId: msg.video_note.file_id, mimeType: 'video/mp4' };
+  if (msg.animation) return { type: 'animation', text: msg.caption || '', fileId: msg.animation.file_id, mimeType: 'video/mp4' };
+  if (msg.sticker) return { type: 'sticker', text: msg.sticker.emoji || '', fileId: msg.sticker.is_animated || msg.sticker.is_video ? null : msg.sticker.file_id };
+  if (msg.contact) return { type: 'contact', text: `${msg.contact.first_name || ''} ${msg.contact.phone_number || ''}`.trim() };
+  if (msg.location) return { type: 'location', text: `${msg.location.latitude}, ${msg.location.longitude}` };
+  return { type: 'other', text: '[неподдерживаемый тип сообщения]' };
+}
+
+const INBOX_TYPE_LABEL = {
+  photo: '📷 Фото', document: '📎 Файл', voice: '🎤 Голосовое', audio: '🎵 Аудио',
+  video: '🎬 Видео', video_note: '⭕ Видеосообщение', animation: '🎞️ GIF',
+  sticker: '🖼️ Стикер', contact: '👤 Контакт', location: '📍 Локация', other: '📦 Сообщение',
+};
+
+async function inboxIngestMessage(env, msg) {
+  const chatId = String(msg.chat.id);
+  const dedupKey = `inbox:dedup:${chatId}:${msg.message_id}`;
+  if (await env.KV.get(dedupKey)) return;
+  await env.KV.put(dedupKey, '1', { expirationTtl: 300 });
+
+  const classified = inboxClassifyMessage(msg);
+  const at = (msg.date ? msg.date * 1000 : Date.now());
+  const entry = {
+    id: `in-${msg.message_id}`,
+    tgMessageId: msg.message_id,
+    direction: 'in',
+    at,
+    ...classified,
+  };
+
+  const messages = await inboxLoadMessages(env, chatId);
+  messages.push(entry);
+  await inboxSaveMessages(env, chatId, messages);
+
+  const conversations = await inboxLoadConversations(env);
+  let conv = conversations.find(c => c.chatId === chatId);
+  const preview = entry.text || INBOX_TYPE_LABEL[entry.type] || '';
+  if (!conv) {
+    conv = {
+      chatId,
+      chatType: msg.chat.type,
+      firstName: msg.from?.first_name || msg.chat.first_name || '',
+      lastName: msg.from?.last_name || msg.chat.last_name || '',
+      username: msg.from?.username || msg.chat.username || '',
+      title: msg.chat.title || '',
+      displayName: inboxDisplayName(msg.chat, msg.from),
+      projectId: null,
+      notes: [],
+      pinned: false,
+      archived: false,
+      unread: 0,
+      createdAt: at,
+    };
+    conversations.push(conv);
+  } else {
+    // Keep contact info fresh (username/name can change).
+    conv.firstName = msg.from?.first_name || msg.chat.first_name || conv.firstName;
+    conv.lastName = msg.from?.last_name || msg.chat.last_name || conv.lastName;
+    conv.username = msg.from?.username || msg.chat.username || conv.username;
+    conv.displayName = inboxDisplayName(msg.chat, msg.from);
+    conv.archived = false; // a new message un-archives the conversation
+  }
+  conv.lastMessageAt = at;
+  conv.lastMessagePreview = preview.slice(0, 200);
+  conv.lastDirection = 'in';
+  conv.unread = (conv.unread || 0) + 1;
+
+  await inboxSaveConversations(env, conversations);
+
+  try {
+    await pushBroadcast(env, {
+      title: conv.displayName,
+      body: preview.slice(0, 180) || 'Новое сообщение',
+      tag: `inbox-${chatId}`,
+      url: '/message/',
+    });
+  } catch (e) {
+    console.error('Inbox push notify failed:', e);
+  }
+}
+
+async function handleInboxWebhook(request, env) {
+  if (env.INBOX_TG_WEBHOOK_SECRET) {
+    const hdr = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
+    if (hdr !== env.INBOX_TG_WEBHOOK_SECRET) return new Response('Forbidden', { status: 403 });
+  }
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response('OK');
+  }
+  const msg = body.message;
+  if (msg) {
+    try {
+      await inboxIngestMessage(env, msg);
+    } catch (e) {
+      console.error('Inbox ingest failed:', e);
+    }
+  }
+  return new Response('OK');
+}
+
+function inboxConvSummary(c) {
+  return {
+    chatId: c.chatId, chatType: c.chatType, displayName: c.displayName,
+    firstName: c.firstName, lastName: c.lastName, username: c.username, title: c.title,
+    projectId: c.projectId, notes: c.notes || [], pinned: !!c.pinned, archived: !!c.archived,
+    unread: c.unread || 0, createdAt: c.createdAt, lastMessageAt: c.lastMessageAt,
+    lastMessagePreview: c.lastMessagePreview || '', lastDirection: c.lastDirection || 'in',
+  };
+}
+
+async function handleInboxApi(request, env, url) {
+  if (!inboxAuthOk(request, env, url)) {
+    return jsonResponse({ error: env.INBOX_ACCESS_TOKEN ? 'unauthorized' : 'INBOX_ACCESS_TOKEN secret not configured' }, 401);
+  }
+
+  const parts = url.pathname.split('/').filter(Boolean); // ['message','api', resource, chatId, sub, subId]
+  const resource = parts[2];
+
+  if (resource === 'projects') {
+    if (request.method === 'GET') return jsonResponse({ projects: await kget(env, 'mylife:projects', mlDefaultProjects()) });
+    if (request.method === 'POST') return mlCreateProject(env, await readJson(request));
+  }
+
+  if (resource === 'conversations') {
+    const chatId = parts[3];
+
+    if (!chatId && request.method === 'GET') {
+      const conversations = await inboxLoadConversations(env);
+      const q = (url.searchParams.get('q') || '').trim().toLowerCase();
+      let list = conversations;
+      if (q) {
+        list = list.filter(c => (c.displayName || '').toLowerCase().includes(q)
+          || (c.username || '').toLowerCase().includes(q)
+          || (c.lastMessagePreview || '').toLowerCase().includes(q));
+      }
+      const totalUnread = conversations.reduce((s, c) => s + (c.unread || 0), 0);
+      list = list.slice().sort((a, b) => {
+        if (!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1;
+        return (b.lastMessageAt || 0) - (a.lastMessageAt || 0);
+      });
+      return jsonResponse({ conversations: list.map(inboxConvSummary), totalUnread });
+    }
+
+    if (!chatId) return jsonResponse({ error: 'not found' }, 404);
+
+    const conversations = await inboxLoadConversations(env);
+    const conv = conversations.find(c => c.chatId === chatId);
+    if (!conv) return jsonResponse({ error: 'conversation not found' }, 404);
+    const sub = parts[4];
+
+    if (!sub && request.method === 'GET') {
+      return jsonResponse({ conversation: inboxConvSummary(conv) });
+    }
+
+    if (!sub && request.method === 'PATCH') {
+      const patch = await readJson(request);
+      if ('projectId' in patch) conv.projectId = patch.projectId || null;
+      if ('pinned' in patch) conv.pinned = !!patch.pinned;
+      if ('archived' in patch) conv.archived = !!patch.archived;
+      await inboxSaveConversations(env, conversations);
+      return jsonResponse({ conversation: inboxConvSummary(conv) });
+    }
+
+    if (!sub && request.method === 'DELETE') {
+      const next = conversations.filter(c => c.chatId !== chatId);
+      await inboxSaveConversations(env, next);
+      await env.KV.delete(`inbox:msgs:${chatId}`);
+      return jsonResponse({ ok: true });
+    }
+
+    if (sub === 'read' && request.method === 'POST') {
+      conv.unread = 0;
+      await inboxSaveConversations(env, conversations);
+      return jsonResponse({ ok: true });
+    }
+
+    if (sub === 'messages' && request.method === 'GET') {
+      const all = await inboxLoadMessages(env, chatId);
+      const limit = Math.min(parseInt(url.searchParams.get('limit') || '60', 10) || 60, 300);
+      const offset = Math.max(parseInt(url.searchParams.get('offset') || '0', 10) || 0, 0);
+      const end = all.length - offset;
+      const start = Math.max(end - limit, 0);
+      const page = start < end ? all.slice(start, end) : [];
+      return jsonResponse({ messages: page, total: all.length, hasMore: start > 0 });
+    }
+
+    if (sub === 'send' && request.method === 'POST') {
+      if (!env.INBOX_TG_TOKEN) return jsonResponse({ error: 'INBOX_TG_TOKEN secret not configured' }, 503);
+      const body = await readJson(request);
+      const text = (body.text || '').trim();
+      if (!text) return jsonResponse({ error: 'empty text' }, 400);
+      const res = await inboxTgReq(env, 'sendMessage', { chat_id: chatId, text });
+      if (!res.ok) return jsonResponse({ error: res.description || 'send failed' }, 502);
+
+      const messages = await inboxLoadMessages(env, chatId);
+      const at = Date.now();
+      const entry = { id: `out-${res.result.message_id}`, tgMessageId: res.result.message_id, direction: 'out', type: 'text', text, at };
+      messages.push(entry);
+      await inboxSaveMessages(env, chatId, messages);
+
+      conv.lastMessageAt = at;
+      conv.lastMessagePreview = text.slice(0, 200);
+      conv.lastDirection = 'out';
+      conv.archived = false;
+      await inboxSaveConversations(env, conversations);
+
+      return jsonResponse({ message: entry });
+    }
+
+    if (sub === 'notes' && request.method === 'POST') {
+      const body = await readJson(request);
+      const text = (body.text || '').trim();
+      if (!text) return jsonResponse({ error: 'empty text' }, 400);
+      const note = { id: randomToken(), text, at: Date.now() };
+      conv.notes = conv.notes || [];
+      conv.notes.push(note);
+      await inboxSaveConversations(env, conversations);
+      return jsonResponse({ note });
+    }
+
+    if (sub === 'notes' && parts[5] && request.method === 'DELETE') {
+      conv.notes = (conv.notes || []).filter(n => n.id !== parts[5]);
+      await inboxSaveConversations(env, conversations);
+      return jsonResponse({ ok: true });
+    }
+  }
+
+  if (resource === 'media' && request.method === 'GET') {
+    const chatId = parts[3];
+    const msgId = parts[4];
+    if (!chatId || !msgId) return new Response('Not found', { status: 404 });
+    const messages = await inboxLoadMessages(env, chatId);
+    const entry = messages.find(m => m.id === msgId);
+    if (!entry?.fileId) return new Response('Not found', { status: 404 });
+    try {
+      const fileRes = await inboxTgReq(env, 'getFile', { file_id: entry.fileId });
+      const filePath = fileRes?.result?.file_path;
+      if (!filePath) return new Response('Not found', { status: 404 });
+      const fileFetch = await fetch(`https://api.telegram.org/file/bot${env.INBOX_TG_TOKEN}/${filePath}`);
+      if (!fileFetch.ok) return new Response('Not found', { status: 404 });
+      const headers = new Headers();
+      headers.set('Content-Type', entry.mimeType || fileFetch.headers.get('Content-Type') || 'application/octet-stream');
+      headers.set('Cache-Control', 'private, max-age=86400');
+      if (entry.fileName) headers.set('Content-Disposition', `inline; filename="${entry.fileName.replace(/"/g, '')}"`);
+      return new Response(fileFetch.body, { headers });
+    } catch (e) {
+      console.error('Inbox media proxy failed:', e);
+      return new Response('Error', { status: 500 });
+    }
+  }
+
+  return jsonResponse({ error: 'not found' }, 404);
+}
+
 // ── Zoom → Telegram (recording + transcript) ─────────────────────────────────
 // One or more independent Zoom accounts, each with its own Server-to-Server
 // OAuth app and its own webhook Secret Token, all feeding the same Telegram
@@ -2855,6 +3193,42 @@ export default {
       } catch (e) {
         console.error('Zoom webhook error:', e);
         return new Response('Error: ' + e.message, { status: 500 });
+      }
+    }
+
+    if (url.pathname.startsWith('/message/api/')) {
+      try {
+        return await handleInboxApi(request, env, url);
+      } catch (e) {
+        console.error('Inbox API error:', e);
+        return jsonResponse({ error: e.message }, 500);
+      }
+    }
+
+    if (url.pathname === '/inbox/webhook') {
+      if (request.method !== 'POST') return new Response('OK');
+      try {
+        return await handleInboxWebhook(request, env);
+      } catch (e) {
+        console.error('Inbox webhook error:', e);
+        return new Response('Error: ' + e.message, { status: 500 });
+      }
+    }
+
+    // One-time setup helper: registers the inbox bot's webhook with Telegram
+    // (pointing at /inbox/webhook, with INBOX_TG_WEBHOOK_SECRET if set).
+    // Secured with the main bot token as a shared secret, like the other
+    // /debug/* endpoints below.
+    if (url.pathname === '/debug/inbox-setwebhook') {
+      if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
+      if (!env.INBOX_TG_TOKEN) return jsonResponse({ ok: false, error: 'INBOX_TG_TOKEN secret not set' });
+      try {
+        const params = { url: `${url.origin}/inbox/webhook`, allowed_updates: ['message'] };
+        if (env.INBOX_TG_WEBHOOK_SECRET) params.secret_token = env.INBOX_TG_WEBHOOK_SECRET;
+        const res = await inboxTgReq(env, 'setWebhook', params);
+        return jsonResponse(res);
+      } catch (e) {
+        return jsonResponse({ ok: false, error: e.message || String(e) });
       }
     }
 
