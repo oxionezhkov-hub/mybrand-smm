@@ -31,8 +31,12 @@ binding = "AI"
 #   INBOX_TG_TOKEN       — second Telegram bot's token (from @BotFather), used by the
 #                          /message inbox (see "Inbox (second Telegram bot)" in worker.js).
 #                          Unlike the main bot above, this bot is NOT owner-only — anyone
-#                          who messages it gets captured. After setting it, register its
-#                          webhook once by visiting /debug/inbox-setwebhook?token=<TG_TOKEN>.
+#                          who messages it gets captured, and it can also be connected via
+#                          Telegram → Settings → Telegram Business → Chatbots to relay the
+#                          owner's real personal chats (requires Telegram Premium) — replies
+#                          sent to those then go out as the owner's own account, not the bot.
+#                          After setting it, register its webhook once by visiting
+#                          /debug/inbox-setwebhook?token=<TG_TOKEN>.
 #   INBOX_TG_WEBHOOK_SECRET — optional random string; if set, verified against Telegram's
 #                          secret_token header on /inbox/webhook (also auto-sent to
 #                          setWebhook by /debug/inbox-setwebhook).
