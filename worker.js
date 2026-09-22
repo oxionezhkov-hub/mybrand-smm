@@ -2433,27 +2433,40 @@ async function handleVideoMcp(request, env, url) {
 }
 
 // ── Inbox (second Telegram bot) ───────────────────────────────────────────────
-// A separate bot (its own token, `INBOX_TG_TOKEN`) that anyone can message —
-// unlike the main bot above it is NOT owner-only. Every incoming message is
-// captured into KV so nothing scrolls away, and the /message page (a static
-// page under public/message/) lets the owner browse every conversation, tag
-// it to a project, leave notes, and reply — replies go out through this same
-// bot via plain sendMessage, with no added prefix/signature.
+// A separate bot (its own token, `INBOX_TG_TOKEN`) — unlike the main bot
+// above it is NOT owner-only. Two ways messages reach it, both captured into
+// the same KV-backed conversations so nothing scrolls away:
+//  1. Someone messages the bot's own @username directly (a plain `message`
+//     update, chat = that person).
+//  2. The bot is connected via Telegram (Settings → Telegram Business →
+//     Chatbots → pick this bot) to the owner's *personal* account — Telegram
+//     then relays every message in the owner's real private chats as a
+//     `business_message` update (chat = the other party, `from` = whoever
+//     actually typed it, including the owner themselves if they replied by
+//     hand from their own phone — that case is only logged, never re-sent).
+//     Replying to one of these through /message calls sendMessage with that
+//     message's `business_connection_id`, so Telegram delivers it AS the
+//     owner's own account — not as a bot message at all.
+// The /message page (a static page under public/message/) lets the owner
+// browse every conversation from either source, tag it to a project, leave
+// notes, and reply — with no added prefix/signature on the outgoing text.
 //
 // Setup: `wrangler secret put INBOX_TG_TOKEN` with the second bot's token
 // from @BotFather, `wrangler secret put INBOX_ACCESS_TOKEN` with any long
 // random string (this guards the /message page + its API — the page will
 // ask for it once and remember it in the browser), then hit
-// `/debug/inbox-setwebhook?token=<TG_TOKEN>` once to register the webhook.
+// `/debug/inbox-setwebhook?token=<TG_TOKEN>` once to register the webhook
+// (this also opts into business_connection/business_message updates).
 // Optionally also set INBOX_TG_WEBHOOK_SECRET (any random string) — if set,
 // it's verified against Telegram's secret_token header and is also sent to
-// setWebhook automatically.
+// setWebhook automatically. To connect it to the owner's personal chats,
+// open Telegram → Settings → Telegram Business → Chatbots (requires
+// Telegram Premium) and pick this bot there.
 //
-// Limitation inherent to the Telegram Bot API: a bot only ever receives
-// messages sent *after* its webhook is registered — there is no way to pull
-// a user's message history from before that point, even if they'd written
-// to this bot earlier under a different integration. So conversations start
-// capturing from the moment the webhook goes live.
+// Limitation inherent to the Telegram Bot API: a bot (and a Business
+// connection) only ever receives messages sent *after* it's registered/
+// connected — there is no way to pull message history from before that
+// point. So conversations start capturing from the moment each is set up.
 
 const INBOX_MAX_MESSAGES_PER_CHAT = 4000;
 
@@ -2527,18 +2540,27 @@ const INBOX_TYPE_LABEL = {
   sticker: '🖼️ Стикер', contact: '👤 Контакт', location: '📍 Локация', other: '📦 Сообщение',
 };
 
-async function inboxIngestMessage(env, msg) {
+// `msg` is a Telegram Message — either a plain update sent directly to the
+// inbox bot's own chat, or (when `isBusiness`) one relayed through a
+// Telegram Business connection, i.e. a message in the *owner's real personal
+// chat* with someone. In the business case `msg.from` is the owner
+// themselves when they replied from their own phone (not through this app)
+// — that's an outgoing message we only need to log, not send.
+async function inboxIngestMessage(env, msg, { isBusiness = false } = {}) {
   const chatId = String(msg.chat.id);
   const dedupKey = `inbox:dedup:${chatId}:${msg.message_id}`;
   if (await env.KV.get(dedupKey)) return;
   await env.KV.put(dedupKey, '1', { expirationTtl: 300 });
 
+  const isOwnerMessage = isBusiness && env.OWNER_CHAT_ID && msg.from && String(msg.from.id) === String(env.OWNER_CHAT_ID);
+  const direction = isOwnerMessage ? 'out' : 'in';
+
   const classified = inboxClassifyMessage(msg);
   const at = (msg.date ? msg.date * 1000 : Date.now());
   const entry = {
-    id: `in-${msg.message_id}`,
+    id: `${direction}-${msg.message_id}`,
     tgMessageId: msg.message_id,
-    direction: 'in',
+    direction,
     at,
     ...classified,
   };
@@ -2550,15 +2572,19 @@ async function inboxIngestMessage(env, msg) {
   const conversations = await inboxLoadConversations(env);
   let conv = conversations.find(c => c.chatId === chatId);
   const preview = entry.text || INBOX_TYPE_LABEL[entry.type] || '';
+  // The other party in the chat — for a business message sent by the owner
+  // themselves, `msg.from` is the owner, so fall back to `msg.chat` (which
+  // Telegram Business always sets to the actual contact) for their identity.
+  const peer = isOwnerMessage ? null : msg.from;
   if (!conv) {
     conv = {
       chatId,
       chatType: msg.chat.type,
-      firstName: msg.from?.first_name || msg.chat.first_name || '',
-      lastName: msg.from?.last_name || msg.chat.last_name || '',
-      username: msg.from?.username || msg.chat.username || '',
+      firstName: peer?.first_name || msg.chat.first_name || '',
+      lastName: peer?.last_name || msg.chat.last_name || '',
+      username: peer?.username || msg.chat.username || '',
       title: msg.chat.title || '',
-      displayName: inboxDisplayName(msg.chat, msg.from),
+      displayName: inboxDisplayName(msg.chat, peer),
       projectId: null,
       notes: [],
       pinned: false,
@@ -2569,18 +2595,21 @@ async function inboxIngestMessage(env, msg) {
     conversations.push(conv);
   } else {
     // Keep contact info fresh (username/name can change).
-    conv.firstName = msg.from?.first_name || msg.chat.first_name || conv.firstName;
-    conv.lastName = msg.from?.last_name || msg.chat.last_name || conv.lastName;
-    conv.username = msg.from?.username || msg.chat.username || conv.username;
-    conv.displayName = inboxDisplayName(msg.chat, msg.from);
+    conv.firstName = peer?.first_name || msg.chat.first_name || conv.firstName;
+    conv.lastName = peer?.last_name || msg.chat.last_name || conv.lastName;
+    conv.username = peer?.username || msg.chat.username || conv.username;
+    conv.displayName = inboxDisplayName(msg.chat, peer);
     conv.archived = false; // a new message un-archives the conversation
   }
+  if (isBusiness && msg.business_connection_id) conv.businessConnectionId = msg.business_connection_id;
   conv.lastMessageAt = at;
   conv.lastMessagePreview = preview.slice(0, 200);
-  conv.lastDirection = 'in';
-  conv.unread = (conv.unread || 0) + 1;
+  conv.lastDirection = direction;
+  if (!isOwnerMessage) conv.unread = (conv.unread || 0) + 1;
 
   await inboxSaveConversations(env, conversations);
+
+  if (isOwnerMessage) return; // sent by the owner themselves — nothing to notify about
 
   try {
     await pushBroadcast(env, {
@@ -2605,13 +2634,19 @@ async function handleInboxWebhook(request, env) {
   } catch {
     return new Response('OK');
   }
-  const msg = body.message;
-  if (msg) {
-    try {
-      await inboxIngestMessage(env, msg);
-    } catch (e) {
-      console.error('Inbox ingest failed:', e);
+  try {
+    if (body.message) {
+      await inboxIngestMessage(env, body.message);
+    } else if (body.business_message) {
+      await inboxIngestMessage(env, body.business_message, { isBusiness: true });
+    } else if (body.business_connection) {
+      // Connection created/updated/revoked (Telegram → Settings → Business →
+      // Chatbots). Nothing to persist — each business_message already
+      // carries its own business_connection_id — but logged for visibility.
+      console.log('Inbox business_connection update:', JSON.stringify(body.business_connection));
     }
+  } catch (e) {
+    console.error('Inbox ingest failed:', e);
   }
   return new Response('OK');
 }
@@ -2623,6 +2658,7 @@ function inboxConvSummary(c) {
     projectId: c.projectId, notes: c.notes || [], pinned: !!c.pinned, archived: !!c.archived,
     unread: c.unread || 0, createdAt: c.createdAt, lastMessageAt: c.lastMessageAt,
     lastMessagePreview: c.lastMessagePreview || '', lastDirection: c.lastDirection || 'in',
+    viaBusiness: !!c.businessConnectionId,
   };
 }
 
@@ -2707,8 +2743,18 @@ async function handleInboxApi(request, env, url) {
       const body = await readJson(request);
       const text = (body.text || '').trim();
       if (!text) return jsonResponse({ error: 'empty text' }, 400);
-      const res = await inboxTgReq(env, 'sendMessage', { chat_id: chatId, text });
+      // Via a Telegram Business connection this is sent AS the owner's real
+      // account (indistinguishable from typing it by hand); otherwise it
+      // goes out as the inbox bot itself.
+      const sendParams = { chat_id: chatId, text };
+      if (conv.businessConnectionId) sendParams.business_connection_id = conv.businessConnectionId;
+      const res = await inboxTgReq(env, 'sendMessage', sendParams);
       if (!res.ok) return jsonResponse({ error: res.description || 'send failed' }, 502);
+      if (conv.businessConnectionId) {
+        // Telegram Business echoes our own send back through the webhook as
+        // a business_message — pre-mark it deduped so it isn't logged twice.
+        await env.KV.put(`inbox:dedup:${chatId}:${res.result.message_id}`, '1', { expirationTtl: 300 });
+      }
 
       const messages = await inboxLoadMessages(env, chatId);
       const at = Date.now();
@@ -3223,7 +3269,7 @@ export default {
       if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
       if (!env.INBOX_TG_TOKEN) return jsonResponse({ ok: false, error: 'INBOX_TG_TOKEN secret not set' });
       try {
-        const params = { url: `${url.origin}/inbox/webhook`, allowed_updates: ['message'] };
+        const params = { url: `${url.origin}/inbox/webhook`, allowed_updates: ['message', 'business_connection', 'business_message'] };
         if (env.INBOX_TG_WEBHOOK_SECRET) params.secret_token = env.INBOX_TG_WEBHOOK_SECRET;
         const res = await inboxTgReq(env, 'setWebhook', params);
         return jsonResponse(res);

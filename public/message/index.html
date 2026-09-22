@@ -471,14 +471,15 @@
     paintAvatar(document.getElementById('chat-avatar'), c);
     document.getElementById('chat-head-name').textContent = c.displayName;
     var sub = c.username ? ('@' + c.username) : (c.chatType === 'private' ? 'личный чат' : c.chatType);
-    document.getElementById('chat-head-sub').innerHTML = c.username
+    var businessTag = c.viaBusiness ? ' · <span title="Ответы уходят с личного аккаунта">👤 личный Telegram</span>' : '';
+    document.getElementById('chat-head-sub').innerHTML = (c.username
       ? '<a href="https://t.me/' + c.username + '" target="_blank" rel="noopener">@' + escapeHtml(c.username) + '</a>'
-      : escapeHtml(sub || '');
+      : escapeHtml(sub || '')) + businessTag;
     document.getElementById('pin-btn').classList.toggle('on', !!c.pinned);
 
     paintAvatar(document.getElementById('drawer-avatar'), c);
     document.getElementById('drawer-name').textContent = c.displayName;
-    document.getElementById('drawer-sub').textContent = c.username ? '@' + c.username : (c.chatType || '');
+    document.getElementById('drawer-sub').textContent = (c.username ? '@' + c.username : (c.chatType || '')) + (c.viaBusiness ? ' · личный Telegram' : '');
     document.getElementById('project-select').value = c.projectId || '';
     document.getElementById('pin-switch').classList.toggle('on', !!c.pinned);
     document.getElementById('archive-switch').classList.toggle('on', !!c.archived);
