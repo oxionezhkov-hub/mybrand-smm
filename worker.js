@@ -2605,22 +2605,16 @@ async function inboxIngestMessage(env, msg, { isBusiness = false } = {}) {
   conv.lastMessageAt = at;
   conv.lastMessagePreview = preview.slice(0, 200);
   conv.lastDirection = direction;
-  if (!isOwnerMessage) conv.unread = (conv.unread || 0) + 1;
+  // The owner replying — whether from their own phone (this is a business
+  // message echo) or, previously, through /message — means the conversation
+  // no longer needs attention, so it clears unread rather than just not
+  // adding to it. Telegram already shows its own native notification for
+  // every one of these messages on the owner's phone, so there's no push
+  // broadcast here — that would just be a duplicate alert for something
+  // Telegram already told them about.
+  conv.unread = isOwnerMessage ? 0 : (conv.unread || 0) + 1;
 
   await inboxSaveConversations(env, conversations);
-
-  if (isOwnerMessage) return; // sent by the owner themselves — nothing to notify about
-
-  try {
-    await pushBroadcast(env, {
-      title: conv.displayName,
-      body: preview.slice(0, 180) || 'Новое сообщение',
-      tag: `inbox-${chatId}`,
-      url: '/message/',
-    });
-  } catch (e) {
-    console.error('Inbox push notify failed:', e);
-  }
 }
 
 // An edited version of a message we (should) already have. Keeps the
@@ -2746,6 +2740,14 @@ async function handleInboxApi(request, env, url) {
 
     if (!chatId && request.method === 'GET') {
       const conversations = await inboxLoadConversations(env);
+      // Self-heal stale unread counts left over from before replying by
+      // hand cleared them (see inboxIngestMessage) — if the owner sent the
+      // last message, nothing is actually waiting on them.
+      let healed = false;
+      for (const c of conversations) {
+        if (c.lastDirection === 'out' && c.unread) { c.unread = 0; healed = true; }
+      }
+      if (healed) await inboxSaveConversations(env, conversations);
       const q = (url.searchParams.get('q') || '').trim().toLowerCase();
       let list = conversations;
       if (q) {
@@ -2832,6 +2834,7 @@ async function handleInboxApi(request, env, url) {
       conv.lastMessagePreview = text.slice(0, 200);
       conv.lastDirection = 'out';
       conv.archived = false;
+      conv.unread = 0;
       await inboxSaveConversations(env, conversations);
 
       return jsonResponse({ message: entry });
