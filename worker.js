@@ -1359,7 +1359,10 @@ async function handleScheduled(env, cron) {
   // Kept outside the MAILINGS_PAUSED gate below: pausing the daily task-summary/push
   // mailings shouldn't also stop recordings from reaching Telegram.
   if (cron === '*/5 * * * *') {
-    await checkPendingZoomTranscripts(env);
+    // Independent jobs — one failing mustn't skip the other.
+    const results = await Promise.allSettled([checkPendingZoomTranscripts(env), crmProcessQueue(env)]);
+    const failed = results.find(r => r.status === 'rejected');
+    if (failed) throw failed.reason;
     return;
   }
 
@@ -2470,6 +2473,13 @@ async function handleVideoMcp(request, env, url) {
 
 const INBOX_MAX_MESSAGES_PER_CHAT = 4000;
 
+const INBOX_CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+  'Access-Control-Max-Age': '86400',
+};
+
 async function inboxTgReq(env, method, params = {}) {
   const res = await fetch(`https://api.telegram.org/bot${env.INBOX_TG_TOKEN}/${method}`, {
     method: 'POST',
@@ -2516,7 +2526,13 @@ function inboxDisplayName(chat, from) {
 
 // Classifies a Telegram message into what the inbox UI needs: a short text
 // preview plus (for media) the file_id to fetch it through the proxy below.
+// `entities` (Telegram's bold/italic/link/... ranges over `text`) are kept so
+// formatting survives into the /message page and the sales CRM chat view.
 function inboxClassifyMessage(msg) {
+  return { ...inboxClassifyMessageBase(msg), entities: msg.entities || msg.caption_entities || undefined };
+}
+
+function inboxClassifyMessageBase(msg) {
   if (msg.text) return { type: 'text', text: msg.text };
   if (msg.photo?.length) {
     const largest = msg.photo[msg.photo.length - 1];
@@ -2615,6 +2631,7 @@ async function inboxIngestMessage(env, msg, { isBusiness = false } = {}) {
   conv.unread = isOwnerMessage ? 0 : (conv.unread || 0) + 1;
 
   await inboxSaveConversations(env, conversations);
+  return { conv, entry };
 }
 
 // An edited version of a message we (should) already have. Keeps the
@@ -2677,7 +2694,7 @@ async function inboxHandleDeletedMessages(env, msg) {
   }
 }
 
-async function handleInboxWebhook(request, env) {
+async function handleInboxWebhook(request, env, ctx) {
   if (env.INBOX_TG_WEBHOOK_SECRET) {
     const hdr = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
     if (hdr !== env.INBOX_TG_WEBHOOK_SECRET) return new Response('Forbidden', { status: 403 });
@@ -2692,7 +2709,8 @@ async function handleInboxWebhook(request, env) {
     if (body.message) {
       await inboxIngestMessage(env, body.message);
     } else if (body.business_message) {
-      await inboxIngestMessage(env, body.business_message, { isBusiness: true });
+      const ingested = await inboxIngestMessage(env, body.business_message, { isBusiness: true });
+      if (ingested) crmRunInBackground(ctx, crmOnInboxMessage(env, ingested.conv, ingested.entry));
     } else if (body.edited_message) {
       await inboxIngestEdit(env, body.edited_message);
     } else if (body.edited_business_message) {
@@ -2722,7 +2740,7 @@ function inboxConvSummary(c) {
   };
 }
 
-async function handleInboxApi(request, env, url) {
+async function handleInboxApi(request, env, url, ctx) {
   if (!inboxAuthOk(request, env, url)) {
     return jsonResponse({ error: env.INBOX_ACCESS_TOKEN ? 'unauthorized' : 'INBOX_ACCESS_TOKEN secret not configured' }, 401);
   }
@@ -2810,11 +2828,15 @@ async function handleInboxApi(request, env, url) {
       if (!env.INBOX_TG_TOKEN) return jsonResponse({ error: 'INBOX_TG_TOKEN secret not configured' }, 503);
       const body = await readJson(request);
       const text = (body.text || '').trim();
-      if (!text) return jsonResponse({ error: 'empty text' }, 400);
+      // `html` (Telegram's HTML subset: <b>, <i>, <u>, <s>, <code>, <pre>,
+      // <a href>, <tg-spoiler>, <blockquote>) keeps formatting — the sales
+      // CRM's composer sends this; plain `text` still works for /message.
+      const html = typeof body.html === 'string' ? body.html.trim() : '';
+      if (!text && !html) return jsonResponse({ error: 'empty text' }, 400);
       // Via a Telegram Business connection this is sent AS the owner's real
       // account (indistinguishable from typing it by hand); otherwise it
       // goes out as the inbox bot itself.
-      const sendParams = { chat_id: chatId, text };
+      const sendParams = html ? { chat_id: chatId, text: html, parse_mode: 'HTML' } : { chat_id: chatId, text };
       if (conv.businessConnectionId) sendParams.business_connection_id = conv.businessConnectionId;
       const res = await inboxTgReq(env, 'sendMessage', sendParams);
       if (!res.ok) return jsonResponse({ error: res.description || 'send failed' }, 502);
@@ -2826,16 +2848,20 @@ async function handleInboxApi(request, env, url) {
 
       const messages = await inboxLoadMessages(env, chatId);
       const at = Date.now();
-      const entry = { id: `out-${res.result.message_id}`, tgMessageId: res.result.message_id, direction: 'out', type: 'text', text, at };
+      const sentText = res.result.text || text;
+      const entry = { id: `out-${res.result.message_id}`, tgMessageId: res.result.message_id, direction: 'out', type: 'text', text: sentText, entities: res.result.entities, at };
       messages.push(entry);
       await inboxSaveMessages(env, chatId, messages);
 
       conv.lastMessageAt = at;
-      conv.lastMessagePreview = text.slice(0, 200);
+      conv.lastMessagePreview = sentText.slice(0, 200);
       conv.lastDirection = 'out';
       conv.archived = false;
       conv.unread = 0;
       await inboxSaveConversations(env, conversations);
+      // This send never comes back through the webhook (deduped above), so
+      // hand it to the CRM sync here instead.
+      crmRunInBackground(ctx, crmOnInboxMessage(env, conv, entry));
 
       return jsonResponse({ message: entry });
     }
@@ -2883,6 +2909,251 @@ async function handleInboxApi(request, env, url) {
   }
 
   return jsonResponse({ error: 'not found' }, 404);
+}
+
+// ── Inbox → agency sales CRM (cantor-agency-web /sales-crm) ──────────────────
+// The owner talks to every sales lead from their personal Telegram, which
+// reaches this worker through the Business connection above. This keeps the
+// agency's sales CRM in step with those chats:
+//  - on every message in a personal chat: the CRM row's "last message" is
+//    refreshed right away (no AI) — if that chat is already a CRM row, or a
+//    row has this person's @username (it gets linked on the spot);
+//  - once a dialog has been quiet for CRM_QUIET_MS, the */5 cron hands the
+//    last messages to the AI (same Workers AI Llama as the rest of this bot):
+//      · already in the CRM → the AI moves the lead's status and rewrites its
+//        next step + next-action date from what was just said;
+//      · not in the CRM → the AI decides whether this is a (prospective)
+//        agency client — Avito, the agency's services, launching promotion —
+//        and if so the row is created in the CRM (group НОВЫЕ). Other topics
+//        (friends, staff, contractors, spam) are never sent to the CRM.
+//  - a row the owner deletes in the CRM is never auto-created again.
+// The CRM side (auth, matching, history) is handleSalesCrmTgSync in
+// cantor-agency-web/_worker.js. Replies typed in the CRM come back through
+// /message/api/conversations/<chatId>/send above.
+//
+// Setup: `wrangler secret put CRM_SYNC_SECRET` — any long random string, the
+// same value as the SALESCRM_SYNC_SECRET secret on the "mainweb" worker. Not
+// set = this whole feature is inert. CRM_API_BASE (optional var) overrides
+// the CRM worker's origin. /debug/crm-backfill?token=<TG_TOKEN> queues every
+// existing personal chat for one pass (the cron works through it gradually).
+
+const CRM_API_BASE_DEFAULT = 'https://mainweb.oxion-ezhkov.workers.dev';
+const CRM_AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+const CRM_QUIET_MS = 90 * 1000;          // wait for a burst of messages to settle before the AI reads it
+const CRM_MAX_CHATS_PER_RUN = 6;         // keeps one cron run well inside the subrequest limit
+const CRM_TRANSCRIPT_MESSAGES = 30;
+const CRM_TRANSCRIPT_MAX_CHARS = 9000;
+const CRM_CLASSIFY_MAX_CHECKS = 6;       // a chat judged "not a client" this many times stops being re-checked
+const CRM_CLASSIFY_MIN_NEW_MESSAGES = 2; // ...and is only re-checked after this many new messages
+const CRM_STATUSES = ['Первое сообщение', 'Вопросы', 'Формат', 'Оффер', 'Игнор', 'Отложенный спрос', 'Отказ', 'Продажа'];
+const CRM_WEEKDAYS = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
+
+function crmEnabled(env) {
+  return !!env.CRM_SYNC_SECRET;
+}
+
+// Only the owner's real one-to-one chats (via Business) — not groups, and not
+// people who wrote to the inbox bot's own @username.
+function crmIsCandidate(conv) {
+  return !!(conv && conv.businessConnectionId && conv.chatType === 'private');
+}
+
+function crmRunInBackground(ctx, promise) {
+  const guarded = promise.catch(e => console.error('CRM sync failed:', e));
+  if (ctx?.waitUntil) ctx.waitUntil(guarded);
+}
+
+async function crmSyncCall(env, payload) {
+  const res = await fetch(`${env.CRM_API_BASE || CRM_API_BASE_DEFAULT}/api/salescrm/tg/sync`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-sync-secret': env.CRM_SYNC_SECRET },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`CRM sync ${res.status}: ${data.error || ''}`);
+  return data;
+}
+
+function crmChatPayload(conv) {
+  return { id: conv.chatId, username: conv.username || '', name: conv.displayName || '' };
+}
+
+function crmLastMessagePayload(entry) {
+  const label = entry.type !== 'text' ? INBOX_TYPE_LABEL[entry.type] || '' : '';
+  const text = [label, entry.text || ''].filter(Boolean).join(' ');
+  return { text: text.slice(0, 400), at: entry.at, direction: entry.direction, type: entry.type };
+}
+
+async function crmOnInboxMessage(env, conv, entry) {
+  if (!crmEnabled(env) || !crmIsCandidate(conv)) return;
+  const stateKey = `crmsync:state:${conv.chatId}`;
+  const state = await kget(env, stateKey, {});
+  if (state.dismissed) return;
+  const { client, dismissed } = await crmSyncCall(env, { chat: crmChatPayload(conv), lastMessage: crmLastMessagePayload(entry) });
+  if (dismissed) {
+    await kset(env, stateKey, { ...state, dismissed: true, clientId: null });
+    return;
+  }
+  if ((client?.id || null) !== (state.clientId || null)) {
+    state.clientId = client?.id || null;
+    await kset(env, stateKey, state);
+  }
+  await kset(env, `crmsync:dirty:${conv.chatId}`, { at: Date.now() }, { expirationTtl: 60 * 60 * 24 * 7 });
+}
+
+function crmMskDate(ms) {
+  return new Date(ms + TZ_OFFSET * 3600 * 1000);
+}
+
+function crmTranscript(messages) {
+  const lines = messages.map(m => {
+    const d = crmMskDate(m.at);
+    const when = `${String(d.getUTCDate()).padStart(2, '0')}.${String(d.getUTCMonth() + 1).padStart(2, '0')} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+    const who = m.direction === 'out' ? 'Я' : 'Клиент';
+    const label = m.type !== 'text' ? INBOX_TYPE_LABEL[m.type] || '' : '';
+    const body = [label, m.text || ''].filter(Boolean).join(' ').replace(/\s+/g, ' ').slice(0, 500);
+    return `[${when}] ${who}: ${body}`;
+  });
+  const out = lines.join('\n');
+  return out.length > CRM_TRANSCRIPT_MAX_CHARS ? out.slice(-CRM_TRANSCRIPT_MAX_CHARS) : out;
+}
+
+async function crmAiJson(env, system, user) {
+  const result = await env.AI.run(CRM_AI_MODEL, {
+    messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+    max_tokens: 400,
+    temperature: 0.1,
+  });
+  const raw = typeof result?.response === 'string' ? result.response : JSON.stringify(result?.response ?? '');
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[0]);
+  } catch {
+    return null;
+  }
+}
+
+const CRM_CLASSIFY_SYSTEM = `Ты — фильтр диалогов для CRM продаж агентства Cantor Agency. Агентство продвигает бизнес клиентов на Авито: ведение аккаунта и объявлений, продвижение и реклама на Авито, запуск продвижения; также продаёт другие услуги агентства по продвижению.
+Владелец агентства («Я») переписывается в личном Telegram со всеми подряд: с клиентами, друзьями, семьёй, сотрудниками, подрядчиками.
+Реши, является ли собеседник текущим или потенциальным КЛИЕНТОМ агентства — то есть обсуждается ли продвижение ЕГО бизнеса на Авито, услуги агентства для него, запуск продвижения, стоимость, формат или условия работы с агентством.
+НЕ клиент: личные и бытовые темы, друзья и семья, сотрудники и подрядчики агентства (рабочие задачи по чужим проектам, отчёты, зарплата), люди, продающие что-то владельцу, спам и рассылки. Если непонятно — relevant=false.
+Ответь строго одним JSON-объектом без пояснений и без markdown:
+{"relevant": true или false, "confidence": число от 0 до 1, "reason": "одна короткая фраза по-русски: о чём диалог"}`;
+
+async function crmClassify(env, conv, transcript) {
+  const who = `${conv.displayName || 'Без имени'}${conv.username ? ` (@${conv.username})` : ''}`;
+  const verdict = await crmAiJson(env, CRM_CLASSIFY_SYSTEM, `Собеседник: ${who}\n\nПереписка («Я» — владелец агентства):\n${transcript}`);
+  if (!verdict) return null;
+  const confidence = Number(verdict.confidence);
+  return {
+    relevant: verdict.relevant === true && (!Number.isFinite(confidence) || confidence >= 0.6),
+    reason: String(verdict.reason || '').slice(0, 200),
+  };
+}
+
+function crmAnalyzeSystem(now) {
+  const d = crmMskDate(now);
+  const today = d.toISOString().slice(0, 10);
+  return `Ты ведёшь CRM продаж агентства Cantor Agency (продвижение бизнеса на Авито). По переписке владельца агентства («Я») с клиентом в Telegram обнови карточку клиента.
+Этап (status) — ровно одно значение из списка:
+- "Первое сообщение" — контакт только начался, задачу клиента ещё не обсуждали
+- "Вопросы" — выясняем задачу клиента, клиент задаёт вопросы, собираем информацию
+- "Формат" — обсуждаем формат работы: созвон или встреча, тариф, условия, что входит
+- "Оффер" — клиенту отправлено коммерческое предложение или названа цена, ждём решения
+- "Игнор" — клиент несколько дней не отвечает на наши последние сообщения
+- "Отложенный спрос" — клиенту интересно, но он просит вернуться позже
+- "Отказ" — клиент явно отказался
+- "Продажа" — клиент согласился и оплатил или подтвердил старт работы
+nextAction — следующая задача владельца по клиенту, коротко, до 80 символов, например: "Созвон в четверг в 15:00", "Прислать КП", "Спросить решение по офферу", "Ждать ответа клиента".
+nextActionDate — дата этой задачи в формате ГГГГ-ММ-ДД, не раньше сегодняшней. Если договорились о конкретном дне — этот день. Если ждём ответа клиента — через 2 дня после последнего сообщения. Если клиент просил вернуться позже — эта дата. Для "Отказ" — пустая строка.
+Сегодня ${today}, ${CRM_WEEKDAYS[d.getUTCDay()]} (московское время). Опирайся прежде всего на последние сообщения. Не возвращай этап назад без явной причины в переписке.
+Ответь строго одним JSON-объектом без пояснений и без markdown:
+{"status": "...", "nextAction": "...", "nextActionDate": "ГГГГ-ММ-ДД или пустая строка"}`;
+}
+
+async function crmAnalyze(env, client, transcript) {
+  const now = Date.now();
+  const card = client
+    ? `Текущая карточка: этап «${client.status}», задача «${client.nextAction || '—'}», дата задачи ${client.nextActionDate || '—'}, комментарий: ${(client.comment || '—').slice(0, 300)}`
+    : 'Карточки ещё нет — клиент новый.';
+  const result = await crmAiJson(env, crmAnalyzeSystem(now), `${card}\n\nПереписка («Я» — владелец агентства):\n${transcript}`);
+  if (!result) return null;
+  const today = crmMskDate(now).toISOString().slice(0, 10);
+  const update = {};
+  if (CRM_STATUSES.includes(result.status)) update.status = result.status;
+  if (typeof result.nextAction === 'string' && result.nextAction.trim()) update.nextAction = result.nextAction.trim().slice(0, 120);
+  const date = String(result.nextActionDate ?? '').trim();
+  if (date === '' && update.status === 'Отказ') update.nextActionDate = '';
+  else if (/^\d{4}-\d{2}-\d{2}$/.test(date) && date >= today) update.nextActionDate = date;
+  return Object.keys(update).length ? update : null;
+}
+
+async function crmProcessChat(env, chatId) {
+  const conv = (await inboxLoadConversations(env)).find(c => c.chatId === chatId);
+  if (!crmIsCandidate(conv)) return;
+  const stateKey = `crmsync:state:${chatId}`;
+  const state = await kget(env, stateKey, {});
+  if (state.dismissed) return;
+  const messages = (await inboxLoadMessages(env, chatId)).filter(m => !m.deletedAt);
+  if (!messages.length) return;
+  const last = messages[messages.length - 1];
+  if (state.analyzedMessageId === last.id) return; // nothing new since the last pass (e.g. only an edit)
+
+  const chat = crmChatPayload(conv);
+  const lastMessage = crmLastMessagePayload(last);
+  const { client, dismissed } = await crmSyncCall(env, { chat, lastMessage });
+  if (dismissed) {
+    await kset(env, stateKey, { ...state, dismissed: true, clientId: null });
+    return;
+  }
+
+  let reason = '';
+  if (!client) {
+    if ((state.checks || 0) >= CRM_CLASSIFY_MAX_CHECKS) return;
+    if (state.checkedCount && messages.length - state.checkedCount < CRM_CLASSIFY_MIN_NEW_MESSAGES) return;
+    const verdict = await crmClassify(env, conv, crmTranscript(messages.slice(-CRM_TRANSCRIPT_MESSAGES)));
+    state.checks = (state.checks || 0) + 1;
+    state.checkedCount = messages.length;
+    state.lastVerdict = verdict;
+    if (!verdict?.relevant) {
+      await kset(env, stateKey, state);
+      return;
+    }
+    reason = verdict.reason;
+  }
+
+  const update = await crmAnalyze(env, client, crmTranscript(messages.slice(-CRM_TRANSCRIPT_MESSAGES)));
+  const payload = { chat, lastMessage };
+  if (update) payload.update = update;
+  if (!client) Object.assign(payload, { create: true, reason });
+  const res = await crmSyncCall(env, payload);
+  if (res.dismissed) state.dismissed = true;
+  state.clientId = res.client?.id || null;
+  state.analyzedMessageId = last.id;
+  await kset(env, stateKey, state);
+}
+
+async function crmProcessQueue(env) {
+  if (!crmEnabled(env)) return;
+  const list = await env.KV.list({ prefix: 'crmsync:dirty:' });
+  let processed = 0;
+  for (const key of list.keys) {
+    if (processed >= CRM_MAX_CHATS_PER_RUN) break;
+    const mark = await kget(env, key.name, null);
+    if (!mark) continue;
+    if (Date.now() - (mark.at || 0) < CRM_QUIET_MS) continue;
+    processed++;
+    const chatId = key.name.slice('crmsync:dirty:'.length);
+    try {
+      await crmProcessChat(env, chatId);
+    } catch (e) {
+      console.error(`CRM sync of chat ${chatId} failed:`, e);
+    }
+    // A message that arrived mid-run re-marked the chat — leave that for the next run.
+    const after = await kget(env, key.name, null);
+    if (after && after.at === mark.at) await env.KV.delete(key.name);
+  }
 }
 
 // ── Zoom → Telegram (recording + transcript) ─────────────────────────────────
@@ -3311,19 +3582,28 @@ export default {
       }
     }
 
+    // CORS: the agency sales CRM (cantor-agency-web /sales-crm, another origin)
+    // reads chats and sends replies through this same API with the same
+    // INBOX_ACCESS_TOKEN bearer — auth is the token, never a cookie, so a
+    // wildcard origin exposes nothing extra.
     if (url.pathname.startsWith('/message/api/')) {
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: INBOX_CORS_HEADERS });
+      let res;
       try {
-        return await handleInboxApi(request, env, url);
+        res = await handleInboxApi(request, env, url, ctx);
       } catch (e) {
         console.error('Inbox API error:', e);
-        return jsonResponse({ error: e.message }, 500);
+        res = jsonResponse({ error: e.message }, 500);
       }
+      const headers = new Headers(res.headers);
+      for (const [k, v] of Object.entries(INBOX_CORS_HEADERS)) headers.set(k, v);
+      return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
     }
 
     if (url.pathname === '/inbox/webhook') {
       if (request.method !== 'POST') return new Response('OK');
       try {
-        return await handleInboxWebhook(request, env);
+        return await handleInboxWebhook(request, env, ctx);
       } catch (e) {
         console.error('Inbox webhook error:', e);
         return new Response('Error: ' + e.message, { status: 500 });
@@ -3345,6 +3625,19 @@ export default {
       } catch (e) {
         return jsonResponse({ ok: false, error: e.message || String(e) });
       }
+    }
+
+    // One-time pass over chats captured before the CRM sync existed: queues
+    // every personal chat; the */5 cron then works through them a few at a
+    // time (see crmProcessQueue).
+    if (url.pathname === '/debug/crm-backfill') {
+      if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
+      if (!crmEnabled(env)) return jsonResponse({ ok: false, error: 'CRM_SYNC_SECRET secret not set' });
+      const candidates = (await inboxLoadConversations(env)).filter(crmIsCandidate);
+      for (const c of candidates) {
+        await kset(env, `crmsync:dirty:${c.chatId}`, { at: 0 }, { expirationTtl: 60 * 60 * 24 * 7 });
+      }
+      return jsonResponse({ ok: true, queued: candidates.length });
     }
 
     if (url.pathname.startsWith('/mylife/api/')) {

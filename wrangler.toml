@@ -43,6 +43,13 @@ binding = "AI"
 #   INBOX_ACCESS_TOKEN   — required to use the /message page and its API at all (fails
 #                          closed if unset). Any long random string — the page asks for
 #                          it once and remembers it in the browser (localStorage).
+#   CRM_SYNC_SECRET      — links the inbox's personal Telegram chats to the agency sales CRM
+#                          (cantor-agency-web /sales-crm, "mainweb" worker): last message per
+#                          client, AI-updated status / next step / date, new Avito leads added
+#                          automatically (see "Inbox → agency sales CRM" in worker.js). Any long
+#                          random string — the SAME value as SALESCRM_SYNC_SECRET on mainweb.
+#                          Not set = the sync is off. After setting it, optionally visit
+#                          /debug/crm-backfill?token=<TG_TOKEN> once to run it over existing chats.
 #   ZOOM_ACCOUNTS_JSON   — JSON array configuring the Zoom → Telegram recording/transcript
 #                          forwarder (see "Zoom → Telegram" in worker.js). One entry per
 #                          Zoom account, each with its own Server-to-Server OAuth app and
