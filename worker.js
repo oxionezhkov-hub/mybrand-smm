@@ -80,6 +80,41 @@ async function readJson(request) {
   }
 }
 
+// ── ARA exam trainer progress ───────────────────────────────────────────────
+// The /ara page (public/ara/index.html) mirrors its localStorage state here so
+// progress (checklist, quiz answers, mock-exam inputs, pasted data) follows the
+// owner across devices. Single-user like MyLife: one KV key, the client's
+// timestamp decides — an older write is rejected with 409.
+
+const ARA_PROGRESS_KEY = 'ara:progress';
+const ARA_PROGRESS_MAX_BYTES = 512 * 1024;
+
+async function handleAraProgress(request, env) {
+  if (request.method === 'GET') {
+    return jsonResponse(await kget(env, ARA_PROGRESS_KEY, { state: null, updatedAt: 0 }));
+  }
+  if (request.method === 'PUT' || request.method === 'POST') {
+    const text = await request.text();
+    if (text.length > ARA_PROGRESS_MAX_BYTES) return jsonResponse({ error: 'payload too large' }, 413);
+    let body;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      return jsonResponse({ error: 'invalid json' }, 400);
+    }
+    if (!body || !body.state || typeof body.state !== 'object' || Array.isArray(body.state) || !Number.isFinite(body.updatedAt)) {
+      return jsonResponse({ error: 'expected {state, updatedAt}' }, 400);
+    }
+    const current = await kget(env, ARA_PROGRESS_KEY, { updatedAt: 0 });
+    if (body.updatedAt < (current.updatedAt || 0)) {
+      return jsonResponse({ ok: false, stale: true, updatedAt: current.updatedAt }, 409);
+    }
+    await kset(env, ARA_PROGRESS_KEY, { state: body.state, updatedAt: body.updatedAt });
+    return jsonResponse({ ok: true, updatedAt: body.updatedAt });
+  }
+  return jsonResponse({ error: 'method not allowed' }, 405);
+}
+
 async function handleMylifeApi(request, env, url) {
   const parts = url.pathname.split('/').filter(Boolean); // ['mylife', 'api', resource, id?]
   const resource = parts[2];
@@ -3638,6 +3673,15 @@ export default {
         await kset(env, `crmsync:dirty:${c.chatId}`, { at: 0 }, { expirationTtl: 60 * 60 * 24 * 7 });
       }
       return jsonResponse({ ok: true, queued: candidates.length });
+    }
+
+    if (url.pathname === '/ara/api/progress') {
+      try {
+        return await handleAraProgress(request, env);
+      } catch (e) {
+        console.error('ARA progress error:', e);
+        return jsonResponse({ error: e.message }, 500);
+      }
     }
 
     if (url.pathname.startsWith('/mylife/api/')) {

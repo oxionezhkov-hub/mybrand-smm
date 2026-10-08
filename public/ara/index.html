@@ -1,0 +1,1806 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Тренажёр ARA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Рабочая тетрадь к пересдаче: шапка с отсчётом, вкладки = части экзамена, внутри — карточки-инструменты и разборы */
+:root {
+  --bg: #EEF1F5; --surface: #FFFFFF; --sunk: #F4F6FA; --ink: #131A2B; --muted: #576078; --line: #D4DAE4;
+  --accent: #2C47C9; --accent-ink: #FFFFFF; --accent-soft: #E3E8FB;
+  --good: #17804F; --good-soft: #E0F2E8; --warn: #9C620A; --warn-soft: #FBEFD9; --bad: #B5382F; --bad-soft: #F8E2DF;
+  --display: "Unbounded", "Golos Text", system-ui, sans-serif;
+  --body: "Golos Text", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0D111B; --surface: #161B28; --sunk: #1C2233; --ink: #E4E8F1; --muted: #9AA3B9; --line: #2B3347;
+  --accent: #8FA3FF; --accent-ink: #0D111B; --accent-soft: #232C50;
+  --good: #52C78F; --good-soft: #153021; --warn: #E7AF55; --warn-soft: #33290F; --bad: #F27A70; --bad-soft: #3B1D1A; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0D111B; --surface: #161B28; --sunk: #1C2233; --ink: #E4E8F1; --muted: #9AA3B9; --line: #2B3347;
+  --accent: #8FA3FF; --accent-ink: #0D111B; --accent-soft: #232C50;
+  --good: #52C78F; --good-soft: #153021; --warn: #E7AF55; --warn-soft: #33290F; --bad: #F27A70; --bad-soft: #3B1D1A; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 20px; padding-block: 0 64px; }
+h1, h2, h3, h4 { text-wrap: balance; margin: 0; }
+h1 { font: 700 clamp(24px, 4.2vw, 38px)/1.1 var(--display); letter-spacing: -0.01em; }
+h2 { font: 600 clamp(19px, 2.6vw, 24px)/1.25 var(--display); letter-spacing: -0.005em; }
+h3 { font: 600 17px/1.35 var(--body); }
+h4 { font: 600 15px/1.4 var(--body); }
+p { margin: 0; max-width: 72ch; }
+a { color: var(--accent); }
+code, .mono { font-family: var(--mono); font-size: 0.9em; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.eyebrow { font: 600 11px/1.3 var(--body); letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+
+/* шапка */
+.top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: end; padding-block: 28px 18px; }
+.top .lead { display: grid; gap: 10px; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 12.5px; padding: 3px 9px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); }
+.chip.hot { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.count { text-align: right; display: grid; gap: 2px; }
+.count b { font: 700 clamp(22px, 3.6vw, 32px)/1 var(--display); font-variant-numeric: tabular-nums; color: var(--accent); }
+.frontier-mark { width: 140px; height: 70px; display: block; margin-left: auto; }
+.frontier-mark .fl { stroke: var(--accent); }
+.frontier-mark .pt { fill: var(--muted); }
+.frontier-mark .pe { fill: var(--accent); }
+@media (max-width: 640px) { .top { grid-template-columns: 1fr; } .count { text-align: left; } .frontier-mark { display: none; } }
+
+/* вкладки */
+.tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; margin-inline: -20px; padding-inline: 20px; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs button { font: 500 14px/1 var(--body); color: var(--muted); background: none; border: 0; border-bottom: 2px solid transparent; padding: 14px 12px 12px; cursor: pointer; white-space: nowrap; }
+.tabs button span { font: 600 11px/1 var(--mono); margin-right: 6px; color: var(--muted); }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tabs button[aria-selected="true"] span { color: var(--accent); }
+.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+section.panel { display: grid; gap: 18px; padding-top: 22px; }
+.panel-head { display: grid; gap: 6px; }
+
+/* карточки и сетки */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: grid; gap: 12px; min-width: 0; align-content: start; }
+.card.flat { background: transparent; border-style: dashed; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 860px) { .grid2, .grid3 { grid-template-columns: minmax(0, 1fr); } }
+.stack { display: grid; gap: 8px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+ul.clean { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+ol.steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.callout { border-radius: 8px; padding: 10px 12px; background: var(--warn-soft); color: var(--ink); font-size: 14px; }
+.callout.info { background: var(--accent-soft); }
+.callout.ok { background: var(--good-soft); }
+.callout.bad { background: var(--bad-soft); }
+.callout b { color: inherit; }
+.formula { font-family: var(--mono); font-size: 13.5px; background: var(--sunk); border-radius: 8px; padding: 10px 12px; white-space: pre-wrap; overflow-x: auto; line-height: 1.6; }
+details { border-top: 1px solid var(--line); padding-top: 10px; }
+details > summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; gap: 8px; align-items: baseline; }
+details > summary::before { content: "+"; font-family: var(--mono); color: var(--accent); width: 12px; }
+details[open] > summary::before { content: "−"; }
+details > .body { padding-top: 10px; display: grid; gap: 10px; }
+
+/* формы */
+label.f { display: grid; gap: 4px; font-size: 13px; color: var(--muted); min-width: 0; }
+input[type="number"], input[type="text"], select, textarea { font: 14px/1.4 var(--body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; min-width: 0; width: 100%; }
+textarea { font: 12.5px/1.45 var(--mono); resize: vertical; min-height: 140px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+.btn { font: 600 14px/1 var(--body); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.small { padding: 7px 10px; font-size: 13px; }
+.copybuf { width: 100%; min-height: 80px; margin-top: 6px; }
+.check { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--ink); }
+.check input { width: 17px; height: 17px; accent-color: var(--accent); }
+
+/* таблицы */
+.tw { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; max-width: 100%; }
+.tw.tall { max-height: 420px; overflow-y: auto; }
+table.t { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+table.t th, table.t td { padding: 6px 9px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+table.t th { background: var(--sunk); font-weight: 600; position: sticky; top: 0; z-index: 1; }
+table.t th:first-child, table.t td:first-child { text-align: left; }
+table.t td.l, table.t th.l { text-align: left; white-space: normal; }
+table.t tr:last-child td { border-bottom: 0; }
+table.t tr.sel td { background: var(--accent-soft); }
+.pill { display: inline-block; font: 600 11.5px/1 var(--body); padding: 3px 7px; border-radius: 999px; }
+.pill.good { background: var(--good-soft); color: var(--good); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.acc { background: var(--accent-soft); color: var(--accent); }
+.eff1 { color: var(--good); font-weight: 600; }
+
+/* структура экзамена */
+.parts { display: grid; gap: 8px; }
+.part { display: grid; grid-template-columns: 54px minmax(0, 1fr) 64px 66px; gap: 12px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.part:last-child { border-bottom: 0; }
+.part .n { font: 700 22px/1 var(--display); color: var(--accent); }
+.part .pts, .part .min { font: 600 14px/1.2 var(--mono); text-align: right; }
+.part .min { color: var(--muted); }
+@media (max-width: 560px) { .part { grid-template-columns: 38px minmax(0, 1fr) 50px; } .part .min { display: none; } }
+.budget { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: var(--sunk); }
+.budget i { display: block; height: 100%; }
+
+/* тест */
+.q { display: grid; gap: 8px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.q:last-child { border-bottom: 0; }
+.q .opts { display: grid; gap: 6px; }
+.q .opts button { text-align: left; font: 14px/1.4 var(--body); color: var(--ink); background: var(--sunk); border: 1px solid transparent; border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+.q .opts button:hover { border-color: var(--line); }
+.q .opts button.right { background: var(--good-soft); border-color: var(--good); }
+.q .opts button.wrong { background: var(--bad-soft); border-color: var(--bad); }
+.q .why { font-size: 14px; color: var(--muted); }
+
+/* таймер */
+.timer { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: center; }
+.timer .clock { font: 700 clamp(34px, 7vw, 54px)/1 var(--display); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+@media (max-width: 560px) { .timer { grid-template-columns: minmax(0, 1fr); } }
+.chk-in { width: 92px; font-family: var(--mono); font-size: 13px; padding: 5px 7px; }
+.chk-in.ok { border-color: var(--good); background: var(--good-soft); }
+.chk-in.no { border-color: var(--bad); background: var(--bad-soft); }
+
+svg text { font-family: var(--body); }
+.ax { stroke: var(--muted); stroke-width: 1; }
+.grid-l { stroke: var(--line); stroke-width: 1; }
+.lbl { fill: var(--muted); font-size: 11px; }
+.lbl-ink { fill: var(--ink); font-size: 12px; font-weight: 600; }
+.iso { stroke: var(--accent); stroke-width: 2.2; fill: none; }
+.cost { stroke: var(--warn); stroke-width: 1.6; stroke-dasharray: 5 4; fill: none; }
+.ray { stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 2 3; }
+.dotB { fill: var(--bad); } .dotBp { fill: var(--accent); } .dotS { fill: var(--good); } .dotF { fill: var(--warn); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<style>body{margin:0}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="lead">
+      <span class="eyebrow">Advanced Research and Analysis · пересдача</span>
+      <h1>Тренажёр ARA</h1>
+      <div class="chips">
+        <span class="chip hot">пт 09.10 · 18:00</span>
+        <span class="chip">ауд. 105 (Fedotov I.) или 211 (Khokhlova A.) — уточнить слот</span>
+        <span class="chip">open-book онлайн · 120 мин</span>
+        <span class="chip">70 баллов · сдано от 50 с проектами</span>
+      </div>
+    </div>
+    <div class="count">
+      <svg class="frontier-mark" viewBox="0 0 140 70" aria-hidden="true">
+        <polyline class="fl" fill="none" stroke-width="2" points="14,4 22,30 48,48 92,58 136,62"/>
+        <circle class="pe" cx="22" cy="30" r="3"/><circle class="pe" cx="48" cy="48" r="3"/><circle class="pe" cx="92" cy="58" r="3"/>
+        <circle class="pt" cx="60" cy="24" r="2.5"/><circle class="pt" cx="88" cy="36" r="2.5"/><circle class="pt" cx="40" cy="14" r="2.5"/><circle class="pt" cx="118" cy="44" r="2.5"/>
+      </svg>
+      <span class="eyebrow">до начала экзамена</span>
+      <b id="cd">—</b>
+      <span class="small muted" id="sync"></span>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Разделы">
+    <button data-tab="plan" role="tab"><span>00</span>План</button>
+    <button data-tab="t1" role="tab"><span>01</span>DEA-модели</button>
+    <button data-tab="t2" role="tab"><span>02</span>Фаррелл и экономика</button>
+    <button data-tab="t3" role="tab"><span>03</span>DPF и SFA</button>
+    <button data-tab="t4" role="tab"><span>04</span>DEA-кейс</button>
+    <button data-tab="quiz" role="tab"><span>Q</span>Самопроверка</button>
+    <button data-tab="mock" role="tab"><span>120</span>Пробный экзамен</button>
+  </nav>
+
+  <!-- ========== ПЛАН ========== -->
+  <section class="panel" id="tab-plan" role="tabpanel">
+    <div class="grid2">
+      <div class="card">
+        <div class="panel-head">
+          <span class="eyebrow">Как устроен экзамен на самом деле</span>
+          <h2>Четыре части, 70 баллов</h2>
+          <p class="muted small">По вариантам 2019/20 и 23.06.2026 (Fedotov Yu.V.). Баллы совпадают с программой 2024 года, но содержание конкретнее, чем «теория + кейсы».</p>
+        </div>
+        <div class="parts">
+          <div class="part"><span class="n">1</span><div><h4>Performance measurement models</h4><p class="small muted">Для фирмы №5 из таблицы 7 фирм записать технологическое множество T, модели CCR-O, BCC-O и FDH (или объяснить, почему нельзя).</p></div><span class="pts">4×2,5</span><span class="min">12 мин</span></div>
+          <div class="part"><span class="n">2</span><div><h4>Production economics</h4><p class="small muted">2026: граница y = 3x₁ + 5x₂, план и цены → TE, AE, OE с формулами. 2020: функция издержек и economies of scope.</p></div><span class="pts">4×2,5</span><span class="min">12 мин</span></div>
+          <div class="part"><span class="n">3</span><div><h4>DPF и SFA по данным станций</h4><p class="small muted">OLS Cobb–Douglas в логарифмах → DPF методом COLS → TE. В Stata sfcross: exponential, hnormal, tnormal, gamma. Таблицы 1–3, сравнение, выбор модели.</p></div><span class="pts">2×15</span><span class="min">50 мин</span></div>
+          <div class="part"><span class="n">4</span><div><h4>DEA в DEA-Solver</h4><p class="small muted">CCR-I, BCC-I, FDH (в 2020: BCC-O). Ранги, число эффективных, 2 неэффективные DMU по правилу, reference sets, frontier equations, частые пиры, projections. Файлы DEA-Solver приложить.</p></div><span class="pts">20</span><span class="min">40 мин</span></div>
+        </div>
+        <div class="stack">
+          <div class="budget" aria-label="Бюджет времени">
+            <i style="width:10%;background:var(--accent)"></i><i style="width:10%;background:var(--warn)"></i><i style="width:41.7%;background:var(--good)"></i><i style="width:33.3%;background:var(--bad)"></i><i style="width:5%;background:var(--muted)"></i>
+          </div>
+          <p class="small muted">Бюджет на 120 минут: 12 + 12 + 50 + 40 + 6 минут на загрузку файлов в Grade Center.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="panel-head">
+          <span class="eyebrow">Разбор присланных вариантов</span>
+          <h2>Где теряют баллы</h2>
+        </div>
+        <div class="callout bad"><b>Вариант 1 (23.06.2026): 47 баллов, из них 0 из 20 за DEA.</b> Таблица проекций осталась пустой, для неэффективных DMU нет полного разбора. Часть 4 оценивается по файлам и заполненным таблицам, поэтому её нельзя оставлять на последние 10 минут.</div>
+        <ul class="clean small">
+          <li>Части 1 и 2 приносят 20 баллов за ~25 минут. Шаблоны ответов есть во вкладках 01 и 02, их можно отрепетировать до автоматизма.</li>
+          <li>Gamma в sfcross часто не сходится («flat or discontinuous region»). Это нормально: зафиксируйте, объясните, исключите из сравнения. Для gamma нет <code>predict …, bc</code>, только <code>jlms</code>.</li>
+          <li>Если LR-статистика меньше 2,706, SFA не отличается от OLS. Это вывод, его надо написать, а не прятать.</li>
+          <li>Frontier equations в этом курсе записываются через λ: θ·x<sub>o</sub> = Σλ<sub>j</sub>x<sub>j</sub>, y<sub>o</sub> = Σλ<sub>j</sub>y<sub>j</sub>. Для FDH это данные одной доминирующей DMU.</li>
+          <li>Правило выбора 2 неэффективных DMU: сначала FDH-неэффективные (не больше двух), если одна — вторую из BCC-I, если нет — обе из BCC-I.</li>
+        </ul>
+        <div class="callout info small">APIS есть в программе 2024 и в списке ПО, но в вариантах 2020 и 2026 его не было. Читайте его в последнюю очередь: краткая выжимка во вкладке «Фаррелл и экономика».</div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="panel-head">
+          <span class="eyebrow">Чек-лист</span>
+          <h2>Сегодня и завтра</h2>
+          <p class="small muted">Отметки, ответы теста и пробного экзамена сохраняются.</p>
+        </div>
+        <div class="stack" id="checklist"></div>
+      </div>
+      <div class="card">
+        <div class="panel-head">
+          <span class="eyebrow">К 17:45 пятницы</span>
+          <h2>Что открыть до старта</h2>
+        </div>
+        <ol class="steps small">
+          <li>Blackboard: страница курса, шаблон ответа, раздел Grade Center для загрузки. Уточнить аудиторию и слот.</li>
+          <li>Excel с <code>DEA-SOLVER-LV8.xlsm</code>, макросы включены, пробный запуск CCR-I уже сделан на этой машине.</li>
+          <li>Stata с установленным <code>sfcross</code> (<code>ssc install sfcross</code>) и готовым do-файлом из вкладки 03.</li>
+          <li>Эта страница: шаблоны для частей 1–2 и калькуляторы для сверки чисел.</li>
+          <li>Папка для результатов: <code>DEA_CCR-I.xlsx</code>, <code>DEA_BCC-I.xlsx</code>, <code>DEA_FDH.xlsx</code>, <code>TE_results.xlsx</code>, лог Stata.</li>
+        </ol>
+        <div class="row">
+          <span class="small muted">Десятичный разделитель при копировании таблиц:</span>
+          <select id="decSel" style="width:auto"><option value=",">запятая (русский Excel)</option><option value=".">точка</option></select>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== ЧАСТЬ 1 ========== -->
+  <section class="panel" id="tab-t1" role="tabpanel" hidden>
+    <div class="panel-head">
+      <span class="eyebrow">Часть 1 · 10 баллов</span>
+      <h2>Записать DEA-модель для фирмы</h2>
+      <p class="muted">Вставьте таблицу из задания, выберите фирму и модель. Генератор пишет систему ограничений в том виде, в каком её ждут в ответе, и решает её для сверки.</p>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <label class="f">Данные (первая строка: DMU, затем столбцы с префиксами (I) и (O), как в DEA-Solver)
+          <textarea id="t1data" rows="9"></textarea>
+        </label>
+        <div class="fields">
+          <label class="f">Фирма<select id="t1dmu"></select></label>
+          <label class="f">Модель<select id="t1model">
+            <option value="T">Технологическое множество T</option>
+            <option value="CCR-O">CCR-O</option><option value="BCC-O">BCC-O</option><option value="FDH-O">FDH-O</option>
+            <option value="CCR-I">CCR-I</option><option value="BCC-I">BCC-I</option><option value="FDH-I">FDH-I</option>
+            <option value="ALL-O">Весь ответ части 1 (T, CCR-O, BCC-O, FDH)</option>
+          </select></label>
+        </div>
+        <div class="row"><button class="btn small" id="t1reset">Вернуть 7 фирм из экзамена</button></div>
+      </div>
+      <div class="card">
+        <div class="row" style="justify-content:space-between"><h3>Ответ</h3><button class="btn small" id="t1copy">Копировать</button></div>
+        <div class="formula" id="t1out"></div>
+        <div id="t1sol" class="small"></div>
+      </div>
+    </div>
+    <div class="grid3">
+      <div class="card"><h3>Технологическое множество</h3>
+        <div class="formula">T_CCR = {(x,y): Xλ ≤ x, Yλ ≥ y, λ ≥ 0}
+T_BCC = T_CCR + eλ = 1
+T_FDH = T_BCC + λⱼ ∈ {0,1}</div>
+        <p class="small">Вложенность T_FDH ⊆ T_BCC ⊆ T_CCR даёт θ_FDH ≥ θ_BCC ≥ θ_CCR и обратный порядок по числу эффективных DMU.</p>
+      </div>
+      <div class="card"><h3>Ориентация</h3>
+        <p class="small"><b>Input:</b> min θ, Xλ ≤ θx<sub>o</sub>, Yλ ≥ y<sub>o</sub>. Оценка θ* ≤ 1.</p>
+        <p class="small"><b>Output:</b> max η, Xλ ≤ x<sub>o</sub>, Yλ ≥ ηy<sub>o</sub>. η* ≥ 1, оценка эффективности 1/η*.</p>
+        <p class="small">При CRS θ* = 1/η*, при VRS значения могут различаться, но множество эффективных DMU одно и то же.</p>
+      </div>
+      <div class="card"><h3>Можно ли записать FDH?</h3>
+        <p class="small">Да. FDH получается из <b>BCC</b>: условие выпуклости Σλ = 1 сохраняется, а λⱼ ≥ 0 заменяется на λⱼ ∈ {0,1}. Ровно одна λ равна 1, эталоном служит реально наблюдаемая фирма. Это задача смешанного целочисленного программирования. Из CCR FDH не получить: там нет Σλ = 1.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== ЧАСТЬ 2 ========== -->
+  <section class="panel" id="tab-t2" role="tabpanel" hidden>
+    <div class="panel-head">
+      <span class="eyebrow">Часть 2 · 10 баллов</span>
+      <h2>Модель Фаррелла: TE, AE, OE</h2>
+      <p class="muted">По умолчанию загружено задание 23.06.2026. Поменяйте функцию, план или цены и получите все четыре точки, формулы и диаграмму.</p>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="fields">
+          <label class="f">Граница<select id="fkind"><option value="linear">Линейная a₁x₁ + a₂x₂</option><option value="cd">Cobb–Douglas A·x₁^α·x₂^β</option><option value="leon">Леонтьев min(x₁/a, x₂/b)</option></select></label>
+          <label class="f" id="fp1l">a₁<input type="number" id="fp1" step="any" value="3"></label>
+          <label class="f" id="fp2l">a₂<input type="number" id="fp2" step="any" value="5"></label>
+          <label class="f" id="fp3l" hidden>β<input type="number" id="fp3" step="any" value="0.5"></label>
+        </div>
+        <div class="fields">
+          <label class="f">x₁<input type="number" id="fx1" step="any" value="30"></label>
+          <label class="f">x₂<input type="number" id="fx2" step="any" value="15"></label>
+          <label class="f">y<input type="number" id="fy" step="any" value="110"></label>
+          <label class="f">w₁ (цена x₁)<input type="number" id="fw1" step="any" value="7.5"></label>
+          <label class="f">w₂ (цена x₂)<input type="number" id="fw2" step="any" value="15"></label>
+        </div>
+        <div class="row"><button class="btn small" id="fex1">Задание 2026 (линейная)</button><button class="btn small" id="fex2">Пример из лекции (Cobb–Douglas)</button></div>
+        <div id="fres"></div>
+      </div>
+      <div class="card">
+        <svg id="fsvg" viewBox="0 0 460 360" role="img" aria-label="Изокванта, изокоста и точки B, B′, S, F"></svg>
+        <p class="small muted">Красная B — факт, синяя B′ — технически эффективный план на том же луче, зелёная S — минимум издержек, жёлтая F — пересечение минимальной изокосты с лучом OB.</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><h3>Текст ответа (EN)</h3><button class="btn small" id="fcopy">Копировать</button></div>
+      <div class="formula" id="ftext"></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h3>Определения, которые проверяют</h3>
+        <div class="formula">TE = OB′/OB = C(B′)/C(B)       (Farrell, input-oriented)
+AE = OF/OB′ = C(S)/C(B′)
+OE = OF/OB  = C(S)/C(B) = TE × AE</div>
+        <ul class="clean small">
+          <li>План технически неэффективен, если f(x) &gt; y: из тех же ресурсов можно выпустить больше.</li>
+          <li>Линейная граница (совершенные субституты): минимум издержек в углу, сравниваем w₁/a₁ и w₂/a₂.</li>
+          <li>Cobb–Douglas: MRTS = (α·x₂)/(β·x₁) = w₁/w₂ ⇒ x₂/x₁ = β·w₁/(α·w₂).</li>
+          <li>Леонтьев: AE = 1 только если факт на луче вершины; оптимум x₁ = a·y, x₂ = b·y.</li>
+        </ul>
+        <div class="callout small">В лекции 1 (слайды 78–81) в условии w₁ = $1, w₂ = $4, но решение (S = (10; 40), изокоста x₂ = −4x₁ + 80, AE = 0,899) соответствует w₁ = 4, w₂ = 1. Кнопка «Пример из лекции» использует цены, при которых ответ совпадает со слайдами.</div>
+      </div>
+      <div class="card">
+        <h3>Distance functions и отдача от масштаба</h3>
+        <div class="formula">Dᵢ(y,x) = max{λ: x/λ ∈ L(y)} ≥ 1,   TE_input = 1/Dᵢ
+Dₒ(x,y) = min{μ: y/μ ∈ P(x)} ≤ 1,   TE_output = Dₒ
+CRS: Dᵢ = 1/Dₒ</div>
+        <ul class="clean small">
+          <li>Dᵢ убывает по y, растёт по x, однородна степени 1 по x, вогнута по x. Isoq L(y) = {x: Dᵢ = 1}.</li>
+          <li>Cobb–Douglas y = A∏xᵢ^αᵢ: Σαᵢ = 1 — CRS, &gt; 1 — IRS, &lt; 1 — DRS. Коэффициенты ln–ln модели — эластичности выпуска.</li>
+          <li>Пример 2026: 0,153 + 0,543 = 0,696 &lt; 1 ⇒ убывающая отдача.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h3>Economies of scope (вариант 2020)</h3>
+        <div class="formula">SC = [C(q₁,0) + C(0,q₂) − C(q₁,q₂)] / C(q₁,q₂)
+SC &gt; 0 — economies of scope, SC &lt; 0 — diseconomies
+Cost complementarity: ∂²C/∂qᵢ∂qⱼ &lt; 0 ⇒ economies of scope</div>
+        <ol class="steps small">
+          <li>Проверьте, что C однородна степени 1 по ценам: сумма степеней wᵢ должна быть 1. В задаче 2020: 0,3 + 0,5 + 0,8 + 0,2 = 1,8, это нарушение свойства функции издержек, его стоит отметить.</li>
+          <li>Для каждой пары продуктов посчитайте ∂²C/∂qᵢ∂qⱼ. Слагаемые, которые не содержат обоих qᵢ и qⱼ, дают ноль: такая пара не связана в издержках.</li>
+          <li>Если продукт стоит с отрицательной степенью (q³⁻⁰·¹), C(…, qⱼ = 0, …) не определена или бесконечна: выпускать его партнёра отдельно невозможно, совместное производство обязательно.</li>
+          <li>Аддитивно разделимые группы продуктов (C = g(w)·[h₁(q₁,q₃) + h₂(q₂)]) дают нулевую комплементарность между группами: экономии от разнообразия между ними нет, если нет общих постоянных издержек.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>APIS кратко (в 2020 и 2026 не встречался)</h3>
+        <ul class="clean small">
+          <li>Метод агрегированных индексов Хованова: показатели → нормированные частные индексы qᵢ ∈ [0,1] → сводный индекс Q = Σwᵢqᵢ.</li>
+          <li>Нормировка: «больше — лучше» qᵢ = (xᵢ − min)/(max − min), «меньше — лучше» qᵢ = (max − xᵢ)/(max − min).</li>
+          <li>Веса при нечисловой, неточной, неполной (ННН) информации: множество допустимых весов на сетке с шагом 1/n, например w₁ ≥ w₂ = w₃. Веса считаются случайными и равномерно распределёнными на этом множестве.</li>
+          <li>Результат: ожидаемые веса w̄ᵢ, средний индекс Q̄ и его стандартное отклонение по каждой альтернативе, вероятность доминирования P(Q̃ₐ &gt; Q̃ᵦ) как надёжность ранжирования.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== ЧАСТЬ 3 ========== -->
+  <section class="panel" id="tab-t3" role="tabpanel" hidden>
+    <div class="panel-head">
+      <span class="eyebrow">Часть 3 · 30 баллов</span>
+      <h2>Average PF → DPF → SFA</h2>
+      <p class="muted">Вставьте выборку (в экзамене она уже в натуральных логарифмах), выберите столбцы. Страница считает OLS, COLS-границу и три SFA-модели методом максимального правдоподобия, чтобы сверить ваш вывод Stata.</p>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <label class="f">Данные (первая строка — заголовки)
+          <textarea id="t3data" rows="10"></textarea>
+        </label>
+        <div class="row">
+          <button class="btn small" id="t3hps">82 станции HPS (ln, из файла курса)</button>
+          <button class="btn small" id="t3var2">Вариант 2 от 23.06.2026 (50 станций)</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="fields">
+          <label class="f">ln y (выпуск)<select id="t3y"></select></label>
+          <label class="f">ln x₁<select id="t3x1"></select></label>
+          <label class="f">ln x₂<select id="t3x2"></select></label>
+        </div>
+        <label class="check"><input type="checkbox" id="t3log"> Данные в уровнях — взять ln</label>
+        <label class="check"><input type="checkbox" id="t3cost"> Граница издержек (cost frontier)</label>
+        <div class="row"><button class="btn primary" id="t3run">Рассчитать</button><span id="t3status" class="small muted"></span></div>
+        <div class="callout info small">Gamma в браузере не считается: в Stata она оценивается симулированным правдоподобием и часто не сходится. Остальные модели совпадают с Stata до 2–3 знака; у tnormal μ определяется слабо, расхождение может быть больше.</div>
+      </div>
+    </div>
+    <div id="t3out" class="stack" style="gap:18px"></div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><h3>Do-файл для Stata</h3><button class="btn small" id="t3docopy">Копировать</button></div>
+      <p class="small muted">Имена переменных берутся из заголовков выше. Данные вставьте в Data Editor (Ctrl+V с первой строкой как именами).</p>
+      <div class="formula" id="t3do"></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h3>Что писать в выводах</h3>
+        <ul class="clean small">
+          <li><b>Average PF:</b> коэффициенты ln–ln — эластичности, их сумма даёт отдачу от масштаба. R², F, t-статистики.</li>
+          <li><b>DPF (COLS):</b> к константе прибавляется max OLS-остаток; TEᵢ = exp(eᵢ − max e), одна станция ровно на границе. Всё отклонение считается неэффективностью, граница держится на одном выбросе.</li>
+          <li><b>SFA:</b> ε = v − u, v ~ N(0,σᵥ²) шум, u ≥ 0 неэффективность. λ = σᵤ/σᵥ, γ = σᵤ²/(σᵤ²+σᵥ²).</li>
+          <li><b>Проверка наличия неэффективности:</b> асимметрия OLS-остатков должна быть отрицательной (sktest); LR = 2(lnL_SFA − lnL_OLS) против критического 2,706 (смесь ½χ²(0) + ½χ²(1), 5%).</li>
+          <li><b>TE:</b> bc = E[exp(−u)|ε] (Battese–Coelli), jlms = exp(−E[u|ε]). Обе — выходно-ориентированные.</li>
+          <li><b>Согласованность:</b> ранговая корреляция Спирмена между TE моделей. Уровни отличаются, ранги обычно почти совпадают.</li>
+          <li><b>Выбор модели:</b> SFA предпочтительнее DPF по сути (шум отделён). Среди распределений — по lnL/AIC и значимости σᵤ; half-normal и exponential устойчивее, tnormal и gamma слабо идентифицируются.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Wrong skewness</h3>
+        <p class="small">Если остатки OLS имеют положительную асимметрию (для границы производства), ML-оценка σᵤ уходит в ноль и SFA совпадает с OLS (результат Waldman, 1982). В варианте 2 так и вышло: асимметрия около нуля, LR ≈ 0,01, σᵤ незначима. Правильный ответ — признать, что неэффективность статистически не выделяется, и всё равно выбрать модель с обоснованием.</p>
+        <h3>sfcross: короткая памятка</h3>
+        <div class="formula">sfcross lny lnx1 lnx2, distribution(hnormal)
+predict te_hn, bc        // E[exp(-u)|e]
+predict u_hn, u          // E[u|e], JLMS
+predict tej_hn, jlms     // exp(-E[u|e])
+* cost-граница: опция cost
+* gamma: bc нельзя, только u / jlms</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== ЧАСТЬ 4 ========== -->
+  <section class="panel" id="tab-t4" role="tabpanel" hidden>
+    <div class="panel-head">
+      <span class="eyebrow">Часть 4 · 20 баллов</span>
+      <h2>DEA-кейс как в DEA-Solver</h2>
+      <p class="muted">Вставьте лист данных DEA-Solver. Считаются CCR, BCC (обе ориентации) и FDH с двухфазной процедурой слэков; результаты повторяют листы Score, Rank, Projection.</p>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <label class="f">Данные в формате DEA-Solver: DMU, (I)…, (O)…
+          <textarea id="t4data" rows="10"></textarea>
+        </label>
+        <div class="row">
+          <button class="btn small" id="t4hps">82 станции HPS</button>
+          <button class="btn small" id="t4firms">7 фирм из части 1</button>
+          <button class="btn small" id="t4hosp">12 больниц (Cooper–Seiford–Tone)</button>
+        </div>
+      </div>
+      <div class="card">
+        <ol class="steps small">
+          <li>Откройте <code>DEA-SOLVER-LV8.xlsm</code>, включите макросы.</li>
+          <li>Лист данных: A1 — название задачи, B1… заголовки с префиксами <code>(I)</code>/<code>(O)</code>, со 2-й строки DMU. Без пустых ячеек, нулей во входах и текста в числах.</li>
+          <li>Start DEA-Solver → модель (CCR → CCR-I, BCC → BCC-I, FDH) → файл данных → новая книга для результатов. Каждую модель сохраняйте отдельным файлом.</li>
+          <li>Листы результата: Summary, Score (оценка, ранг, reference set с λ), Rank, Weight, Slack, Projection.</li>
+          <li>Файлы приложите к ответу в Blackboard, без них часть 4 не засчитывают.</li>
+        </ol>
+        <div class="row"><button class="btn primary" id="t4run">Рассчитать</button><span id="t4status" class="small muted"></span></div>
+      </div>
+    </div>
+    <div id="t4out" class="stack" style="gap:18px"></div>
+  </section>
+
+  <!-- ========== ТЕСТ ========== -->
+  <section class="panel" id="tab-quiz" role="tabpanel" hidden>
+    <div class="panel-head">
+      <span class="eyebrow">Самопроверка</span>
+      <h2>Вопросы по всем частям</h2>
+      <p class="muted">Нажмите вариант, и сразу увидите правильный ответ с пояснением. <span id="qscore" class="pill acc"></span></p>
+    </div>
+    <div class="row"><button class="btn small" id="qshuffle">Перемешать и начать заново</button></div>
+    <div class="card" id="qlist"></div>
+  </section>
+
+  <!-- ========== ПРОБНЫЙ ЭКЗАМЕН ========== -->
+  <section class="panel" id="tab-mock" role="tabpanel" hidden>
+    <div class="panel-head">
+      <span class="eyebrow">Генерал-репетиция</span>
+      <h2>Пробный экзамен на 120 минут</h2>
+      <p class="muted">Каждый вариант собирается из данных курса: 7 фирм, задача Фаррелла, 50 станций для SFA и 50 для DEA. Считайте в Stata и DEA-Solver, вводите ключевые числа и проверяйте.</p>
+    </div>
+    <div class="card">
+      <div class="timer">
+        <div class="clock" id="mclock">120:00</div>
+        <div class="stack">
+          <div class="budget" id="mbar"></div>
+          <div class="row">
+            <button class="btn primary" id="mstart">Старт</button>
+            <button class="btn" id="mpause">Пауза</button>
+            <button class="btn" id="mreset">Сбросить</button>
+            <span class="small muted" id="mphase"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <button class="btn primary" id="mnew">Новый вариант</button>
+      <span class="small muted" id="mseed"></span>
+    </div>
+    <div id="mout" class="stack" style="gap:18px"></div>
+  </section>
+</div>
+<script>
+/* ===== Чистые расчётные функции: LP-симплекс, DEA, SFA, APIS ===== */
+const LP_EPS = 1e-9;
+
+// maximize c·x, x >= 0, rows A_i·x (<=|>=|=) b_i. Двухфазный симплекс, правило Бленда.
+function simplex(c, A, b, types) {
+  const m = A.length, n = c.length;
+  A = A.map(r => r.slice()); b = b.slice(); types = types.slice();
+  for (let i = 0; i < m; i++) if (b[i] < 0) {
+    A[i] = A[i].map(v => -v); b[i] = -b[i];
+    types[i] = types[i] === '<=' ? '>=' : types[i] === '>=' ? '<=' : '=';
+  }
+  let nS = 0, nA = 0;
+  for (const t of types) { if (t !== '=') nS++; if (t !== '<=') nA++; }
+  const N = n + nS + nA, T = [], basis = [];
+  let si = n, ai = n + nS;
+  for (let i = 0; i < m; i++) {
+    const row = new Float64Array(N + 1);
+    for (let j = 0; j < n; j++) row[j] = A[i][j];
+    row[N] = b[i];
+    if (types[i] === '<=') { row[si] = 1; basis.push(si++); }
+    else if (types[i] === '>=') { row[si++] = -1; row[ai] = 1; basis.push(ai++); }
+    else { row[ai] = 1; basis.push(ai++); }
+    T.push(row);
+  }
+  const isArt = j => j >= n + nS;
+  function pivot(r, col) {
+    const pr = T[r], pv = pr[col];
+    for (let j = 0; j <= N; j++) pr[j] /= pv;
+    for (let i = 0; i < m; i++) {
+      if (i === r) continue;
+      const f = T[i][col];
+      if (f !== 0) { const row = T[i]; for (let j = 0; j <= N; j++) row[j] -= f * pr[j]; }
+    }
+    basis[r] = col;
+  }
+  function run(cost, allowed) {
+    for (let it = 0; it < 20000; it++) {
+      let enter = -1;
+      for (let j = 0; j < N && enter < 0; j++) {
+        if (!allowed(j) || basis.includes(j)) continue;
+        let d = cost[j];
+        for (let i = 0; i < m; i++) d -= cost[basis[i]] * T[i][j];
+        if (d > 1e-10) enter = j;
+      }
+      if (enter < 0) return 'optimal';
+      let leave = -1, best = Infinity;
+      for (let i = 0; i < m; i++) {
+        const a = T[i][enter];
+        if (a > LP_EPS) {
+          const r = T[i][N] / a;
+          if (r < best - 1e-12 || (Math.abs(r - best) <= 1e-12 && basis[i] < basis[leave])) { best = r; leave = i; }
+        }
+      }
+      if (leave < 0) return 'unbounded';
+      pivot(leave, enter);
+    }
+    return 'iterlimit';
+  }
+  if (nA > 0) {
+    const c1 = new Array(N).fill(0);
+    for (let j = n + nS; j < N; j++) c1[j] = -1;
+    run(c1, () => true);
+    for (let i = 0; i < m; i++) if (isArt(basis[i]) && T[i][N] > 1e-7) return { status: 'infeasible' };
+    for (let i = 0; i < m; i++) if (isArt(basis[i])) {
+      for (let j = 0; j < n + nS; j++) if (Math.abs(T[i][j]) > 1e-9) { pivot(i, j); break; }
+    }
+  }
+  const c2 = new Array(N).fill(0);
+  for (let j = 0; j < n; j++) c2[j] = c[j];
+  const st = run(c2, j => !isArt(j));
+  if (st !== 'optimal') return { status: st };
+  const x = new Array(n).fill(0);
+  for (let i = 0; i < m; i++) if (basis[i] < n) x[basis[i]] = T[i][N];
+  let obj = 0; for (let j = 0; j < n; j++) obj += c[j] * x[j];
+  return { status: 'optimal', x, obj };
+}
+
+const unit = (k, i) => { const a = new Array(k).fill(0); a[i] = 1; return a; };
+const zeros = k => new Array(k).fill(0);
+
+// Огибающая модель (envelopment) + фаза 2 (максимизация слэков). X: m×n, Y: s×n.
+function deaEnvelop(X, Y, o, rts, orient) {
+  const m = X.length, s = Y.length, n = X[0].length;
+  const A = [], b = [], t = [], c = zeros(n + 1);
+  if (orient === 'I') {
+    c[0] = -1;
+    for (let i = 0; i < m; i++) { A.push([-X[i][o], ...X[i]]); b.push(0); t.push('<='); }
+    for (let r = 0; r < s; r++) { A.push([0, ...Y[r]]); b.push(Y[r][o]); t.push('>='); }
+  } else {
+    c[0] = 1;
+    for (let i = 0; i < m; i++) { A.push([0, ...X[i]]); b.push(X[i][o]); t.push('<='); }
+    for (let r = 0; r < s; r++) { A.push([-Y[r][o], ...Y[r]]); b.push(0); t.push('>='); }
+  }
+  if (rts === 'vrs') { A.push([0, ...new Array(n).fill(1)]); b.push(1); t.push('='); }
+  const p1 = simplex(c, A, b, t);
+  if (p1.status !== 'optimal') return null;
+  const phi = p1.x[0];
+  const A2 = [], b2 = [], t2 = [];
+  for (let i = 0; i < m; i++) { A2.push([...X[i], ...unit(m, i), ...zeros(s)]); b2.push(orient === 'I' ? phi * X[i][o] : X[i][o]); t2.push('='); }
+  for (let r = 0; r < s; r++) { A2.push([...Y[r], ...zeros(m), ...unit(s, r).map(v => -v)]); b2.push(orient === 'I' ? Y[r][o] : phi * Y[r][o]); t2.push('='); }
+  if (rts === 'vrs') { A2.push([...new Array(n).fill(1), ...zeros(m + s)]); b2.push(1); t2.push('='); }
+  const p2 = simplex([...zeros(n), ...new Array(m + s).fill(1)], A2, b2, t2);
+  const sol = p2.status === 'optimal' ? p2.x : [...p1.x.slice(1), ...zeros(m + s)];
+  return { phi, lambda: sol.slice(0, n), sm: sol.slice(n, n + m), sp: sol.slice(n + m) };
+}
+
+// Мультипликаторная модель (веса). Конвенция Cooper–Seiford–Tone:
+// I: max u·y_o − u0, v·x_o = 1, u·y_j − v·x_j − u0 <= 0  → граница u·y − v·x − u0 = 0
+// O: min v·x_o − v0, u·y_o = 1, v·x_j − u·y_j − v0 >= 0  → граница v·x − u·y − v0 = 0
+function deaMultiplier(X, Y, o, rts, orient) {
+  const m = X.length, s = Y.length, n = X[0].length, vrs = rts === 'vrs';
+  const nv = m + s + (vrs ? 2 : 0), A = [], b = [], t = [], c = zeros(nv);
+  if (orient === 'I') {
+    for (let r = 0; r < s; r++) c[m + r] = Y[r][o];
+    if (vrs) { c[m + s] = -1; c[m + s + 1] = 1; }
+    A.push([...X.map(row => row[o]), ...zeros(s), ...(vrs ? [0, 0] : [])]); b.push(1); t.push('=');
+    for (let j = 0; j < n; j++) { A.push([...X.map(row => -row[j]), ...Y.map(row => row[j]), ...(vrs ? [-1, 1] : [])]); b.push(0); t.push('<='); }
+  } else {
+    for (let i = 0; i < m; i++) c[i] = -X[i][o];
+    if (vrs) { c[m + s] = 1; c[m + s + 1] = -1; }
+    A.push([...zeros(m), ...Y.map(row => row[o]), ...(vrs ? [0, 0] : [])]); b.push(1); t.push('=');
+    for (let j = 0; j < n; j++) { A.push([...X.map(row => row[j]), ...Y.map(row => -row[j]), ...(vrs ? [-1, 1] : [])]); b.push(0); t.push('>='); }
+  }
+  const p = simplex(c, A, b, t);
+  if (p.status !== 'optimal') return null;
+  return { v: p.x.slice(0, m), u: p.x.slice(m, m + s), w0: vrs ? p.x[m + s] - p.x[m + s + 1] : 0 };
+}
+
+// FDH перебором доминирующих DMU
+function deaFDH(X, Y, o, orient) {
+  const m = X.length, s = Y.length, n = X[0].length;
+  let best = null, bj = -1, bslack = -1;
+  for (let j = 0; j < n; j++) {
+    let val, ok = true;
+    if (orient === 'I') {
+      for (let r = 0; r < s; r++) if (Y[r][j] < Y[r][o] - 1e-12) ok = false;
+      if (!ok) continue;
+      val = Math.max(...X.map(row => row[j] / row[o]));
+      if (best === null || val < best - 1e-12 || (Math.abs(val - best) <= 1e-12 && slackSum(j, val) > bslack)) { best = val; bj = j; bslack = slackSum(j, val); }
+    } else {
+      for (let i = 0; i < m; i++) if (X[i][j] > X[i][o] + 1e-12) ok = false;
+      if (!ok) continue;
+      val = Math.min(...Y.map(row => row[o] > 0 ? row[j] / row[o] : Infinity));
+      if (best === null || val > best + 1e-12 || (Math.abs(val - best) <= 1e-12 && slackSum(j, val) > bslack)) { best = val; bj = j; bslack = slackSum(j, val); }
+    }
+  }
+  function slackSum(j, v) {
+    let sum = 0;
+    if (orient === 'I') { for (let i = 0; i < m; i++) sum += (v * X[i][o] - X[i][j]) / X[i][o]; for (let r = 0; r < s; r++) sum += Y[r][o] ? (Y[r][j] - Y[r][o]) / Y[r][o] : 0; }
+    else { for (let i = 0; i < m; i++) sum += (X[i][o] - X[i][j]) / X[i][o]; for (let r = 0; r < s; r++) sum += Y[r][o] ? (Y[r][j] - v * Y[r][o]) / Y[r][o] : 0; }
+    return sum;
+  }
+  const lambda = zeros(n); lambda[bj] = 1;
+  const sm = X.map(row => (orient === 'I' ? best * row[o] : row[o]) - row[bj]);
+  const sp = Y.map(row => row[bj] - (orient === 'I' ? row[o] : best * row[o]));
+  return { phi: best, lambda, sm, sp };
+}
+
+const DEA_MODELS = ['CCR-I', 'CCR-O', 'BCC-I', 'BCC-O', 'FDH-I', 'FDH-O'];
+
+// data: {names, inNames, outNames, X (m×n), Y (s×n)} в исходных единицах
+function deaSolveAll(data, withWeights) {
+  const { X, Y } = data, n = X[0].length;
+  const mx = X.map(r => r.reduce((a, v) => a + v, 0) / n || 1);
+  const my = Y.map(r => r.reduce((a, v) => a + v, 0) / n || 1);
+  const Xs = X.map((r, i) => r.map(v => v / mx[i])), Ys = Y.map((r, k) => r.map(v => v / my[k]));
+  const out = {};
+  for (const model of DEA_MODELS) {
+    const [kind, orient] = model.split('-');
+    out[model] = [];
+    for (let o = 0; o < n; o++) {
+      let res;
+      if (kind === 'FDH') res = deaFDH(X, Y, o, orient);
+      else {
+        const rts = kind === 'CCR' ? 'crs' : 'vrs';
+        const e = deaEnvelop(Xs, Ys, o, rts, orient);
+        if (!e) { out[model].push(null); continue; }
+        const w = withWeights ? deaMultiplier(Xs, Ys, o, rts, orient) : null;
+        res = { phi: e.phi, lambda: e.lambda, sm: e.sm.map((v, i) => v * mx[i]), sp: e.sp.map((v, k) => v * my[k]) };
+        if (w) res.w = { v: w.v.map((v, i) => v / mx[i]), u: w.u.map((u, k) => u / my[k]), w0: w.w0 };
+      }
+      if (!res) { out[model].push(null); continue; }
+      res.score = orient === 'I' ? res.phi : 1 / res.phi;
+      res.proj = {
+        x: X.map((row, i) => (orient === 'I' ? res.phi * row[o] : row[o]) - res.sm[i]),
+        y: Y.map((row, k) => (orient === 'I' ? row[o] : res.phi * row[o]) + res.sp[k])
+      };
+      out[model].push(clean(res));
+    }
+  }
+  return out;
+  function clean(r) {
+    const z = v => Math.abs(v) < 1e-9 ? 0 : v;
+    r.lambda = r.lambda.map(z); r.sm = r.sm.map(z); r.sp = r.sp.map(z);
+    return r;
+  }
+}
+
+function rankDesc(scores) {
+  return scores.map(s => s == null ? null : 1 + scores.filter(t => t != null && t > s + 1e-6).length);
+}
+function avgRanks(v) {
+  const idx = v.map((x, i) => i).sort((a, b) => v[b] - v[a]);
+  const r = new Array(v.length);
+  for (let i = 0; i < idx.length;) {
+    let j = i; while (j + 1 < idx.length && Math.abs(v[idx[j + 1]] - v[idx[i]]) < 1e-6) j++;
+    for (let k = i; k <= j; k++) r[idx[k]] = (i + j) / 2 + 1;
+    i = j + 1;
+  }
+  return r;
+}
+function spearman(a, b) {
+  const ra = avgRanks(a), rb = avgRanks(b), n = a.length;
+  const ma = ra.reduce((s, v) => s + v, 0) / n, mb = rb.reduce((s, v) => s + v, 0) / n;
+  let num = 0, da = 0, db = 0;
+  for (let i = 0; i < n; i++) { num += (ra[i] - ma) * (rb[i] - mb); da += (ra[i] - ma) ** 2; db += (rb[i] - mb) ** 2; }
+  return da && db ? num / Math.sqrt(da * db) : 1;
+}
+
+/* ---------- SFA: half-normal stochastic frontier, ML ---------- */
+function logErfc(x) {
+  if (x >= 0) {
+    const t = 1 / (1 + 0.5 * x);
+    return Math.log(t) + (-x * x - 1.26551223 + t * (1.00002368 + t * (0.37409196 + t * (0.09678418 + t * (-0.18628806 + t * (0.27886807 + t * (-1.13520398 + t * (1.48851587 + t * (-0.82215223 + t * 0.17087277)))))))));
+  }
+  return Math.log(2 - Math.exp(logErfc(-x)));
+}
+const logPhi = z => Math.log(0.5) + logErfc(-z / Math.SQRT2);
+const Phi = z => Math.exp(logPhi(z));
+const phi = z => Math.exp(-0.5 * z * z) / Math.sqrt(2 * Math.PI);
+
+function solveLinear(M, v) {
+  const n = M.length, A = M.map((r, i) => [...r, v[i]]);
+  for (let c = 0; c < n; c++) {
+    let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
+    if (Math.abs(A[p][c]) < 1e-14) return null;
+    [A[c], A[p]] = [A[p], A[c]];
+    for (let r = 0; r < n; r++) if (r !== c) { const f = A[r][c] / A[c][c]; for (let k = c; k <= n; k++) A[r][k] -= f * A[c][k]; }
+  }
+  return A.map((r, i) => r[n] / r[i]);
+}
+function invert(M) {
+  const n = M.length, cols = [];
+  for (let j = 0; j < n; j++) { const c = solveLinear(M, unit(n, j)); if (!c) return null; cols.push(c); }
+  return M.map((_, i) => cols.map(c => c[i]));
+}
+function ols(y, X) {
+  const k = X[0].length, n = y.length;
+  const XtX = Array.from({ length: k }, (_, a) => Array.from({ length: k }, (_, b) => X.reduce((s, r) => s + r[a] * r[b], 0)));
+  const Xty = Array.from({ length: k }, (_, a) => X.reduce((s, r, i) => s + r[a] * y[i], 0));
+  const beta = solveLinear(XtX, Xty);
+  const e = y.map((yi, i) => yi - X[i].reduce((s, x, j) => s + x * beta[j], 0));
+  const ssr = e.reduce((s, v) => s + v * v, 0);
+  const inv = invert(XtX), s2 = ssr / (n - k);
+  return { beta, e, ssr, se: inv ? inv.map((r, i) => Math.sqrt(r[i] * s2)) : null, ll: -n / 2 * (Math.log(2 * Math.PI) + Math.log(ssr / n) + 1) };
+}
+function nelderMead(f, x0, maxIt) {
+  const n = x0.length;
+  let S = [x0.slice()];
+  for (let i = 0; i < n; i++) { const x = x0.slice(); x[i] += Math.abs(x[i]) > 0.05 ? 0.1 * x[i] : 0.05; S.push(x); }
+  let F = S.map(f);
+  for (let it = 0; it < maxIt; it++) {
+    const idx = [...S.keys()].sort((a, b) => F[a] - F[b]);
+    S = idx.map(i => S[i]); F = idx.map(i => F[i]);
+    if (Math.abs(F[n] - F[0]) < 1e-12 * (1 + Math.abs(F[0]))) break;
+    const c = zeros(n);
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) c[j] += S[i][j] / n;
+    const xr = c.map((v, j) => 2 * v - S[n][j]), fr = f(xr);
+    if (fr < F[0]) {
+      const xe = c.map((v, j) => 3 * v - 2 * S[n][j]), fe = f(xe);
+      if (fe < fr) { S[n] = xe; F[n] = fe; } else { S[n] = xr; F[n] = fr; }
+    } else if (fr < F[n - 1]) { S[n] = xr; F[n] = fr; }
+    else {
+      const outside = fr < F[n];
+      const xc = outside ? c.map((v, j) => v + 0.5 * (xr[j] - v)) : c.map((v, j) => v + 0.5 * (S[n][j] - v));
+      const fc = f(xc);
+      if (fc < (outside ? fr : F[n])) { S[n] = xc; F[n] = fc; }
+      else for (let i = 1; i <= n; i++) { S[i] = S[i].map((v, j) => S[0][j] + 0.5 * (v - S[0][j])); F[i] = f(S[i]); }
+    }
+  }
+  let bi = 0; for (let i = 1; i <= n; i++) if (F[i] < F[bi]) bi = i;
+  return { x: S[bi], f: F[bi] };
+}
+
+const pNormal2 = z => Math.exp(logErfc(Math.abs(z) / Math.SQRT2));
+function lgamma(x) {
+  const g = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+  let y = x, tmp = x + 5.5; tmp -= (x + 0.5) * Math.log(tmp);
+  let ser = 1.000000000190015; for (const c of g) ser += c / ++y;
+  return -tmp + Math.log(2.5066282746310005 * ser / x);
+}
+function betacf(a, b, x) {
+  let qab = a + b, qap = a + 1, qam = a - 1, c = 1, d = 1 - qab * x / qap;
+  if (Math.abs(d) < 1e-30) d = 1e-30; d = 1 / d; let h = d;
+  for (let m = 1; m <= 300; m++) {
+    const m2 = 2 * m; let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+    d = 1 + aa * d; if (Math.abs(d) < 1e-30) d = 1e-30; c = 1 + aa / c; if (Math.abs(c) < 1e-30) c = 1e-30; d = 1 / d; h *= d * c;
+    aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+    d = 1 + aa * d; if (Math.abs(d) < 1e-30) d = 1e-30; c = 1 + aa / c; if (Math.abs(c) < 1e-30) c = 1e-30; d = 1 / d;
+    const del = d * c; h *= del; if (Math.abs(del - 1) < 3e-14) break;
+  }
+  return h;
+}
+function ibeta(x, a, b) {
+  if (x <= 0) return 0; if (x >= 1) return 1;
+  const bt = Math.exp(lgamma(a + b) - lgamma(a) - lgamma(b) + a * Math.log(x) + b * Math.log(1 - x));
+  return x < (a + 1) / (a + b + 2) ? bt * betacf(a, b, x) / a : 1 - bt * betacf(b, a, 1 - x) / b;
+}
+const pStudent2 = (t, df) => ibeta(df / (df + t * t), df / 2, 0.5);
+const pF = (F, d1, d2) => ibeta(d2 / (d2 + d1 * F), d2 / 2, d1 / 2);
+
+// Полная OLS-статистика (как в Excel «Регрессия» / Stata regress)
+function olsFull(y, X) {
+  const o = ols(y, X), n = y.length, k = X[0].length, df = n - k;
+  const my = y.reduce((s, v) => s + v, 0) / n, sst = y.reduce((s, v) => s + (v - my) ** 2, 0);
+  const r2 = 1 - o.ssr / sst, adj = 1 - (1 - r2) * (n - 1) / df, F = ((sst - o.ssr) / (k - 1)) / (o.ssr / df);
+  const t = o.beta.map((b, i) => b / o.se[i]);
+  return { ...o, n, k, df, r2, adj, F, pFstat: pF(F, k - 1, df), t, p: t.map(v => pStudent2(v, df)), s: Math.sqrt(o.ssr / df) };
+}
+
+// Детерминированная граница (COLS): сдвиг константы на max остаток, TE = exp(e − max e)
+function dpfCols(y, X, cost) {
+  const o = olsFull(y, X);
+  const sg = cost ? -1 : 1;
+  const es = o.e.map(e => sg * e), shift = Math.max(...es), imax = es.indexOf(shift);
+  const te = es.map(e => Math.exp(e - shift));
+  return { ols: o, shift: sg * shift, imax, a0: o.beta[0] + sg * shift, te, u: te.map(v => -Math.log(v)) };
+}
+
+// Тест асимметрии D'Agostino (как Pr(Skewness) в Stata sktest)
+function skewTest(e) {
+  const n = e.length, m = e.reduce((s, v) => s + v, 0) / n;
+  const m2 = e.reduce((s, v) => s + (v - m) ** 2, 0) / n, m3 = e.reduce((s, v) => s + (v - m) ** 3, 0) / n;
+  const b1 = m3 / Math.pow(m2, 1.5);
+  const Y = b1 * Math.sqrt((n + 1) * (n + 3) / (6 * (n - 2)));
+  const B2 = 3 * (n * n + 27 * n - 70) * (n + 1) * (n + 3) / ((n - 2) * (n + 5) * (n + 7) * (n + 9));
+  const W2 = -1 + Math.sqrt(2 * (B2 - 1)), delta = 1 / Math.sqrt(Math.log(Math.sqrt(W2))), alpha = Math.sqrt(2 / (W2 - 1));
+  const Z = delta * Math.log(Y / alpha + Math.sqrt((Y / alpha) ** 2 + 1));
+  return { skew: b1, z: Z, p2: pNormal2(Z), pLeft: Phi(Z) };
+}
+
+// Стохастическая граница: dist = 'hnormal' | 'exponential' | 'tnormal'. Параметры: β, [μ], ln σv², ln σu²
+function sfaFit(y, X, dist, cost) {
+  const n = y.length, k = X[0].length, sg = cost ? -1 : 1, tn = dist === 'tnormal';
+  const o = ols(y, X);
+  const m2 = o.e.reduce((s, v) => s + v * v, 0) / n, m3 = o.e.reduce((s, v) => s + v ** 3, 0) / n;
+  const c3 = Math.sqrt(2 / Math.PI) * (4 / Math.PI - 1);
+  let su = sg * m3 < 0 ? Math.cbrt(-sg * m3 / c3) : 0.2 * Math.sqrt(m2);
+  if (dist === 'exponential') su = sg * m3 < 0 ? Math.cbrt(-sg * m3 / 2) : 0.2 * Math.sqrt(m2);
+  let sv2 = m2 - (dist === 'exponential' ? 1 : (1 - 2 / Math.PI)) * su * su;
+  if (sv2 <= 0.05 * m2) sv2 = 0.3 * m2;
+  const Eu = dist === 'exponential' ? su : su * Math.sqrt(2 / Math.PI);
+  const start = o.beta.slice(); start[0] += sg * Eu;
+  if (tn) start.push(0);
+  start.push(Math.log(sv2), Math.log(su * su));
+  const iv = k + (tn ? 1 : 0);
+  const resid = (p, i) => { let e = y[i]; for (let j = 0; j < k; j++) e -= X[i][j] * p[j]; return sg * e; };
+  const nll = p => {
+    const sv2 = Math.exp(p[iv]), su2 = Math.exp(p[iv + 1]), sv = Math.sqrt(sv2), su = Math.sqrt(su2);
+    const s2 = sv2 + su2, s = Math.sqrt(s2), lam = su / sv, mu = tn ? p[k] : 0;
+    let ll = 0;
+    for (let i = 0; i < n; i++) {
+      const e = resid(p, i);
+      if (dist === 'hnormal') ll += 0.5 * Math.log(2 / Math.PI) - Math.log(s) + logPhi(-e * lam / s) - e * e / (2 * s2);
+      else if (dist === 'exponential') ll += -Math.log(su) + sv2 / (2 * su2) + e / su + logPhi(-e / sv - sv / su);
+      else ll += -0.5 * Math.log(2 * Math.PI) - Math.log(s) - 0.5 * ((e + mu) / s) ** 2 + logPhi(mu / (s * lam) - e * lam / s) - logPhi(mu / su);
+    }
+    return Number.isFinite(ll) ? -ll : 1e300;
+  };
+  let best = nelderMead(nll, start, 10000);
+  for (let r = 0; r < 8; r++) { const nb = nelderMead(nll, best.x, 10000); const done = best.f - nb.f < 1e-9; best = nb; if (done) break; }
+  const p = best.x, P = p.length;
+  const H = Array.from({ length: P }, () => zeros(P));
+  const h = p.map(v => 1e-4 * Math.max(1, Math.abs(v)));
+  for (let a = 0; a < P; a++) for (let b = a; b < P; b++) {
+    const f = (da, db) => { const q = p.slice(); q[a] += da; q[b] += db; return nll(q); };
+    H[a][b] = H[b][a] = (f(h[a], h[b]) - f(h[a], -h[b]) - f(-h[a], h[b]) + f(-h[a], -h[b])) / (4 * h[a] * h[b]);
+  }
+  const cov = invert(H);
+  const se = p.map((_, i) => cov && cov[i][i] > 0 ? Math.sqrt(cov[i][i]) : NaN);
+  const sv2f = Math.exp(p[iv]), su2f = Math.exp(p[iv + 1]), svf = Math.sqrt(sv2f), suf = Math.sqrt(su2f), s2 = sv2f + su2f, mu = tn ? p[k] : 0;
+  const te = [], jlms = [], uhat = [];
+  for (let i = 0; i < n; i++) {
+    const e = resid(p, i);
+    let ms, ss;
+    if (dist === 'exponential') { ms = -e - sv2f / suf; ss = svf; }
+    else { ms = (-su2f * e + mu * sv2f) / s2; ss = suf * svf / Math.sqrt(s2); }
+    const u = ms + ss * phi(ms / ss) / Phi(ms / ss);
+    uhat.push(u); jlms.push(Math.exp(-u));
+    te.push(Math.exp(logPhi(ms / ss - ss) - logPhi(ms / ss) - ms + ss * ss / 2));
+  }
+  const ll = -best.f, LR = Math.max(0, 2 * (ll - o.ll));
+  const stat = a => ({ min: Math.min(...a), mean: a.reduce((s, v) => s + v, 0) / a.length, max: Math.max(...a) });
+  return {
+    dist, beta: p.slice(0, k), se: se.slice(0, k), z: p.slice(0, k).map((b, i) => b / se[i]), mu, muSe: tn ? se[k] : NaN,
+    lnsig2v: p[iv], lnsig2u: p[iv + 1], lnsig2vSe: se[iv], lnsig2uSe: se[iv + 1],
+    sigma_v: svf, sigma_u: suf, sigma2: s2, lambda: suf / svf, gamma: su2f / s2,
+    ll, llOls: o.ll, LR, pLR: LR > 0 ? 0.5 * Math.exp(logErfc(Math.sqrt(LR / 2))) : 0.5,
+    aic: -2 * ll + 2 * P, te, jlms, uhat, teStat: stat(te), uStat: stat(uhat)
+  };
+}
+
+// Модель Фаррелла: граница y = f(x1,x2), фактический план и цены → TE, AE, OE
+function farrell(kind, prm, x1, x2, y, w1, w2) {
+  const f = (a, b) => kind === 'linear' ? prm.a1 * a + prm.a2 * b : kind === 'cd' ? prm.A * Math.pow(a, prm.a) * Math.pow(b, prm.b) : Math.min(a / prm.a, b / prm.b);
+  const deg = kind === 'cd' ? prm.a + prm.b : 1;
+  const yMax = f(x1, x2), th = Math.pow(y / yMax, 1 / deg);
+  const Bp = [th * x1, th * x2];
+  let S, note = '';
+  if (kind === 'linear') {
+    const c1 = w1 / prm.a1, c2 = w2 / prm.a2;
+    if (Math.abs(c1 - c2) < 1e-12) { S = Bp.slice(); note = 'w1/a1 = w2/a2: изокоста совпадает с изоквантой, любая точка изокванты оптимальна (AE = 1).'; }
+    else if (c1 < c2) { S = [y / prm.a1, 0]; note = `Затраты на единицу продукции: через x1 — w1/a1 = ${fmtN(c1)}, через x2 — w2/a2 = ${fmtN(c2)}. Дешевле x1 → угловое решение.`; }
+    else { S = [0, y / prm.a2]; note = `Затраты на единицу продукции: через x1 — w1/a1 = ${fmtN(c1)}, через x2 — w2/a2 = ${fmtN(c2)}. Дешевле x2 → угловое решение.`; }
+  } else if (kind === 'cd') {
+    const r = (prm.b * w1) / (prm.a * w2);
+    const s1 = Math.pow(y / (prm.A * Math.pow(r, prm.b)), 1 / deg);
+    S = [s1, r * s1]; note = `Условие оптимума MRTS = w1/w2 ⇒ x2/x1 = (β·w1)/(α·w2) = ${fmtN(r)}.`;
+  } else { S = [prm.a * y, prm.b * y]; note = 'Леонтьев: оптимум в вершине изокванты, x1 = a·y, x2 = b·y.'; }
+  const cB = w1 * x1 + w2 * x2, cBp = w1 * Bp[0] + w2 * Bp[1], cS = w1 * S[0] + w2 * S[1], t = cS / cB;
+  return { yMax, th, Bp, S, F: [t * x1, t * x2], cB, cBp, cS, TE: cBp / cB, AE: cS / cBp, OE: cS / cB, note, deg };
+}
+function fmtN(v, d = 4) { return Number.isFinite(v) ? (+v.toFixed(d)).toString() : '—'; }
+
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gauss(rnd) { let u = 0; while (u === 0) u = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rnd()); }
+
+const HPS_RAW = `H&P 1	3012739	45229	9194302	156865
+H&P 2	2760397	76262	8504210	114158
+H&P 3	3560085	69260	11596489	238051
+H&P 4	1069053	8487	3078142	384487
+H&P 5	2014247	30172	6079957	275277
+H&P 6	2281521	36768	5510808	4462814
+H&P 7	1998672	189482	5096785	2886461
+H&P 8	411183	5602	799043	1623205
+H&P 9	882926	13103	1782621	3325794
+H&P 10	433074	11216	156656	2510891
+H&P 11	417754	955	524911	1993792
+H&P 12	406306	5216	808952	1365506
+H&P 13	840885	4492	1193908	3552911
+H&P 14	1230345	40993	2865187	3986713
+H&P 15	202811	3960	76832	1041097
+H&P 16	401906	7656	899586	1007000
+H&P 17	313460	8490	387826	1173013
+H&P 18	667998	115193	1131389	2706782
+H&P 19	108356	5288	107575	436785
+H&P 20	1142119	7572	2545143	2378515
+H&P 21	789069	2924	1674256	2033754
+H&P 22	1188043	1811	2359287	3349338
+H&P 23	1175050	11069	2141808	4016594
+H&P 24	1611924	24031	3360396	4644050
+H&P 25	3638310	41150	8389678	11420885
+H&P 26	3336973	35688	8163522	9331570
+H&P 27	3056061	74617	7770802	7190235
+H&P 28	3338077	84791	8268788	8766932
+H&P 29	555230	1755	1148336	1466812
+H&P 30	220736	2121	398495	623930
+H&P 31	108765	1409	216982	179540
+H&P 32	543139	2958	957035	1532954
+H&P 33	686023	7820	1525081	1847604
+H&P 34	253110	2388	268967	1088162
+H&P 35	383898	2686	863707	902616
+H&P 36	489652	19331	832342	1919499
+H&P 37	605004	19406	1105429	2381039
+H&P 38	886455	11001	1909110	2196008
+H&P 39	357449	33454	480853	1574157
+H&P 40	529511	25756	772308	1396779
+H&P 41	453510	117398	1089700	1034438
+H&P 42	746986	176836	1439312	2728874
+H&P 43	767465	39374	1680677	2125500
+H&P 44	113383	1749	45868	616650
+H&P 45	540871	2623	952506	1738220
+H&P 46	668502	2128	858819	1842440
+H&P 47	461265	4042	715723	1427896
+H&P 48	2417796	18316	4746772	7121380
+H&P 49	1124472	5012	1935728	3472948
+H&P 50	342776	1369	420289	1154536
+H&P 51	842592	17328	1434107	2526800
+H&P 52	821361	6890	1895535	1997302
+H&P 53	549817	3919	779805	1757524
+H&P 54	303538	2988	491830	888950
+H&P 55	70526	868	38355	353733
+H&P 56	744902	19183	1429245	2217565
+H&P 57	355455	27453	714774	1221838
+H&P 58	531280	44112	804444	2198372
+H&P 59	440689	2350	911488	1117058
+H&P 60	67782	906	44290	394479
+H&P 61	57166	1065	25661	333167
+H&P 62	1819393	12593	4556466	1074107
+H&P 63	120624	1680	73404	677174
+H&P 64	809211	1151	1665494	1193770
+H&P 65	446388	1322	211295	2548399
+H&P 66	164195	722	192395	788820
+H&P 67	310328	4656	191456	1764263
+H&P 68	712626	2000	1634856	473456
+H&P 69	1059977	6791	1225813	4302387
+H&P 70	403390	2228	709185	1579758
+H&P 71	704415	1534	1286750	1207289
+H&P 72	44611	2036	113057	25113
+H&P 73	462938	1672	745388	1216400
+H&P 74	677119	64920	909847	2577167
+H&P 75	1174006	151326	2096283	4636281
+H&P 76	925227	48667	1403237	3669892
+H&P 77	3060978	134002	9769352	97948
+H&P 78	229544	39792	291599	1265430
+H&P 79	668850	199448	1180220	3101050
+H&P 80	335912	41880	873354	370565
+H&P 81	647121	75392	1206775	2512224
+H&P 82	674239	24032	1360902	2020324`;
+const VAR2 = [["HPS 1", 7.76, 13.73, 23.73], ["HPS 2", 11.43, 13.46, 23.86], ["HPS 3", 6.1, 13.66, 23.21], ["HPS 4", 10.86, 13.53, 24.09], ["HPS 5", 8.14, 13.63, 23.55], ["HPS 6", 7.76, 13.61, 23.46], ["HPS 7", 8.57, 13.6, 23.39], ["HPS 8", 8.83, 13.51, 23.14], ["HPS 9", 9.91, 13.44, 23.93], ["HPS 10", 8.47, 13.42, 22.76], ["HPS 11", 8.27, 13.38, 23.13], ["HPS 12", 6.18, 13.34, 23.55], ["HPS 13", 8.87, 13.26, 22.83], ["HPS 14", 9.09, 13.24, 24.94], ["HPS 15", 8.63, 13.24, 22.44], ["HPS 16", 8.06, 13.15, 23.2], ["HPS 17", 6.88, 13.15, 23.0], ["HPS 18", 6.52, 13.09, 23.18], ["HPS 19", 7.58, 13.0, 23.33], ["HPS 20", 9.06, 12.97, 21.9], ["HPS 21", 11.96, 11.95, 22.71], ["HPS 22", 8.94, 12.93, 22.82], ["HPS 23", 8.46, 12.91, 23.22], ["HPS 24", 9.1, 12.85, 21.66], ["HPS 25", 7.55, 12.81, 22.84], ["HPS 26", 6.99, 12.77, 22.76], ["HPS 27", 6.82, 12.72, 22.7], ["HPS 28", 7.04, 12.7, 22.44], ["HPS 29", 9.46, 12.58, 22.98], ["HPS 30", 6.86, 12.61, 23.22], ["HPS 31", 11.6, 11.25, 23.28], ["HPS 32", 9.86, 12.1, 21.17], ["HPS 33", 6.75, 12.24, 21.7], ["HPS 34", 6.22, 12.21, 22.21], ["HPS 35", 7.64, 12.17, 21.37], ["HPS 36", 6.14, 12.05, 23.59], ["HPS 37", 6.47, 12.01, 21.19], ["HPS 38", 6.29, 11.97, 22.05], ["HPS 39", 6.27, 11.71, 23.23], ["HPS 40", 6.5, 11.62, 21.67], ["HPS 41", 7.22, 11.53, 23.63], ["HPS 42", 8.02, 11.49, 21.53], ["HPS 43", 5.96, 11.29, 20.9], ["HPS 44", 9.81, 10.7, 23.19], ["HPS 45", 6.96, 11.2, 19.87], ["HPS 46", 7.03, 11.12, 23.34], ["HPS 47", 8.49, 10.88, 22.37], ["HPS 48", 6.93, 10.96, 22.85], ["HPS 49", 5.52, 10.87, 20.6], ["HPS 50", 5.34, 10.67, 20.6]];
+/* ===== Синхронизация прогресса с воркером (/ara/api/progress) ===== */
+const SYNC_URL = '/ara/api/progress';
+const CAN_SYNC = /^https?:$/.test(location.protocol) && location.pathname.startsWith('/ara');
+const LS = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { } },
+  keys() { try { return Object.keys(localStorage).filter(k => k.startsWith('ara.')); } catch (e) { return []; } }
+};
+function setSync(text) { const el = document.getElementById('sync'); if (el) el.textContent = text; }
+function collectState() { const s = {}; for (const k of LS.keys()) if (k !== 'ara.__ts') s[k] = LS.get(k); return s; }
+let pushTimer = null;
+function schedulePush() {
+  if (!CAN_SYNC) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(pushNow, 3000);
+}
+async function pushNow(keepalive) {
+  clearTimeout(pushTimer); pushTimer = null;
+  const updatedAt = +(LS.get('ara.__ts') || Date.now());
+  try {
+    const r = await fetch(SYNC_URL, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state: collectState(), updatedAt }), keepalive: !!keepalive });
+    if (r.status === 409) setSync('На сервере более новая версия, обновите страницу');
+    else if (r.ok) setSync('Прогресс сохранён на сервере · ' + new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }));
+    else setSync('Не удалось сохранить на сервере, прогресс остаётся в браузере');
+  } catch (e) { setSync('Сервер недоступен, прогресс остаётся в браузере'); }
+}
+function markChanged() { LS.set('ara.__ts', String(Date.now())); schedulePush(); }
+async function syncPull() {
+  if (!CAN_SYNC) { setSync('Прогресс хранится в этом браузере'); return; }
+  try {
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 5000);
+    const r = await fetch(SYNC_URL, { signal: ctrl.signal, cache: 'no-store' });
+    clearTimeout(t);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const { state, updatedAt } = await r.json();
+    const localTs = +(LS.get('ara.__ts') || 0);
+    if (state && updatedAt > localTs) {
+      for (const k of LS.keys()) { try { localStorage.removeItem(k); } catch (e) { } }
+      for (const [k, v] of Object.entries(state)) if (k.startsWith('ara.') && typeof v === 'string') LS.set(k, v);
+      LS.set('ara.__ts', String(updatedAt));
+    } else if (localTs > (updatedAt || 0)) schedulePush();
+    setSync('Прогресс синхронизирован с сервером');
+  } catch (e) { setSync('Сервер недоступен, прогресс сохраняется в этом браузере'); }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && pushTimer) pushNow(true); });
+
+(async () => {
+await syncPull();
+/* ===== утилиты ===== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('ara.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { const s = JSON.stringify(v); try { if (localStorage.getItem('ara.' + k) === s) return; localStorage.setItem('ara.' + k, s); } catch (e) { return; } markChanged(); }
+};
+let DEC = store.get('dec', ',');
+const fmt = (v, d = 4) => (v == null || !Number.isFinite(v)) ? '—' : (+v).toFixed(d).replace('.', DEC);
+const fmtT = (v, d = 3) => (v == null || !Number.isFinite(v)) ? '—' : String(+(+v).toFixed(d)).replace('.', DEC);
+const raw = (v, d = 4) => (v == null || !Number.isFinite(v)) ? '' : (+v).toFixed(d).replace('.', DEC);
+function fmtG(v, d = 2) {
+  if (!Number.isFinite(v)) return '—';
+  let s = Number.isInteger(v) ? String(v) : (Math.abs(v) >= 1000 ? v.toFixed(1) : v.toFixed(d));
+  let [i, f] = s.split('.');
+  i = i.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return f ? i + DEC + f : i;
+}
+const SUB = '₀₁₂₃₄₅₆₇₈₉';
+const sub = n => String(n).split('').map(d => SUB[+d]).join('');
+function copyText(text, btn) {
+  const label = btn.textContent;
+  const done = msg => { btn.textContent = msg; setTimeout(() => { btn.textContent = label; }, 1800); };
+  const fallback = () => {
+    const ta = document.createElement('textarea'); ta.value = text; ta.className = 'copybuf'; ta.setAttribute('aria-label', 'Текст для копирования');
+    btn.insertAdjacentElement('afterend', ta); ta.focus(); ta.select(); done('Выделено, нажмите Ctrl+C');
+    setTimeout(() => ta.remove(), 15000);
+  };
+  try { navigator.clipboard.writeText(text).then(() => done('Скопировано'), fallback); } catch (e) { fallback(); }
+}
+function parseTable(text) {
+  const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim());
+  if (lines.length < 2) throw new Error('Нужна строка заголовков и хотя бы одна строка данных.');
+  const sep = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : lines[0].includes(',') ? ',' : null;
+  const split = l => (sep ? l.split(sep) : l.trim().split(/\s+/)).map(s => s.trim());
+  const head = split(lines[0]);
+  const rows = lines.slice(1).map(split);
+  const num = s => {
+    if (s == null) return NaN;
+    let t = s.replace(/[\s  ]/g, '');
+    if (sep !== ',') t = t.replace(',', '.');
+    return t === '' ? NaN : Number(t);
+  };
+  return { head, rows, num };
+}
+function tableHTML(head, rows, opts = {}) {
+  return `<div class="tw${opts.tall ? ' tall' : ''}"><table class="t"><thead><tr>${head.map(h => `<th${opts.leftHead ? ' class="l"' : ''}>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr${r.sel ? ' class="sel"' : ''}>${(r.cells || r).map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+const tsv = (head, rows) => [head.join('\t'), ...rows.map(r => r.join('\t'))].join('\n');
+function card(title, body, copy) {
+  const id = 'c' + Math.random().toString(36).slice(2, 9);
+  setTimeout(() => { const b = $(id); if (b) b.onclick = () => copyText(copy, b); });
+  return `<div class="card"><div class="row" style="justify-content:space-between"><h3>${title}</h3>${copy ? `<button class="btn small" id="${id}">Копировать для Excel</button>` : ''}</div>${body}</div>`;
+}
+
+/* ===== данные курса ===== */
+const HPS_ROWS = HPS_RAW.trim().split('\n').map(l => { const p = l.split('\t'); return { name: p[0], gas: +p[1], oil: +p[2], el: +p[3], heat: +p[4] }; });
+const energyGJ = r => 3.6 * r.el + 4.1868 * r.heat;
+const FIRMS7 = 'Firm\t(I)Labor\t(I)Materials\t(I)Energy\t(O)Product 1\t(O)Product 2\n1\t20\t1510\t3152\t100\t90\n2\t27\t1310\t3225\t190\t50\n3\t55\t2551\t3958\t230\t90\n4\t30\t2445\t3860\t190\t100\n5\t50\t2683\t4012\t250\t100\n6\t53\t3061\t4237\t260\t147\n7\t49\t2780\t3950\t234\t87';
+const HOSP = 'Hospital\t(I)Doctors\t(I)Nurses\t(O)Outpatients\t(O)Inpatients\nA\t20\t151\t100\t90\nB\t19\t131\t150\t50\nC\t25\t160\t160\t55\nD\t27\t168\t180\t72\nE\t22\t158\t94\t66\nF\t55\t255\t230\t90\nG\t33\t235\t220\t88\nH\t31\t206\t152\t80\nI\t30\t244\t190\t100\nJ\t50\t268\t250\t100\nK\t53\t306\t260\t147\nL\t38\t284\t250\t120';
+const hpsDEA = rows => ['H&P\t(I)Natural gas\t(I)Furnace oil\t(O)Electricity\t(O)Heat', ...rows.map(r => [r.name, r.gas, r.oil, r.el, r.heat].join('\t'))].join('\n');
+const hpsLn = rows => ['HPS\tln_gas\tln_oil\tln_energy', ...rows.map(r => [r.name.replace('H&P ', 'HPS '), Math.log(r.gas).toFixed(4), Math.log(r.oil).toFixed(4), Math.log(energyGJ(r)).toFixed(4)].join('\t'))].join('\n');
+
+/* ===== вкладки, отсчёт, чек-лист ===== */
+const TABS = ['plan', 't1', 't2', 't3', 't4', 'quiz', 'mock'];
+function showTab(id) {
+  if (!TABS.includes(id)) id = 'plan';
+  TABS.forEach(t => { $('tab-' + t).hidden = t !== id; document.querySelector(`[data-tab="${t}"]`).setAttribute('aria-selected', String(t === id)); });
+  store.set('tab', id);
+  try { history.replaceState(null, '', '#' + id); } catch (e) { }
+}
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { showTab(b.dataset.tab); window.scrollTo({ top: 0 }); });
+
+const EXAM = new Date('2026-10-09T18:00:00+03:00');
+function tick() {
+  const ms = EXAM - Date.now();
+  if (ms <= 0) { $('cd').textContent = ms > -7.2e6 ? 'идёт экзамен' : 'экзамен прошёл'; return; }
+  const h = Math.floor(ms / 3.6e6), m = Math.floor(ms % 3.6e6 / 6e4);
+  $('cd').textContent = (h >= 24 ? Math.floor(h / 24) + ' д ' + (h % 24) + ' ч ' : h + ' ч ') + m + ' мин';
+}
+tick(); setInterval(tick, 30000);
+
+const CHECK = [
+  ['Сегодня, 8 октября', [
+    ['bb', 'Blackboard: открыть актуальную программу и вариант прошлого года, сверить структуру с вкладкой «План»'],
+    ['dea', 'DEA-Solver: CCR-I, BCC-I и FDH на 82 станциях, сверить числа с вкладкой 04'],
+    ['stata', 'Stata: ssc install sfcross, прогнать do-файл из вкладки 03, сверить таблицы'],
+    ['p12', 'Части 1–2: дважды написать ответ руками по шаблону, не дольше 12 минут на часть'],
+    ['mock', 'Пробный экзамен на 120 минут по таймеру'],
+    ['quiz', 'Самопроверка: пройти все вопросы, разобрать ошибки']]],
+  ['Завтра, 9 октября до 18:00', [
+    ['room', 'Уточнить слот: ауд. 105 (Fedotov I.) или 211 (Khokhlova A.)'],
+    ['warm', 'Утром: один быстрый прогон DEA и SFA на новом варианте, не больше 30 минут'],
+    ['tech', 'Ноутбук заряжен, макросы Excel разрешены, Stata запускается, вход в Blackboard проверен'],
+    ['folder', 'Папка для файлов результатов создана, имена файлов продуманы']]]
+];
+function renderChecklist() {
+  const st = store.get('check', {});
+  $('checklist').innerHTML = CHECK.map(([h, items]) => `<h4>${h}</h4>${items.map(([k, t]) => `<label class="check"><input type="checkbox" id="ck-${k}" ${st[k] ? 'checked' : ''}> <span>${t}</span></label>`).join('')}`).join('');
+  CHECK.forEach(([, items]) => items.forEach(([k]) => { $('ck-' + k).onchange = e => { const s = store.get('check', {}); s[k] = e.target.checked; store.set('check', s); }; }));
+}
+renderChecklist();
+$('decSel').value = DEC;
+$('decSel').onchange = e => { DEC = e.target.value; store.set('dec', DEC); t1render(); farrellRender(); if (t3last) t3render(); if (t4last) t4render(); };
+
+/* ===== DEA: разбор входных данных ===== */
+function parseDEA(text) {
+  const { head, rows, num } = parseTable(text);
+  const cols = head.slice(1).map(h => { const m = h.match(/^\((I|O)\)\s*(.*)$/i); return m ? { t: m[1].toUpperCase(), name: (m[2] || h).trim() } : null; });
+  if (!cols.length || cols.some(c => !c)) throw new Error('Каждый заголовок после первого должен начинаться с (I) или (O), например (I)Labor, (O)Product 1.');
+  const inNames = cols.filter(c => c.t === 'I').map(c => c.name), outNames = cols.filter(c => c.t === 'O').map(c => c.name);
+  if (!inNames.length || !outNames.length) throw new Error('Нужен хотя бы один вход (I) и один выход (O).');
+  const names = [], X = inNames.map(() => []), Y = outNames.map(() => []);
+  rows.forEach((r, k) => {
+    names.push(r[0]);
+    let xi = 0, yi = 0;
+    cols.forEach((c, j) => {
+      const v = num(r[j + 1]);
+      if (!Number.isFinite(v)) throw new Error(`Строка ${k + 2}, столбец «${c.name}»: «${r[j + 1] ?? ''}» не число.`);
+      if (c.t === 'I') { if (v <= 0) throw new Error(`Строка ${k + 2}: входы должны быть больше нуля.`); X[xi++].push(v); }
+      else { if (v < 0) throw new Error(`Строка ${k + 2}: выходы не могут быть отрицательными.`); Y[yi++].push(v); }
+    });
+  });
+  return { names, inNames, outNames, X, Y, n: names.length };
+}
+function deaWeights(D, o, model) {
+  const [kind, orient] = model.split('-');
+  const mx = D.X.map(r => r.reduce((a, v) => a + v, 0) / D.n), my = D.Y.map(r => r.reduce((a, v) => a + v, 0) / D.n);
+  const w = deaMultiplier(D.X.map((r, i) => r.map(v => v / mx[i])), D.Y.map((r, k) => r.map(v => v / my[k])), o, kind === 'CCR' ? 'crs' : 'vrs', orient);
+  return w && { v: w.v.map((v, i) => v / mx[i]), u: w.u.map((u, k) => u / my[k]), w0: w.w0 };
+}
+const isEff = s => s > 1 - 1e-6;
+const refSet = (D, res, o) => res.lambda.map((l, j) => [j, l]).filter(([j, l]) => l > 1e-6).map(([j, l]) => ({ j, name: D.names[j], l }));
+const refStr = (D, res, o) => refSet(D, res, o).map(r => `${r.name} (${fmt(r.l, 4)})`).join(', ');
+
+/* ===== Часть 1: генератор моделей ===== */
+function lpText(D, o, model) {
+  const [kind, orient] = model.split('-'), I = orient === 'I';
+  const L = j => 'λ' + sub(j + 1), comb = row => row.map((v, j) => `${v}${L(j)}`).join(' + ');
+  const all = D.names.map((_, j) => L(j)).join(', ');
+  const out = [I ? 'min θ' : 'max η', I ? ' θ,λ' : ' η,λ', 's.t.:'];
+  D.X.forEach((row, i) => out.push(`${comb(row)} ≤ ${row[o]}${I ? 'θ' : ''}   (${D.inNames[i]})`));
+  D.Y.forEach((row, r) => out.push(`${comb(row)} ≥ ${row[o]}${I ? '' : 'η'}   (${D.outNames[r]})`));
+  if (kind !== 'CCR') out.push(`${D.names.map((_, j) => L(j)).join(' + ')} = 1`);
+  out.push(kind === 'FDH' ? `${all} ∈ {0, 1}` : `${all} ≥ 0`);
+  return out.join('\n');
+}
+function techText(D, o) {
+  const L = j => 'λ' + sub(j + 1), comb = row => row.map((v, j) => `${v}${L(j)}`).join(' + ');
+  const n = D.X.length, s = D.Y.length;
+  const out = [`T = {(x, y) ∈ R₊^${n + s}: Xλ ≤ x, Yλ ≥ y, λ ≥ 0}   (CRS, CCR)`, `For DMU ${D.names[o]}: x = (${D.X.map(r => r[o]).join('; ')}), y = (${D.Y.map(r => r[o]).join('; ')})`, ''];
+  D.X.forEach((row, i) => out.push(`${comb(row)} ≤ ${row[o]}   (${D.inNames[i]})`));
+  D.Y.forEach((row, r) => out.push(`${comb(row)} ≥ ${row[o]}   (${D.outNames[r]})`));
+  out.push(`${D.names.map((_, j) => L(j)).join(', ')} ≥ 0`, '', `BCC (VRS): add ${D.names.map((_, j) => L(j)).join(' + ')} = 1`, 'FDH: Σλ = 1 and λⱼ ∈ {0, 1}');
+  return out.join('\n');
+}
+let t1D = null;
+function t1render() {
+  const out = $('t1out'), sol = $('t1sol');
+  try {
+    store.set('d.t1', $('t1data').value);
+    t1D = parseDEA($('t1data').value);
+    const sel = $('t1dmu'), prev = sel.value;
+    sel.innerHTML = t1D.names.map((n, i) => `<option value="${i}">${esc(n)}</option>`).join('');
+    sel.value = prev !== '' && +prev < t1D.n ? prev : String(Math.min(4, t1D.n - 1));
+    const o = +sel.value, model = $('t1model').value;
+    let text;
+    if (model === 'T') text = techText(t1D, o);
+    else if (model === 'ALL-O') text = ['i) Technology set T for output-oriented models, DMU ' + t1D.names[o], techText(t1D, o), '', 'ii) Output-oriented CCR model', lpText(t1D, o, 'CCR-O'), 'Efficiency score = 1/η*.', '', 'iii) Output-oriented BCC model', lpText(t1D, o, 'BCC-O'), 'Differs from CCR only by the convexity constraint Σλ = 1 (VRS).', '', 'iv) FDH model: possible. It is derived from BCC by replacing λⱼ ≥ 0 with λⱼ ∈ {0,1}; together with Σλ = 1 exactly one observed DMU is the benchmark (mixed-integer problem). It cannot be derived from CCR, which has no Σλ = 1.', lpText(t1D, o, 'FDH-O')].join('\n');
+    else text = lpText(t1D, o, model);
+    out.textContent = text;
+    const R = deaSolveAll(t1D, false);
+    const rows = DEA_MODELS.map(m => { const r = R[m][o]; return [m, fmt(r.score, 4), fmt(r.phi, 4), refStr(t1D, r, o) || '—']; });
+    sol.innerHTML = `<p class="muted" style="margin-bottom:6px">Решение для сверки (θ* для input, η* для output; оценка = θ* или 1/η*):</p>` + tableHTML(['Модель', 'Оценка', 'θ* / η*', 'Reference set (λ)'], rows.map(r => r.map((c, i) => i === 3 ? `<span style="white-space:normal">${esc(c)}</span>` : c)));
+  } catch (e) { out.textContent = e.message; sol.innerHTML = ''; }
+}
+$('t1data').value = store.get('d.t1', FIRMS7);
+['t1data', 't1model', 't1dmu'].forEach(id => $(id).addEventListener(id === 't1data' ? 'input' : 'change', t1render));
+$('t1reset').onclick = () => { $('t1data').value = FIRMS7; $('t1dmu').value = '4'; t1render(); };
+$('t1copy').onclick = e => copyText($('t1out').textContent, e.target);
+
+/* ===== Часть 2: Фаррелл ===== */
+const FK = { linear: [['a₁', 3], ['a₂', 5]], cd: [['A', 2.1], ['α', 0.5], ['β', 0.5]], leon: [['a (x₁ на ед. y)', 3], ['b (x₂ на ед. y)', 5]] };
+function setKind(kind, keep) {
+  const spec = FK[kind];
+  ['fp1', 'fp2', 'fp3'].forEach((id, i) => {
+    const l = $(id + 'l');
+    if (spec[i]) { l.hidden = false; l.firstChild.textContent = spec[i][0]; if (!keep) $(id).value = spec[i][1]; } else l.hidden = true;
+  });
+}
+function farrellInput() {
+  const kind = $('fkind').value, p = ['fp1', 'fp2', 'fp3'].map(id => parseFloat($(id).value));
+  const prm = kind === 'linear' ? { a1: p[0], a2: p[1] } : kind === 'cd' ? { A: p[0], a: p[1], b: p[2] } : { a: p[0], b: p[1] };
+  const v = ['fx1', 'fx2', 'fy', 'fw1', 'fw2'].map(id => parseFloat($(id).value));
+  return { kind, prm, v };
+}
+const fdesc = (kind, prm) => kind === 'linear' ? `y = ${prm.a1}x1 + ${prm.a2}x2` : kind === 'cd' ? `y = ${prm.A}·x1^${prm.a}·x2^${prm.b}` : `y = min(x1/${prm.a}; x2/${prm.b})`;
+function farrellRender() {
+  const { kind, prm, v } = farrellInput();
+  const [x1, x2, y, w1, w2] = v;
+  if (v.some(t => !Number.isFinite(t)) || Object.values(prm).some(t => !Number.isFinite(t))) { $('fres').innerHTML = '<div class="callout bad">Заполните все поля числами.</div>'; return; }
+  const r = farrell(kind, prm, x1, x2, y, w1, w2);
+  const f = (a, b) => kind === 'linear' ? prm.a1 * a + prm.a2 * b : kind === 'cd' ? prm.A * a ** prm.a * b ** prm.b : Math.min(a / prm.a, b / prm.b);
+  if (r.yMax <= y + 1e-12) {
+    $('fres').innerHTML = `<div class="callout ok">f(${fmtG(x1)}; ${fmtG(x2)}) = ${fmtT(r.yMax)} ≤ y = ${fmtG(y)}: план лежит на границе (или выше неё — проверьте данные). TE = 1.</div>`;
+  }
+  const rows = [
+    ['Факт (B)', x1, x2, y, r.cB], ['Технически эффективный, та же структура (B′)', r.Bp[0], r.Bp[1], y, r.cBp],
+    ['Технически и аллокативно эффективный (S)', r.S[0], r.S[1], y, r.cS], ['Изокоста минимума ∩ луч OB (F)', r.F[0], r.F[1], f(r.F[0], r.F[1]), r.cS]
+  ];
+  $('fres').innerHTML = (r.yMax > y + 1e-12 ? `<div class="callout bad small">f(x) = ${fmtT(r.yMax)} &gt; y = ${fmtG(y)} ⇒ план технически неэффективен.</div>` : '') +
+    tableHTML(['Точка', 'x₁', 'x₂', 'y', 'Издержки'], rows.map(rw => [`<span style="white-space:normal">${rw[0]}</span>`, fmtT(rw[1]), fmtT(rw[2]), fmtT(rw[3]), fmtT(rw[4])])) +
+    `<div class="grid3"><div class="card flat"><span class="eyebrow">TE</span><b class="mono">${fmt(r.TE, 4)}</b><span class="small muted">C(B′)/C(B) = ${fmtT(r.cBp)}/${fmtT(r.cB)}</span></div><div class="card flat"><span class="eyebrow">AE</span><b class="mono">${fmt(r.AE, 4)}</b><span class="small muted">C(S)/C(B′) = ${fmtT(r.cS)}/${fmtT(r.cBp)}</span></div><div class="card flat"><span class="eyebrow">OE = TE·AE</span><b class="mono">${fmt(r.OE, 4)}</b><span class="small muted">C(S)/C(B) = ${fmtT(r.cS)}/${fmtT(r.cB)}</span></div></div><p class="small muted">${esc(r.note)}${kind === 'cd' && Math.abs(r.deg - 1) > 1e-9 ? ' Функция не линейно однородна (α+β ≠ 1): TE считается радиальным сжатием входов до изокванты.' : ''}</p>`;
+  const p = n => fmtT(n, 3);
+  $('ftext').textContent = [
+    `Frontier: ${fdesc(kind, prm)}. Actual plan B: x1 = ${fmtG(x1)}, x2 = ${fmtG(x2)}, y = ${fmtG(y)}; prices w1 = ${fmtG(w1)}, w2 = ${fmtG(w2)}.`,
+    `C(B) = ${fmtG(w1)}·${fmtG(x1)} + ${fmtG(w2)}·${fmtG(x2)} = ${p(r.cB)}.`,
+    ``,
+    `i) Technical efficiency check. Maximum output from the actual inputs: f(${fmtG(x1)}; ${fmtG(x2)}) = ${p(r.yMax)} ${r.yMax > y + 1e-12 ? '>' : '≤'} ${fmtG(y)}. ${r.yMax > y + 1e-12 ? 'The plan lies strictly inside the technology set (below the frontier), so it is NOT technically efficient: the same output can be produced with radially contracted inputs.' : 'The plan lies on the frontier and is technically efficient.'}`,
+    ``,
+    `ii) Point B′ (technically efficient plan with the actual input mix, ray x2 = ${p(x2 / x1)}·x1): solve f(θx1, θx2) = ${fmtG(y)} ⇒ θ = ${fmt(r.th, 4)}; B′ = (${p(r.Bp[0])}; ${p(r.Bp[1])}), C(B′) = ${p(r.cBp)}.`,
+    `TE = OB′/OB = C(B′)/C(B) = ${p(r.cBp)}/${p(r.cB)} = ${fmt(r.TE, 4)} (${fmt(r.TE * 100, 1)}%).`,
+    ``,
+    `iii) Point S (cost-minimising plan for y = ${fmtG(y)}): ${r.note.replace('Затраты на единицу продукции: через x1 — ', 'cost per unit of output via x1: ').replace(', через x2 — ', ', via x2: ').replace('. Дешевле x1 → угловое решение.', '. Input 1 is cheaper ⇒ corner solution, only x1 is used.').replace('. Дешевле x2 → угловое решение.', '. Input 2 is cheaper ⇒ corner solution, only x2 is used.').replace('Условие оптимума MRTS = w1/w2 ⇒', 'Optimality condition MRTS = w1/w2 ⇒')}`,
+    `S = (${p(r.S[0])}; ${p(r.S[1])}), C(S) = ${p(r.cS)} (minimal cost).`,
+    `Point F: the minimal isocost ${fmtG(w1)}x1 + ${fmtG(w2)}x2 = ${p(r.cS)} intersects ray OB at t = C(S)/C(B) = ${fmt(r.cS / r.cB, 4)} ⇒ F = (${p(r.F[0])}; ${p(r.F[1])}).`,
+    `AE = OF/OB′ = C(S)/C(B′) = ${p(r.cS)}/${p(r.cBp)} = ${fmt(r.AE, 4)} (${fmt(r.AE * 100, 1)}%).`,
+    ``,
+    `iv) OE = OF/OB = C(S)/C(B) = ${p(r.cS)}/${p(r.cB)} = ${fmt(r.OE, 4)} (${fmt(r.OE * 100, 1)}%). Check: TE × AE = ${fmt(r.TE, 4)} × ${fmt(r.AE, 4)} = ${fmt(r.TE * r.AE, 4)} = OE.`,
+    ``,
+    `Interpretation: the firm could cut all inputs by ${fmt((1 - r.TE) * 100, 1)}% keeping the input mix (technical inefficiency); with the cost-minimising mix it would save a further ${fmt((1 - r.AE) * 100, 1)}% of C(B′) (allocative inefficiency). Overall it spends ${p(r.cB)} instead of the minimum ${p(r.cS)}.`
+  ].join('\n');
+  drawFarrell(kind, prm, x1, x2, y, w1, w2, r);
+}
+function drawFarrell(kind, prm, x1, x2, y, w1, w2, r) {
+  const W = 460, H = 360, P = { l: 46, r: 16, t: 14, b: 40 };
+  const cand = [x1, x2, r.S[0], r.S[1], r.Bp[0], r.Bp[1]];
+  if (kind === 'linear') cand.push(y / prm.a1, y / prm.a2);
+  const M = Math.max(...cand.filter(Number.isFinite)) * 1.15;
+  const sx = v => P.l + v / M * (W - P.l - P.r), sy = v => H - P.b - v / M * (H - P.t - P.b);
+  const tick = M / 5, step = Math.pow(10, Math.floor(Math.log10(tick))), nice = [1, 2, 2.5, 5, 10].map(k => k * step).find(k => k >= tick);
+  let g = '';
+  for (let v = 0; v <= M + 1e-9; v += nice) {
+    g += `<line class="grid-l" x1="${sx(v)}" y1="${sy(0)}" x2="${sx(v)}" y2="${sy(M)}"/><line class="grid-l" x1="${sx(0)}" y1="${sy(v)}" x2="${sx(M)}" y2="${sy(v)}"/>`;
+    g += `<text class="lbl" x="${sx(v)}" y="${H - P.b + 16}" text-anchor="middle">${+v.toFixed(2)}</text><text class="lbl" x="${P.l - 6}" y="${sy(v) + 4}" text-anchor="end">${+v.toFixed(2)}</text>`;
+  }
+  g += `<line class="ax" x1="${sx(0)}" y1="${sy(0)}" x2="${sx(M)}" y2="${sy(0)}"/><line class="ax" x1="${sx(0)}" y1="${sy(0)}" x2="${sx(0)}" y2="${sy(M)}"/>`;
+  g += `<text class="lbl" x="${W - P.r}" y="${H - 6}" text-anchor="end">x₁</text><text class="lbl" x="10" y="${P.t + 6}">x₂</text>`;
+  let iso = '';
+  if (kind === 'linear') iso = `M${sx(y / prm.a1)},${sy(0)} L${sx(0)},${sy(y / prm.a2)}`;
+  else if (kind === 'leon') iso = `M${sx(prm.a * y)},${sy(M)} L${sx(prm.a * y)},${sy(prm.b * y)} L${sx(M)},${sy(prm.b * y)}`;
+  else { const pts = []; for (let i = 1; i <= 160; i++) { const a = M * i / 160, b = Math.pow(y / (prm.A * a ** prm.a), 1 / prm.b); if (b <= M) pts.push(`${sx(a)},${sy(b)}`); } iso = 'M' + pts.join(' L'); }
+  g += `<path class="iso" d="${iso}"/>`;
+  const c1 = r.cS / w1, c2 = r.cS / w2;
+  g += `<line class="cost" x1="${sx(Math.min(c1, M))}" y1="${sy(c1 <= M ? 0 : r.cS / w2 - M * w1 / w2)}" x2="${sx(c2 <= M ? 0 : (r.cS - w2 * M) / w1)}" y2="${sy(Math.min(c2, M))}"/>`;
+  const k = M / Math.max(x1, x2) * 0.98;
+  g += `<line class="ray" x1="${sx(0)}" y1="${sy(0)}" x2="${sx(x1 * k)}" y2="${sy(x2 * k)}"/>`;
+  const dot = (p, cls, t, dx = 8, dy = -8) => `<circle class="${cls}" cx="${sx(p[0])}" cy="${sy(p[1])}" r="5"/><text class="lbl-ink" x="${sx(p[0]) + dx}" y="${sy(p[1]) + dy}">${t}</text>`;
+  g += dot([x1, x2], 'dotB', 'B') + dot(r.Bp, 'dotBp', 'B′', -22, -8) + dot(r.F, 'dotF', 'F', -14, 16) + dot(r.S, 'dotS', 'S', 8, -10);
+  g += `<text class="lbl" x="${sx(0) + 4}" y="${sy(0) - 6}">O</text>`;
+  $('fsvg').innerHTML = g;
+}
+$('fkind').onchange = () => { setKind($('fkind').value); farrellRender(); };
+['fp1', 'fp2', 'fp3', 'fx1', 'fx2', 'fy', 'fw1', 'fw2'].forEach(id => $(id).addEventListener('input', farrellRender));
+function farrellPreset(kind, p, x) { $('fkind').value = kind; setKind(kind, true); ['fp1', 'fp2', 'fp3'].forEach((id, i) => { if (p[i] != null) $(id).value = p[i]; }); ['fx1', 'fx2', 'fy', 'fw1', 'fw2'].forEach((id, i) => $(id).value = x[i]); farrellRender(); }
+$('fex1').onclick = () => farrellPreset('linear', [3, 5], [30, 15, 110, 7.5, 15]);
+$('fex2').onclick = () => farrellPreset('cd', [2.1, 0.5, 0.5], [20, 31.25, 42, 4, 1]);
+$('fcopy').onclick = e => copyText($('ftext').textContent, e.target);
+
+/* ===== Часть 3: DPF и SFA ===== */
+let t3last = null;
+function t3cols() {
+  store.set('d.t3', $('t3data').value);
+  try {
+    const { head, rows, num } = parseTable($('t3data').value);
+    const numeric = head.map((h, j) => rows.every(r => Number.isFinite(num(r[j]))));
+    const opts = head.map((h, j) => numeric[j] ? `<option value="${j}">${esc(h)}</option>` : '').join('');
+    const idx = head.map((h, j) => j).filter(j => numeric[j]);
+    ['t3y', 't3x1', 't3x2'].forEach(id => { $(id).innerHTML = opts; });
+    if (idx.length >= 3) { $('t3y').value = idx[idx.length - 1]; $('t3x1').value = idx[0]; $('t3x2').value = idx[1]; }
+    $('t3status').textContent = '';
+  } catch (e) { $('t3status').textContent = e.message; }
+  t3do();
+}
+const stataName = h => { let s = h.replace(/[^A-Za-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, ''); if (!s || /^\d/.test(s)) s = 'v_' + s; return s.slice(0, 30); };
+function t3do() {
+  let n = { y: 'lny', x1: 'lnx1', x2: 'lnx2', id: 'id' };
+  try { const { head } = parseTable($('t3data').value); n = { y: stataName(head[$('t3y').value] || 'lny'), x1: stataName(head[$('t3x1').value] || 'lnx1'), x2: stataName(head[$('t3x2').value] || 'lnx2'), id: stataName(head[0] || 'id') }; } catch (e) { }
+  const lg = $('t3log').checked, cost = $('t3cost').checked ? ' cost' : '';
+  const Y = lg ? 'ln_' + n.y : n.y, X1 = lg ? 'ln_' + n.x1 : n.x1, X2 = lg ? 'ln_' + n.x2 : n.x2;
+  $('t3do').textContent = [
+    '* ARA, часть 3. Данные вставлены в Data Editor с именами из первой строки.',
+    lg ? `gen ${Y} = ln(${n.y})\ngen ${X1} = ln(${n.x1})\ngen ${X2} = ln(${n.x2})` : '* данные уже в логарифмах',
+    '',
+    '* 1) Average PF (OLS) и проверка асимметрии остатков',
+    `regress ${Y} ${X1} ${X2}`,
+    'scalar ll_ols = e(ll)',
+    'predict e_ols, residuals',
+    'sktest e_ols',
+    'summarize e_ols, detail',
+    '',
+    '* 2) DPF методом COLS: константа + max остаток',
+    'scalar emax = r(max)',
+    'display "DPF const = " _b[_cons] + emax',
+    'gen te_dpf = exp(e_ols - emax)',
+    `list ${n.id} if e_ols == emax`,
+    '',
+    '* 3) SFA (один раз: ssc install sfcross)',
+    `sfcross ${Y} ${X1} ${X2}, distribution(exponential)${cost}`,
+    'estimates store expo',
+    'scalar ll_expo = e(ll)',
+    'predict te_expo, bc',
+    `sfcross ${Y} ${X1} ${X2}, distribution(hnormal)${cost}`,
+    'estimates store hnorm',
+    'scalar ll_hnorm = e(ll)',
+    'predict te_hnorm, bc',
+    `sfcross ${Y} ${X1} ${X2}, distribution(tnormal)${cost}`,
+    'estimates store tnorm',
+    'scalar ll_tnorm = e(ll)',
+    'predict te_tnorm, bc',
+    `capture noisily sfcross ${Y} ${X1} ${X2}, distribution(gamma) nsimulations(250)${cost}`,
+    'if _rc == 0 {',
+    '    estimates store gam',
+    '    predict te_gam, jlms      // bc для gamma недоступен',
+    '}',
+    '',
+    '* 4) Сводки для таблиц 1-3',
+    'estimates table expo hnorm tnorm, b(%9.4f) t(%9.2f) stats(ll aic)',
+    'display "LR expo  = " 2*(ll_expo  - ll_ols)',
+    'display "LR hnorm = " 2*(ll_hnorm - ll_ols)',
+    'display "LR tnorm = " 2*(ll_tnorm - ll_ols)',
+    '* критическое значение 5%: 2.706 (смесь 1/2 chi2(0) + 1/2 chi2(1))',
+    'tabstat te_dpf te_expo te_hnorm te_tnorm, stat(min mean max sd) col(stat)',
+    'spearman te_dpf te_expo te_hnorm te_tnorm',
+    `export excel ${n.id} te_* using "TE_results.xlsx", firstrow(variables) replace`,
+    '',
+    '* Альтернатива без sfcross: frontier ..., distribution(hnormal) — сразу печатает LR-тест sigma_u = 0',
+  ].join('\n');
+}
+['t3y', 't3x1', 't3x2', 't3log', 't3cost'].forEach(id => $(id).addEventListener('change', t3do));
+$('t3data').addEventListener('change', t3cols);
+$('t3hps').onclick = () => { $('t3data').value = hpsLn(HPS_ROWS); $('t3log').checked = false; t3cols(); };
+$('t3var2').onclick = () => { $('t3data').value = ['HPS\tln_gas\tln_oil\tln_energy', ...VAR2.map(r => r.join('\t'))].join('\n'); $('t3log').checked = false; t3cols(); };
+$('t3docopy').onclick = e => copyText($('t3do').textContent, e.target);
+$('t3run').onclick = () => t3run();
+function t3run() {
+  $('t3status').textContent = 'Считаю…';
+  setTimeout(() => {
+    try {
+      const { head, rows, num } = parseTable($('t3data').value);
+      const jy = +$('t3y').value, j1 = +$('t3x1').value, j2 = +$('t3x2').value, lg = $('t3log').checked, cost = $('t3cost').checked;
+      if (new Set([jy, j1, j2]).size < 3) throw new Error('Выберите три разных столбца.');
+      const tr = v => { if (lg) { if (!(v > 0)) throw new Error('Для ln нужны положительные значения.'); return Math.log(v); } return v; };
+      const ids = [], y = [], X = [];
+      rows.forEach((r, k) => { const a = num(r[jy]), b = num(r[j1]), c = num(r[j2]); if (![a, b, c].every(Number.isFinite)) throw new Error(`Строка ${k + 2}: не число.`); ids.push(r[0]); y.push(tr(a)); X.push([1, tr(b), tr(c)]); });
+      if (y.length < 8) throw new Error('Слишком мало наблюдений.');
+      const names = { y: head[jy], x1: head[j1], x2: head[j2] };
+      const ols0 = olsFull(y, X), sk = skewTest(ols0.e.map(e => cost ? -e : e)), dpf = dpfCols(y, X, cost);
+      const sfa = {}; for (const d of ['exponential', 'hnormal', 'tnormal']) sfa[d] = sfaFit(y, X, d, cost);
+      t3last = { ids, y, X, names, ols: ols0, sk, dpf, sfa, cost };
+      t3render();
+      $('t3status').textContent = `Готово: ${y.length} наблюдений.`;
+    } catch (e) { $('t3status').textContent = e.message; $('t3out').innerHTML = ''; }
+  }, 30);
+}
+function t3render() {
+  const { ids, names, ols: o, sk, dpf, sfa, cost } = t3last;
+  const D = ['exponential', 'hnormal', 'tnormal'], DL = { exponential: 'SFA (expon)', hnormal: 'SFA (hnorm)', tnormal: 'SFA (tnorm)' };
+  const vn = ['const', 'ln ' + names.x1, 'ln ' + names.x2].map(esc);
+  let h = '';
+  // OLS
+  const rts = o.beta[1] + o.beta[2];
+  h += card('Average PF (OLS)', tableHTML(['', 'Coef.', 'Std. err.', 't', 'P>|t|'], [1, 2, 0].map(i => [vn[i], fmt(o.beta[i], 4), fmt(o.se[i], 4), fmt(o.t[i], 3), fmt(o.p[i], 3)])) +
+    `<div class="formula">ln y = ${fmt(o.beta[0], 4)} + ${fmt(o.beta[1], 4)}·ln x1 + ${fmt(o.beta[2], 4)}·ln x2
+y = ${fmtG(Math.exp(o.beta[0]), 2)} · x1^${fmt(o.beta[1], 4)} · x2^${fmt(o.beta[2], 4)}
+R² = ${fmt(o.r2, 4)}   adj. R² = ${fmt(o.adj, 4)}   F(${o.k - 1}, ${o.df}) = ${fmt(o.F, 2)}, p = ${fmt(o.pFstat, 4)}
+σ̂ = ${fmt(o.s, 4)}   ln L(OLS) = ${fmt(o.ll, 3)}   N = ${o.n}
+Σ elasticities = ${fmt(rts, 3)} ⇒ ${Math.abs(rts - 1) < 0.02 ? 'approximately constant' : rts < 1 ? 'decreasing' : 'increasing'} returns to scale</div>`);
+  // skewness + DPF
+  const skOk = sk.skew < 0;
+  h += `<div class="grid2">` + card('Асимметрия OLS-остатков', `<div class="formula">skewness = ${fmt(sk.skew, 4)}   z = ${fmt(sk.z, 3)}
+Pr(Skewness), двусторонний = ${fmt(sk.p2, 4)}
+односторонний (H₁: skew &lt; 0) = ${fmt(sk.pLeft, 4)}</div><div class="callout ${skOk && sk.pLeft < 0.05 ? 'ok' : 'bad'} small">${skOk ? (sk.pLeft < 0.05 ? 'Асимметрия отрицательная и значимая: в данных есть односторонняя компонента, SFA оправдана.' : 'Асимметрия отрицательная, но незначимая: неэффективность слабо выделяется из шума.') : 'Асимметрия положительная (wrong skewness): ML-оценка σᵤ уйдёт к нулю, SFA ≈ OLS.'}</div><p class="small muted">Тест D'Agostino, как Pr(Skewness) в sktest; без поправки Royston на эксцесс, поэтому p может немного отличаться.</p>`) +
+    card('DPF (COLS)', `<div class="formula">max OLS residual = ${fmt(dpf.shift, 4)} (${esc(ids[dpf.imax])})
+DPF: ln y = ${fmt(dpf.a0, 4)} + ${fmt(o.beta[1], 4)}·ln x1 + ${fmt(o.beta[2], 4)}·ln x2
+     y = ${fmtG(Math.exp(dpf.a0), 2)} · x1^${fmt(o.beta[1], 4)} · x2^${fmt(o.beta[2], 4)}
+TEᵢ = exp(eᵢ − max e)   (output-oriented)
+TE: min ${fmt(Math.min(...dpf.te), 4)}, mean ${fmt(dpf.te.reduce((a, b) => a + b, 0) / dpf.te.length, 4)}, max 1</div><p class="small">На границе ровно одна станция: ${esc(ids[dpf.imax])}.</p>`) + `</div>`;
+  // Table 1
+  const t1rows = [
+    [vn[1], fmt(o.beta[1], 4), ...D.map(d => `${fmt(sfa[d].beta[1], 4)} (${fmt(sfa[d].z[1], 2)})`), 'только Stata'],
+    [vn[2], fmt(o.beta[2], 4), ...D.map(d => `${fmt(sfa[d].beta[2], 4)} (${fmt(sfa[d].z[2], 2)})`), ''],
+    [vn[0], fmt(dpf.a0, 4), ...D.map(d => `${fmt(sfa[d].beta[0], 4)} (${fmt(sfa[d].z[0], 2)})`), ''],
+    ['σᵤ', '—', ...D.map(d => fmt(sfa[d].sigma_u, 4)), ''], ['σᵥ', '—', ...D.map(d => fmt(sfa[d].sigma_v, 4)), ''],
+    ['λ = σᵤ/σᵥ', '—', ...D.map(d => fmt(sfa[d].lambda, 4)), ''], ['γ = σᵤ²/σ²', '—', ...D.map(d => fmt(sfa[d].gamma, 4)), ''],
+    ['μ (tnormal)', '—', '—', '—', fmt(sfa.tnormal.mu, 4), ''],
+    ['ln L', fmt(o.ll, 3) + ' (OLS)', ...D.map(d => fmt(sfa[d].ll, 3)), ''], ['AIC', '—', ...D.map(d => fmt(sfa[d].aic, 3)), '']
+  ];
+  const t1tsv = tsv(['', 'DPF', 'SFA (expon)', 'SFA (hnorm)', 'SFA (tnorm)', 'SFA (gamma)'], [
+    ['ln ' + names.x1, raw(o.beta[1]), ...D.map(d => `${raw(sfa[d].beta[1])} (z=${raw(sfa[d].z[1], 2)})`), ''],
+    ['ln ' + names.x2, raw(o.beta[2]), ...D.map(d => `${raw(sfa[d].beta[2])} (z=${raw(sfa[d].z[2], 2)})`), ''],
+    ['const', raw(dpf.a0), ...D.map(d => `${raw(sfa[d].beta[0])} (z=${raw(sfa[d].z[0], 2)})`), '']]);
+  h += card('Таблица 1. Оценки параметров (z в скобках)', tableHTML(['', 'DPF', 'SFA (expon)', 'SFA (hnorm)', 'SFA (tnorm)', 'SFA (gamma)'], t1rows) + '<p class="small muted">Знак z у константы и коэффициентов совпадает со Stata; стандартные ошибки — по численному гессиану.</p>', t1tsv);
+  // LR
+  const lrRows = D.map(d => [DL[d], fmt(sfa[d].ll, 3), fmt(sfa[d].LR, 3), fmt(sfa[d].pLR, 4), sfa[d].LR > 2.706 ? '<span class="pill good">H₀ отвергается</span>' : '<span class="pill bad">H₀ не отвергается</span>']);
+  h += card('LR-тест H₀: σᵤ = 0 (нет неэффективности)', tableHTML(['Модель', 'ln L', 'LR = 2(lnL − lnL_OLS)', 'p (смесь χ²)', 'Вывод при 5%'], lrRows) + `<p class="small muted">ln L(OLS) = ${fmt(o.ll, 3)}. Критическое значение 2,706 (Kodde–Palm, 1 ограничение). Для tnormal ограничений два (σᵤ и μ), критическое 5,138.</p>`);
+  // Table 2
+  const te = { dpf: dpf.te, ...Object.fromEntries(D.map(d => [d, sfa[d].te])) };
+  const keys = ['dpf', ...D], KL = { dpf: 'DPF', ...DL };
+  h += card('Таблица 2. TE по станциям (DPF: exp(−u), SFA: bc = E[exp(−u)|ε])', tableHTML(['Станция', ...keys.map(k => KL[k]), 'SFA (gamma)'], ids.map((id, i) => [esc(id), ...keys.map(k => fmt(te[k][i], 4)), '—']), { tall: true }),
+    tsv(['Станция', ...keys.map(k => KL[k])], ids.map((id, i) => [id, ...keys.map(k => raw(te[k][i]))])));
+  // Table 3 + Spearman
+  const st = a => { const m = a.reduce((s, v) => s + v, 0) / a.length; return [Math.min(...a), m, Math.max(...a), Math.sqrt(a.reduce((s, v) => s + (v - m) ** 2, 0) / (a.length - 1))]; };
+  const S3 = keys.map(k => st(te[k]));
+  const argmin = k => ids[te[k].indexOf(Math.min(...te[k]))], argmax = k => ids[te[k].indexOf(Math.max(...te[k]))];
+  h += `<div class="grid2">` + card('Таблица 3. Статистики TE', tableHTML(['', ...keys.map(k => KL[k])], ['minimum', 'average', 'maximum', 'st. dev.'].map((l, r) => [l, ...S3.map(s => fmt(s[r], 4))])) + `<p class="small">Худшая по hnorm: ${esc(argmin('hnormal'))}, лучшая: ${esc(argmax('hnormal'))}.</p>`,
+    tsv(['', ...keys.map(k => KL[k])], ['minimum', 'average', 'maximum', 'st. dev.'].map((l, r) => [l, ...S3.map(s => raw(s[r]))]))) +
+    card('Согласованность: Спирмен', tableHTML(['', ...keys.map(k => KL[k])], keys.map(a => [KL[a], ...keys.map(b => fmt(spearman(te[a], te[b]), 4))]))) + `</div>`;
+  // текст
+  const best = D.reduce((a, b) => sfa[a].aic <= sfa[b].aic ? a : b);
+  const anyLR = D.some(d => sfa[d].LR > 2.706);
+  const txt = [
+    `Average production function (OLS, Cobb–Douglas in logs): ln y = ${raw(o.beta[0])} + ${raw(o.beta[1])}·ln x1 + ${raw(o.beta[2])}·ln x2; t-statistics ${raw(o.t[0], 3)}, ${raw(o.t[1], 3)}, ${raw(o.t[2], 3)} (p = ${raw(o.p[0], 3)}, ${raw(o.p[1], 3)}, ${raw(o.p[2], 3)}); R² = ${raw(o.r2, 3)}, adj. R² = ${raw(o.adj, 3)}, F = ${raw(o.F, 2)} (p = ${raw(o.pFstat, 4)}). The sum of elasticities ${raw(rts, 3)} indicates ${rts < 0.98 ? 'decreasing' : rts > 1.02 ? 'increasing' : 'approximately constant'} returns to scale.`,
+    `DPF (COLS): the OLS intercept is shifted up by the maximum residual ${raw(dpf.shift)} (${ids[dpf.imax]}): ln y = ${raw(dpf.a0)} + ${raw(o.beta[1])}·ln x1 + ${raw(o.beta[2])}·ln x2. TEᵢ = exp(eᵢ − max e): min ${raw(S3[0][0])}, mean ${raw(S3[0][1])}, max 1 (${ids[dpf.imax]} is the only unit on the frontier).`,
+    `Skewness of OLS residuals = ${raw(sk.skew, 3)} (Pr(Skewness) = ${raw(sk.p2, 4)}). ${sk.skew < 0 && sk.pLeft < 0.05 ? 'Significant negative skewness supports a one-sided inefficiency term.' : 'Zero skewness cannot be rejected, so the data give weak evidence of a separate one-sided inefficiency term.'}`,
+    `LR tests of H0: σu = 0 against OLS (lnL = ${raw(o.ll, 3)}, 5% critical value 2.706): ${D.map(d => `${DL[d]} LR = ${raw(sfa[d].LR, 3)}`).join('; ')}. ${anyLR ? 'Inefficiency is statistically significant, the stochastic frontier improves on the average function.' : 'None of the SFA models improves significantly on OLS: inefficiency is not separately identified in this sample.'}`,
+    `Comparison: DPF attributes the whole deviation to inefficiency and depends on one extreme unit, so its efficiency levels are the lowest (mean ${raw(S3[0][1])}); SFA separates noise v from inefficiency u (mean TE: expon ${raw(S3[1][1])}, hnorm ${raw(S3[2][1])}, tnorm ${raw(S3[3][1])}). Rankings are consistent: Spearman ρ between models ranges from ${raw(Math.min(...keys.flatMap(a => keys.map(b => spearman(te[a], te[b])))), 3)} to 1.`,
+    `Recommended model: ${DL[best]} (lowest AIC = ${raw(sfa[best].aic, 3)}). Exponential and half-normal are the most parsimonious and stable; truncated normal weakly identifies μ; gamma ${'(estimated in Stata by simulated ML)'} is reported only if it converges.`
+  ].join('\n\n');
+  const tid = 'c' + Math.random().toString(36).slice(2, 9);
+  h += `<div class="card"><div class="row" style="justify-content:space-between"><h3>Черновик выводов (EN)</h3><button class="btn small" id="${tid}">Копировать</button></div><div class="formula">${esc(txt)}</div><p class="small muted">Перепроверьте числа по своему выводу Stata и допишите gamma.</p></div>`;
+  $('t3out').innerHTML = h;
+  $(tid).onclick = e => copyText(txt, e.target);
+}
+
+/* ===== Часть 4: DEA ===== */
+let t4last = null;
+const SHOW = ['FDH-I', 'BCC-I', 'BCC-O', 'CCR-I', 'CCR-O', 'FDH-O'];
+const ML = m => m === 'FDH-I' ? 'FDH' : m;
+function selectRule(D, R) {
+  const ineff = m => D.names.map((_, j) => j).filter(j => !isEff(R[m][j].score)).sort((a, b) => R[m][a].score - R[m][b].score);
+  const f = ineff('FDH-I'), b = ineff('BCC-I');
+  let pick = f.slice(0, 2), why;
+  if (pick.length === 2) why = 'обе из FDH (FDH-неэффективных ' + f.length + ', взяты две с наименьшей оценкой)';
+  else if (pick.length === 1) { pick.push(b.find(j => j !== pick[0])); why = 'одна из FDH, вторая — наименее эффективная по BCC-I'; }
+  else { pick = b.slice(0, 2); why = 'FDH-неэффективных нет, обе из BCC-I'; }
+  return { pick: pick.filter(j => j != null), why };
+}
+function t4run() {
+  store.set('d.t4', $('t4data').value);
+  $('t4status').textContent = 'Считаю…';
+  setTimeout(() => {
+    try {
+      const D = parseDEA($('t4data').value);
+      if (D.n < 3) throw new Error('Нужно хотя бы 3 DMU.');
+      const t0 = performance.now(), R = deaSolveAll(D, false);
+      if (DEA_MODELS.some(m => R[m].some(r => !r))) throw new Error('Одна из задач не решилась: проверьте нулевые выходы у DMU.');
+      const rule = selectRule(D, R);
+      t4last = { D, R, rule, pick: rule.pick.slice() };
+      t4render();
+      $('t4status').textContent = `Готово: ${D.n} DMU, ${Math.round(performance.now() - t0)} мс.`;
+    } catch (e) { $('t4status').textContent = e.message; $('t4out').innerHTML = ''; }
+  }, 30);
+}
+function frontierLines(D, res, o, model) {
+  const orient = model.split('-')[1], I = orient === 'I', refs = refSet(D, res, o);
+  const comb = (row) => refs.map(r => `${fmt(r.l, 4)} × ${fmtG(row[r.j])}`).join(' + ');
+  const L = [];
+  if (model.startsWith('FDH')) {
+    const j = refs[0].j;
+    return `(${[...D.X.map(r => fmtG(r[j])), ...D.Y.map(r => fmtG(r[j]))].join('; ')}) = data of ${D.names[j]}   (${I ? 'θ' : 'η'} = ${fmt(res.phi, 4)})`;
+  }
+  D.X.forEach((row, i) => { const s = res.sm[i]; L.push(`${I ? fmt(res.phi, 4) + ' × ' : ''}${fmtG(row[o])}${s > 1e-6 ? ' − ' + fmtG(s) + ' (s⁻)' : ''} = ${comb(row)}   (${D.inNames[i]})`); });
+  D.Y.forEach((row, r) => { const s = res.sp[r]; L.push(`${I ? '' : fmt(res.phi, 4) + ' × '}${fmtG(row[o])}${s > 1e-6 ? ' + ' + fmtG(s) + ' (s⁺)' : ''} = ${comb(row)}   (${D.outNames[r]})`); });
+  return L.join('\n');
+}
+function t4render() {
+  const { D, R, rule, pick } = t4last;
+  let h = '';
+  // сводка
+  const sumRows = SHOW.map(m => {
+    const s = R[m].map(r => r.score), ne = s.filter(isEff).length, mean = s.reduce((a, b) => a + b, 0) / s.length;
+    const sd = Math.sqrt(s.reduce((a, v) => a + (v - mean) ** 2, 0) / (s.length - 1)), mi = s.indexOf(Math.min(...s));
+    const weak = R[m].filter(r => isEff(r.score) && (r.sm.some(v => v > 1e-6) || r.sp.some(v => v > 1e-6))).length;
+    return [ML(m), m.startsWith('CCR') ? 'CRS' : m.startsWith('BCC') ? 'VRS' : 'FDH', ne + (weak ? ` <span class="pill warn">${weak} со слэками</span>` : ''), D.n - ne, fmt(mean, 4), `${fmt(s[mi], 4)} (${esc(D.names[mi])})`, fmt(Math.max(...s), 4), fmt(sd, 4)];
+  });
+  h += card('Сводка по моделям', tableHTML(['Модель', 'Отдача', 'Эффективных (θ = 1)', 'Неэффективных', 'Среднее', 'Минимум', 'Максимум', 'St. dev.'], sumRows) +
+    '<p class="small">Вложенность T_FDH ⊆ T_BCC ⊆ T_CCR даёт FDH ≥ BCC ≥ CCR и в оценках, и в числе эффективных DMU. «Со слэками» — слабо эффективные: θ = 1, но есть ненулевые слэки.</p>',
+    tsv(['Model', 'Efficient', 'Inefficient', 'Average', 'Min', 'Max', 'St. dev.'], SHOW.map(m => { const s = R[m].map(r => r.score), mean = s.reduce((a, b) => a + b, 0) / s.length; return [ML(m), s.filter(isEff).length, D.n - s.filter(isEff).length, raw(mean), raw(Math.min(...s)), raw(Math.max(...s)), raw(Math.sqrt(s.reduce((a, v) => a + (v - mean) ** 2, 0) / (s.length - 1)))]; })));
+  // все оценки
+  const ranks = Object.fromEntries(SHOW.map(m => [m, rankDesc(R[m].map(r => r.score))]));
+  const sumL = R['CCR-I'].map(r => r.lambda.reduce((a, b) => a + b, 0));
+  h += card('Оценки и ранги (как лист Score/Rank)', tableHTML(['DMU', ...SHOW.flatMap(m => [ML(m), 'rank']), 'SE = CCR/BCC', 'Σλ (CCR-I)'],
+    D.names.map((n, j) => ({ sel: pick.includes(j), cells: [esc(n), ...SHOW.flatMap(m => [isEff(R[m][j].score) ? `<span class="eff1">${fmt(1, 4)}</span>` : fmt(R[m][j].score, 4), ranks[m][j]]), fmt(R['CCR-I'][j].score / R['BCC-I'][j].score, 4), fmt(sumL[j], 3)] })), { tall: true }) +
+    '<p class="small muted">FDH = FDH-I, как в DEA-Solver. Σλ в CCR: &lt; 1 — возрастающая отдача, = 1 — постоянная, &gt; 1 — убывающая (при единственности решения).</p>',
+    tsv(['DMU', ...SHOW.flatMap(m => [ML(m), 'rank']), 'SE'], D.names.map((n, j) => [n, ...SHOW.flatMap(m => [raw(R[m][j].score), ranks[m][j]]), raw(R['CCR-I'][j].score / R['BCC-I'][j].score)])));
+  // Спирмен
+  h += `<div class="grid2">` + card('Ранги: корреляция Спирмена', tableHTML(['', ...SHOW.map(ML)], SHOW.map(a => [ML(a), ...SHOW.map(b => fmt(spearman(R[a].map(r => r.score), R[b].map(r => r.score)), 3))])));
+  // частые пиры
+  const peers = m => { const c = {}; D.names.forEach((_, o) => { if (isEff(R[m][o].score)) return; refSet(D, R[m][o], o).forEach(r => { if (r.j !== o) c[r.j] = (c[r.j] || 0) + 1; }); }); return Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 6); };
+  h += card('Чаще всего в reference sets', ['CCR-I', 'BCC-I'].map(m => `<p class="small"><b>${m}:</b> ${peers(m).map(([j, k]) => `${esc(D.names[j])} — ${k}`).join(', ') || 'нет'}</p>`).join('') +
+    '<p class="small muted">Счёт по неэффективным DMU. Частые пиры задают крупные грани границы: это устойчивые образцы лучшей практики с разной структурой ресурсов.</p>') + `</div>`;
+  // выбор DMU
+  const opt = sel => D.names.map((n, j) => `<option value="${j}" ${j === sel ? 'selected' : ''}>${esc(n)}</option>`).join('');
+  h += `<div class="card"><h3>Две неэффективные DMU</h3><p class="small">По правилу задания: ${rule.why}. Можно выбрать другие.</p><div class="fields"><label class="f">DMU r<select id="t4r">${opt(pick[0])}</select></label><label class="f">DMU k<select id="t4k">${opt(pick[1])}</select></label></div>`;
+  const P = pick;
+  h += tableHTML(['DMU', ...SHOW.map(m => ML(m) + ' rank'), ...SHOW.map(m => ML(m) + ' score')], P.map(j => [esc(D.names[j]), ...SHOW.map(m => ranks[m][j]), ...SHOW.map(m => fmt(R[m][j].score, 4))]));
+  h += `<h4>Reference sets</h4>` + tableHTML(['DMU', ...SHOW.map(ML)], P.map(j => [esc(D.names[j]), ...SHOW.map(m => `<span style="white-space:normal">${esc(refStr(D, R[m][j], j))}</span>`)]));
+  h += `<h4>Frontier equations</h4>`;
+  for (const m of SHOW) for (const j of P) h += `<p class="small"><b>${ML(m)}, ${esc(D.names[j])}</b></p><div class="formula">${esc(frontierLines(D, R[m][j], j, m))}</div>`;
+  h += `<h4>Projections</h4>`;
+  for (const m of SHOW) {
+    const head = ['DMU', 'Score', 'Rank', ...[...D.inNames, ...D.outNames].flatMap(v => [esc(v) + ' data', 'projection', 'diff %'])];
+    const rows = P.map(j => { const r = R[m][j], data = [...D.X.map(x => x[j]), ...D.Y.map(y => y[j])], pr = [...r.proj.x, ...r.proj.y]; return [esc(D.names[j]), fmt(r.score, 4), ranks[m][j], ...data.flatMap((v, i) => [fmtG(v), fmtG(+pr[i].toFixed(1)), fmt((pr[i] - v) / v * 100, 2)])]; });
+    h += `<p class="small"><b>${ML(m)}</b></p>` + tableHTML(head, rows);
+  }
+  h += `</div>`;
+  // веса
+  h += `<details class="card"><summary>Веса мультипликаторной модели (лист Weight) для выбранных DMU</summary><div class="body small">${['CCR-I', 'BCC-I'].map(m => P.map(j => { const w = deaWeights(D, j, m); return w ? `<p><b>${m}, ${esc(D.names[j])}:</b> v = (${w.v.map(x => fmt(x, 6)).join('; ')}), u = (${w.u.map(x => fmt(x, 6)).join('; ')})${m.startsWith('BCC') ? `, u₀ = ${fmt(w.w0, 4)}` : ''}. Опорная гиперплоскость: ${w.u.map((u, r) => `${fmt(u, 6)}·${esc(D.outNames[r])}`).join(' + ')} − ${w.v.map((v, i) => `${fmt(v, 6)}·${esc(D.inNames[i])}`).join(' − ')}${m.startsWith('BCC') ? ' − u₀' : ''} = 0</p>` : ''; }).join('')).join('')}<p class="muted">Веса могут быть неединственными, DEA-Solver иногда выдаёт другой оптимальный набор.</p></div></details>`;
+  // текст
+  const txt = t4text(D, R, P, ranks);
+  const tid = 'c' + Math.random().toString(36).slice(2, 9);
+  h += `<div class="card"><div class="row" style="justify-content:space-between"><h3>Черновик ответа (EN)</h3><button class="btn small" id="${tid}">Копировать</button></div><div class="formula">${esc(txt)}</div></div>`;
+  $('t4out').innerHTML = h;
+  $(tid).onclick = e => copyText(txt, e.target);
+  $('t4r').onchange = e => { t4last.pick[0] = +e.target.value; t4render(); };
+  $('t4k').onchange = e => { t4last.pick[1] = +e.target.value; t4render(); };
+}
+function t4text(D, R, P, ranks) {
+  const cnt = m => R[m].filter(r => isEff(r.score)).length;
+  const out = [];
+  out.push(`Number of efficient DMUs: FDH ${cnt('FDH-I')}, BCC-I ${cnt('BCC-I')}, CCR-I ${cnt('CCR-I')} (of ${D.n}). The production possibility sets are nested, T_FDH ⊆ T_BCC ⊆ T_CCR: FDH allows no interpolation between observed units, BCC adds convex combinations (Σλ = 1), CCR additionally allows proportional scaling (CRS). Hence θ_FDH ≥ θ_BCC ≥ θ_CCR for every DMU and the number of efficient units falls from FDH to BCC to CCR.`);
+  P.forEach((j, k) => {
+    const n = D.names[j];
+    out.push(`DMU ${k ? 'k' : 'r'} = ${n}: FDH ${raw(R['FDH-I'][j].score)} (rank ${ranks['FDH-I'][j]}), BCC-I ${raw(R['BCC-I'][j].score)} (rank ${ranks['BCC-I'][j]}), CCR-I ${raw(R['CCR-I'][j].score)} (rank ${ranks['CCR-I'][j]}).`);
+    out.push(`Reference sets of ${n}: FDH — ${refStr(D, R['FDH-I'][j], j)}; BCC-I — ${refStr(D, R['BCC-I'][j], j)}; CCR-I — ${refStr(D, R['CCR-I'][j], j)}.`);
+    const c = R['CCR-I'][j], f = R['FDH-I'][j], fj = refSet(D, f, j)[0].j;
+    out.push(`Projections of ${n}. CCR-I: inputs can be reduced radially by ${raw((1 - c.score) * 100, 1)}%${c.sm.some(v => v > 1e-6) ? ' plus input slacks (' + D.inNames.map((nm, i) => c.sm[i] > 1e-6 ? nm + ' −' + fmtG(c.sm[i]) : '').filter(Boolean).join(', ') + ')' : ''}${c.sp.some(v => v > 1e-6) ? ' while outputs rise by slacks (' + D.outNames.map((nm, r) => c.sp[r] > 1e-6 ? nm + ' +' + fmtG(c.sp[r]) : '').filter(Boolean).join(', ') + ')' : ' without loss of outputs'}. BCC-I: ${raw((1 - R['BCC-I'][j].score) * 100, 1)}% radial reduction. FDH: the target is the observed unit ${D.names[fj]}: ${[...D.inNames.map((nm, i) => `${nm} ${raw((D.X[i][fj] - D.X[i][j]) / D.X[i][j] * 100, 1)}%`), ...D.outNames.map((nm, r) => `${nm} ${D.Y[r][fj] >= D.Y[r][j] ? '+' : ''}${raw((D.Y[r][fj] - D.Y[r][j]) / D.Y[r][j] * 100, 1)}%`)].join(', ')}.`);
+  });
+  return out.join('\n\n');
+}
+$('t4run').onclick = t4run;
+$('t4hps').onclick = () => { $('t4data').value = hpsDEA(HPS_ROWS); t4run(); };
+$('t4firms').onclick = () => { $('t4data').value = FIRMS7; t4run(); };
+$('t4hosp').onclick = () => { $('t4data').value = HOSP; t4run(); };
+
+/* ===== Самопроверка ===== */
+const QUIZ = [
+  ['Граница y = 3x₁ + 5x₂, план x = (30; 15), y = 110. Чему равна техническая эффективность (по Фарреллу)?', ['0,667', '0,733', '0,611', '0,917'], 0, 'f(30; 15) = 165, граница линейно однородна, θ = 110/165 = 0,667. Это же C(B′)/C(B) = 300/450.'],
+  ['Какая формула верна для аллокативной эффективности в модели Фаррелла?', ['C(S)/C(B′) = OF/OB′', 'C(B′)/C(B) = OB′/OB', 'C(S)/C(B) = OF/OB', 'C(B)/C(S)'], 0, 'AE сравнивает минимальные издержки с издержками технически эффективного плана на том же луче. C(B′)/C(B) — это TE, C(S)/C(B) — OE.'],
+  ['TE = 0,8, AE = 0,9. Чему равна общая (overall) эффективность?', ['0,72', '0,85', '1,70', '0,89'], 0, 'OE = TE × AE.'],
+  ['Входная функция расстояния Dᵢ(y, x) = 1,25. Чему равна входная TE?', ['0,8', '1,25', '0,25', '0,2'], 0, 'TE_input = 1/Dᵢ. Входы можно сжать в 1,25 раза, то есть на 20%.'],
+  ['Почему FDH-модель выводится из BCC, а не из CCR?', ['FDH сохраняет Σλ = 1 и заменяет λ ≥ 0 на λ ∈ {0,1}; в CCR нет условия Σλ = 1', 'FDH требует постоянной отдачи от масштаба', 'В CCR нельзя использовать бинарные переменные', 'FDH не связан ни с одной из моделей'], 0, 'Σλ = 1 вместе с λ ∈ {0,1} оставляет ровно одну λ = 1: эталон — реальная наблюдаемая DMU.'],
+  ['Как соотносятся оценки одной DMU в input-ориентированных моделях?', ['θ_FDH ≥ θ_BCC ≥ θ_CCR', 'θ_CCR ≥ θ_BCC ≥ θ_FDH', 'θ_BCC ≥ θ_FDH ≥ θ_CCR', 'Порядок зависит от данных'], 0, 'T_FDH ⊆ T_BCC ⊆ T_CCR: чем шире множество, тем строже эталон и ниже оценка.'],
+  ['В CCR-I θ* = 0,8. Какая будет оценка CCR-O (как её показывает DEA-Solver)?', ['0,8 (η* = 1,25)', '1,25', '0,64', 'Нельзя сказать без расчёта'], 0, 'При CRS η* = 1/θ*, DEA-Solver выводит 1/η*, то есть те же 0,8.'],
+  ['Что верно для BCC-I и BCC-O?', ['Множество эффективных DMU одинаково, оценки неэффективных могут различаться', 'Оценки всегда совпадают', 'Эффективные DMU разные', 'BCC-O всегда меньше'], 0, 'Граница VRS одна, но радиальное движение к ней по входам и по выходам даёт разные расстояния.'],
+  ['Что такое scale efficiency?', ['θ_CCR / θ_BCC', 'θ_BCC / θ_CCR', 'θ_FDH − θ_BCC', '1 − θ_CCR'], 0, 'SE ≤ 1. SE = 1 означает оптимальный масштаб.'],
+  ['Сумма λ* в CCR-модели для DMU равна 1,4 (решение единственное). Какая отдача от масштаба?', ['Убывающая (DRS)', 'Возрастающая (IRS)', 'Постоянная', 'Не определяется'], 0, 'Σλ < 1 — IRS, = 1 — CRS, > 1 — DRS.'],
+  ['DMU имеет θ* = 1, но ненулевой входной слэк. Как её классифицировать?', ['Слабо эффективная (не Pareto–Koopmans)', 'Полностью эффективная', 'Неэффективная по θ', 'Супер-эффективная'], 0, 'Сильная эффективность требует θ* = 1 и нулевых слэков во всех входах и выходах.'],
+  ['Что такое reference set DMU o?', ['Эффективные DMU с λⱼ* > 0 в её решении', 'Все эффективные DMU выборки', 'DMU с тем же рангом', 'DMU с теми же весами'], 0, 'Это пиры, из комбинации которых строится проекция.'],
+  ['Как выглядит frontier equation для входа в CCR-I (в стиле курса)?', ['θ*·x_io − s⁻ᵢ = Σλⱼ*xᵢⱼ', 'x_io = θ*·Σλⱼxᵢⱼ', 'Σλⱼ = θ*', 'u·y = v·x + θ'], 0, 'Проекция — λ-комбинация пиров. Для выходов: y_ro + s⁺ᵣ = Σλⱼyᵣⱼ.'],
+  ['Как строится DPF методом COLS?', ['К константе OLS прибавляется максимальный остаток, наклоны не меняются', 'Наклоны умножаются на max остаток', 'Константа уменьшается на средний остаток', 'Оценивается методом ML'], 0, 'После сдвига ровно одна DMU на границе; TEᵢ = exp(eᵢ − max e).'],
+  ['Главный недостаток DPF по сравнению с SFA?', ['Всё отклонение считается неэффективностью, граница определяется одним выбросом', 'DPF нельзя оценить OLS', 'DPF даёт TE больше 1', 'DPF требует данных о ценах'], 0, 'Шум и ошибки измерения записываются в неэффективность, поэтому средняя TE получается заниженной.'],
+  ['Составная ошибка стохастической границы производства:', ['ε = v − u, u ≥ 0', 'ε = v + u, u ≥ 0', 'ε = u − v', 'ε = u, v = 0'], 0, 'Для функции издержек ε = v + u.'],
+  ['Остатки OLS имеют положительную асимметрию (граница производства). Что будет с ML-оценкой?', ['σᵤ → 0, SFA совпадает с OLS (wrong skewness)', 'σᵥ → 0', 'Оценки станут смещёнными вверх', 'Ничего особенного'], 0, 'Результат Waldman (1982): при положительной асимметрии OLS — максимум правдоподобия.'],
+  ['LR-тест H₀: σᵤ = 0 (half-normal) при 5%. Какое критическое значение?', ['2,706', '3,841', '5,991', '1,645'], 0, 'Статистика распределена как ½χ²(0) + ½χ²(1), поэтому берётся 10%-ный квантиль χ²(1).'],
+  ['Что даёт predict te, bc после sfcross?', ['E[exp(−u)|ε], оценка Battese–Coelli', 'exp(−E[u|ε]), оценка JLMS', 'E[u|ε]', 'Остатки OLS'], 0, 'jlms даёт exp(−E[u|ε]), u даёт E[u|ε].'],
+  ['Для какой модели в sfcross недоступна опция bc?', ['gamma', 'hnormal', 'exponential', 'tnormal'], 0, 'Для gamma используйте jlms или u. Gamma к тому же часто не сходится.'],
+  ['Что такое λ в half-normal SFA?', ['σᵤ/σᵥ', 'σᵤ²/(σᵤ² + σᵥ²)', 'σᵥ/σᵤ', 'σᵤ + σᵥ'], 0, 'γ = σᵤ²/(σᵤ² + σᵥ²) — доля дисперсии неэффективности.'],
+  ['Cobb–Douglas в логарифмах: коэффициенты 0,153 и 0,543. Какая отдача от масштаба?', ['Убывающая', 'Возрастающая', 'Постоянная', 'Нельзя определить'], 0, 'Сумма эластичностей 0,696 < 1.'],
+  ['Как проверить согласованность TE из разных моделей?', ['Ранговая корреляция Спирмена между оценками', 'Сравнить средние TE', 'LR-тест', 'Тест на асимметрию'], 0, 'Уровни TE у моделей разные, а ранги обычно почти совпадают.'],
+  ['Какое свойство обязательно для функции издержек C(w, q)?', ['Однородность степени 1 по ценам ресурсов', 'Однородность степени 1 по выпуску', 'Вогнутость по выпуску', 'Независимость от цен'], 0, 'Удвоение всех цен удваивает минимальные издержки. Поэтому сумма степеней wᵢ в Cobb–Douglas-форме должна быть 1.'],
+  ['Когда есть economies of scope для двух продуктов?', ['C(q₁, q₂) < C(q₁, 0) + C(0, q₂)', 'C(q₁, q₂) > C(q₁, 0) + C(0, q₂)', 'Средние издержки падают с ростом выпуска', '∂C/∂q₁ > 0'], 0, 'Достаточное условие при отсутствии проблем с постоянными издержками — cost complementarity: ∂²C/∂q₁∂q₂ < 0.'],
+  ['Для FDH-неэффективной DMU проекция в DEA-Solver — это:', ['данные одной реально наблюдаемой доминирующей DMU', 'выпуклая комбинация нескольких DMU', 'точка на CRS-луче', 'средние по выборке'], 0, 'Отсюда и «frontier equation» FDH: просто вектор данных эталонной DMU.']
+];
+let qorder = [], qans = {};
+function quizMark(el, qi, pick) {
+  const [, , right, why] = QUIZ[qi];
+  el.querySelectorAll('button').forEach(x => { if (+x.dataset.i === right) x.classList.add('right'); else if (+x.dataset.i === pick) x.classList.add('wrong'); });
+  const w = el.querySelector('.why'); w.hidden = false; w.textContent = (pick === right ? 'Верно. ' : 'Неверно. ') + why;
+}
+function quizInit(shuffle) {
+  const saved = store.get('quiz', null);
+  if (!shuffle && saved && Array.isArray(saved.order) && saved.order.length === QUIZ.length) { qorder = saved.order; qans = saved.ans || {}; }
+  else {
+    qorder = QUIZ.map((_, i) => i); qans = {};
+    if (shuffle) for (let i = qorder.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [qorder[i], qorder[j]] = [qorder[j], qorder[i]]; }
+    store.set('quiz', { order: qorder, ans: qans });
+  }
+  $('qlist').innerHTML = qorder.map((qi, n) => {
+    const [q, opts] = QUIZ[qi];
+    const perm = opts.map((_, i) => i); for (let i = perm.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [perm[i], perm[j]] = [perm[j], perm[i]]; }
+    return `<div class="q" data-q="${qi}"><span class="eyebrow">Вопрос ${n + 1}</span><h4>${q}</h4><div class="opts">${perm.map(i => `<button data-i="${i}">${opts[i]}</button>`).join('')}</div><p class="why" hidden></p></div>`;
+  }).join('');
+  document.querySelectorAll('#qlist .q').forEach(el => {
+    const qi = +el.dataset.q;
+    if (qi in qans) quizMark(el, qi, qans[qi]);
+    el.querySelectorAll('button').forEach(b => b.onclick = () => {
+      if (qi in qans) return;
+      qans[qi] = +b.dataset.i; quizMark(el, qi, qans[qi]);
+      store.set('quiz', { order: qorder, ans: qans });
+      qscore();
+    });
+  });
+  qscore();
+}
+function qscore() { const k = Object.keys(qans).length, ok = Object.entries(qans).filter(([qi, p]) => p === QUIZ[qi][2]).length; $('qscore').textContent = k ? `${ok} из ${k} верно` : `${QUIZ.length} вопросов`; }
+$('qshuffle').onclick = () => quizInit(true);
+
+/* ===== Пробный экзамен ===== */
+const SEG = [['Часть 1', 12, 'var(--accent)'], ['Часть 2', 12, 'var(--warn)'], ['Часть 3', 50, 'var(--good)'], ['Часть 4', 40, 'var(--bad)'], ['Загрузка файлов', 6, 'var(--muted)']];
+let T = store.get('timer', { run: false, start: 0, acc: 0 });
+const elapsed = () => T.acc + (T.run ? (Date.now() - T.start) / 1000 : 0);
+function mtick() {
+  const e = Math.min(elapsed(), 7200), left = 7200 - e;
+  $('mclock').textContent = `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
+  let acc = 0, cur = SEG[SEG.length - 1];
+  for (const s of SEG) { if (e / 60 < acc + s[1]) { cur = s; break; } acc += s[1]; }
+  $('mbar').innerHTML = SEG.map(s => `<i style="width:${s[1] / 120 * 100}%;background:${s[2]};opacity:${s === cur && (T.run || e > 0) ? 1 : 0.35}"></i>`).join('');
+  $('mphase').textContent = left <= 0 ? 'Время вышло.' : (T.run || e > 0) ? `Сейчас по плану: ${cur[0]} (до ${String(Math.max(0, 120 - acc - cur[1])).padStart(2, '0')}:00 на часах)` : 'Нажмите «Старт», когда откроете вариант.';
+}
+$('mstart').onclick = () => { if (!T.run) { T = { run: true, start: Date.now(), acc: T.acc }; store.set('timer', T); } mtick(); };
+$('mpause').onclick = () => { if (T.run) { T = { run: false, start: 0, acc: elapsed() }; store.set('timer', T); } mtick(); };
+$('mreset').onclick = () => { T = { run: false, start: 0, acc: 0 }; store.set('timer', T); mtick(); };
+setInterval(mtick, 1000); mtick();
+
+let mockSeed = 0;
+function checker(items, part) {
+  const id = 'k' + part;
+  setTimeout(() => {
+    const root = $(id); if (!root) return;
+    const saved = store.get('mockin', {});
+    items.forEach((it, i) => {
+      const inp = $(id + '_' + i), key = part + '_' + i;
+      if (saved.seed === mockSeed && saved.v && saved.v[key] != null) inp.value = saved.v[key];
+      inp.addEventListener('input', () => { const s = store.get('mockin', {}); const v = s.seed === mockSeed ? { ...(s.v || {}) } : {}; v[key] = inp.value; store.set('mockin', { seed: mockSeed, v }); });
+    });
+    root.querySelector('.go').onclick = () => items.forEach((it, i) => {
+      const inp = $(id + '_' + i), v = inp.value.trim();
+      let ok;
+      if (it.text) ok = it.text(v);
+      else { const x = Number(v.replace(/\s/g, '').replace(',', '.')); ok = v !== '' && Number.isFinite(x) && Math.abs(x - it.val) <= it.tol; }
+      inp.classList.toggle('ok', !!ok); inp.classList.toggle('no', !ok);
+    });
+    root.querySelector('.show').onclick = () => items.forEach((it, i) => { $(id + '_a' + i).textContent = it.show ?? fmt(it.val, it.d ?? 4); });
+  });
+  return `<div id="${id}" class="stack"><div class="tw"><table class="t"><thead><tr><th>Что проверяем</th><th>Ваш ответ</th><th>Эталон</th></tr></thead><tbody>${items.map((it, i) => `<tr><td class="l">${it.label}</td><td><input class="chk-in" id="${id}_${i}" type="text" inputmode="decimal" aria-label="${esc(it.label)}"></td><td id="${id}_a${i}" class="mono"></td></tr>`).join('')}</tbody></table></div><div class="row"><button class="btn small go">Проверить</button><button class="btn small show">Показать эталон</button></div></div>`;
+}
+function newVariant(seed) {
+  const rnd = mulberry32(seed), ri = (a, b) => a + Math.floor(rnd() * (b - a + 1)), pickN = (arr, k) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a.slice(0, k); };
+  store.set('seed', seed); mockSeed = seed;
+  $('mseed').textContent = `Вариант №${seed}`;
+  let h = '';
+  // Часть 1
+  const base = parseDEA(FIRMS7), o = ri(0, 6);
+  const firms = ['Firm\t(I)Labor\t(I)Materials\t(I)Energy\t(O)Product 1\t(O)Product 2', ...base.names.map((n, j) => [n, ...base.X.map(r => Math.round(r[j] * (0.85 + 0.3 * rnd()))), ...base.Y.map(r => Math.round(r[j] * (0.85 + 0.3 * rnd())))].join('\t'))].join('\n');
+  const FD = parseDEA(firms);
+  h += `<div class="card"><span class="eyebrow">Часть 1 · 10 баллов · 12 минут</span><h3>DEA-модели для фирмы №${o + 1}</h3>${tableHTML(['Firm #', ...FD.inNames, ...FD.outNames], FD.names.map((n, j) => [n, ...FD.X.map(r => r[j]), ...FD.Y.map(r => r[j])]))}<ol class="steps small"><li>Запишите технологическое множество T для output-ориентированных моделей фирмы №${o + 1}.</li><li>Запишите output-oriented CCR.</li><li>Запишите output-oriented BCC.</li><li>Запишите FDH, если возможно, иначе объясните почему.</li></ol><details><summary>Эталон</summary><div class="body"><div class="formula">${esc(['T:', techText(FD, o), '', 'CCR-O:', lpText(FD, o, 'CCR-O'), '', 'BCC-O:', lpText(FD, o, 'BCC-O'), '', 'FDH (possible, from BCC with λ ∈ {0,1}):', lpText(FD, o, 'FDH-O')].join('\n'))}</div></div></details></div>`;
+  // Часть 2
+  const lin = rnd() < 0.6;
+  let kind, prm, x1, x2, y, w1, w2;
+  const prices = [5, 6, 7.5, 8, 10, 12, 15, 20];
+  if (lin) { kind = 'linear'; do { prm = { a1: ri(2, 6), a2: ri(2, 7) }; w1 = prices[ri(0, 7)]; w2 = prices[ri(0, 7)]; } while (Math.abs(w1 / prm.a1 - w2 / prm.a2) < 0.2); }
+  else { kind = 'cd'; prm = { A: [1.5, 2, 2.1, 2.5, 3][ri(0, 4)], a: 0.5, b: 0.5 }; w1 = ri(1, 6); w2 = ri(1, 6); if (w1 === w2) w2 += 2; }
+  x1 = ri(10, 40); x2 = ri(10, 40);
+  const fx = kind === 'linear' ? prm.a1 * x1 + prm.a2 * x2 : prm.A * Math.sqrt(x1 * x2);
+  y = Math.round(fx * (0.55 + 0.3 * rnd()));
+  const F = farrell(kind, prm, x1, x2, y, w1, w2);
+  h += `<div class="card"><span class="eyebrow">Часть 2 · 10 баллов · 12 минут</span><h3>Production economics</h3><p>Фирма выпускает y из x₁ и x₂ по технологии ${fdesc(kind, prm).replace('y = ', 'y = ')}. В отчётном периоде выпущено ${y} ед. при x₁ = ${x1}, x₂ = ${x2}. Цена x₁ — $${w1}, цена x₂ — $${w2}.</p><ol class="steps small"><li>Технически ли эффективен план? Докажите.</li><li>Рассчитайте TE.</li><li>Рассчитайте AE.</li><li>Рассчитайте общую эффективность и проверьте TE·AE = OE.</li></ol>` +
+    checker([{ label: 'TE', val: F.TE, tol: 0.005 }, { label: 'AE', val: F.AE, tol: 0.005 }, { label: 'OE', val: F.OE, tol: 0.005 }], 'p2') +
+    `<div class="row"><button class="btn small" id="m2open">Открыть разбор во вкладке 02</button></div></div>`;
+  // Часть 3
+  const s3 = pickN(HPS_ROWS, 50).sort((a, b) => +a.name.split(' ')[1] - +b.name.split(' ')[1]);
+  const lnTxt = hpsLn(s3);
+  const L3 = lnTxt.split('\n').slice(1).map(l => l.split('\t'));
+  const y3 = L3.map(r => +r[3]), X3 = L3.map(r => [1, +r[1], +r[2]]);
+  const o3 = olsFull(y3, X3), d3 = dpfCols(y3, X3, false), hn = sfaFit(y3, X3, 'hnormal', false), ex = sfaFit(y3, X3, 'exponential', false);
+  const mean = a => a.reduce((s, v) => s + v, 0) / a.length;
+  h += `<div class="card"><span class="eyebrow">Часть 3 · 30 баллов · 50 минут</span><h3>DPF и SFA: выборка из 50 станций (ln, GJ)</h3><p class="small">Энергия = 3,6·MWh + 4,1868·Gcal. Скопируйте данные в Stata (точка как разделитель) и выполните do-файл из вкладки 03.</p><div class="row"><button class="btn small" id="m3copy">Копировать данные для Stata</button><button class="btn small" id="m3open">Открыть в разборе 03</button></div>` +
+    checker([{ label: 'OLS: константа', val: o3.beta[0], tol: 0.005 }, { label: 'OLS: эластичность по газу', val: o3.beta[1], tol: 0.005 }, { label: 'OLS: эластичность по мазуту', val: o3.beta[2], tol: 0.005 }, { label: 'R²', val: o3.r2, tol: 0.005 }, { label: 'DPF: константа', val: d3.a0, tol: 0.005 }, { label: 'DPF: средняя TE', val: mean(d3.te), tol: 0.005 }, { label: 'Станция на границе DPF', text: v => v.replace(/\D/g, '') === s3[d3.imax].name.replace(/\D/g, ''), show: s3[d3.imax].name.replace('H&P', 'HPS') }, { label: 'SFA hnorm: средняя TE (bc)', val: hn.teStat.mean, tol: 0.01 }, { label: 'SFA expon: средняя TE (bc)', val: ex.teStat.mean, tol: 0.01 }, { label: 'LR hnorm', val: hn.LR, tol: 0.1, d: 3 }], 'p3') + `</div>`;
+  // Часть 4
+  const s4 = pickN(HPS_ROWS, 50).sort((a, b) => +a.name.split(' ')[1] - +b.name.split(' ')[1]);
+  const deaTxt = hpsDEA(s4), D4 = parseDEA(deaTxt), R4 = deaSolveAll(D4, false), rule = selectRule(D4, R4);
+  const cnt = m => R4[m].filter(r => isEff(r.score)).length;
+  const names4 = rule.pick.map(j => D4.names[j].replace(/\D/g, ''));
+  h += `<div class="card"><span class="eyebrow">Часть 4 · 20 баллов · 40 минут</span><h3>DEA: 50 станций</h3><ol class="steps small"><li>CCR-I, BCC-I и FDH в DEA-Solver, файлы сохранить.</li><li>Сравнить ранги, объяснить разницу в числе эффективных DMU.</li><li>Выбрать 2 неэффективные DMU по правилу (сначала FDH).</li><li>Reference sets, frontier equations, самые частые пиры CCR-I, projections с интерпретацией.</li></ol><div class="row"><button class="btn small" id="m4copy">Копировать данные для DEA-Solver</button><button class="btn small" id="m4open">Открыть в разборе 04</button></div>` +
+    checker([{ label: 'Эффективных в CCR-I', val: cnt('CCR-I'), tol: 0, d: 0 }, { label: 'Эффективных в BCC-I', val: cnt('BCC-I'), tol: 0, d: 0 }, { label: 'Эффективных в FDH', val: cnt('FDH-I'), tol: 0, d: 0 }, { label: 'Средняя CCR-I', val: mean(R4['CCR-I'].map(r => r.score)), tol: 0.0005 },
+    { label: 'Выбранные DMU r и k (номера через запятую)', text: v => { const a = v.split(/[,;\s]+/).map(s => s.replace(/\D/g, '')).filter(Boolean); return a.length === names4.length && names4.every(n => a.includes(n)); }, show: names4.join(', ') },
+    ...rule.pick.map(j => ({ label: `CCR-I оценка ${D4.names[j]}`, val: R4['CCR-I'][j].score, tol: 0.0005 }))], 'p4') + `</div>`;
+  $('mout').innerHTML = h;
+  $('m2open').onclick = () => { farrellPreset(kind, kind === 'linear' ? [prm.a1, prm.a2] : [prm.A, prm.a, prm.b], [x1, x2, y, w1, w2]); showTab('t2'); window.scrollTo({ top: 0 }); };
+  $('m3copy').onclick = e => copyText(lnTxt, e.target);
+  $('m3open').onclick = () => { $('t3data').value = lnTxt; $('t3log').checked = false; t3cols(); showTab('t3'); t3run(); window.scrollTo({ top: 0 }); };
+  $('m4copy').onclick = e => copyText('ARA mock\t' + deaTxt.split('\n')[0].split('\t').slice(1).join('\t') + '\n' + deaTxt.split('\n').slice(1).join('\n'), e.target);
+  $('m4open').onclick = () => { $('t4data').value = deaTxt; showTab('t4'); t4run(); window.scrollTo({ top: 0 }); };
+}
+$('mnew').onclick = () => newVariant(1000 + Math.floor(Math.random() * 9000));
+
+/* ===== старт ===== */
+t1render();
+setKind('linear', true); farrellRender();
+$('t3data').value = store.get('d.t3', ['HPS\tln_gas\tln_oil\tln_energy', ...VAR2.map(r => r.join('\t'))].join('\n')); t3cols();
+$('t4data').value = store.get('d.t4', hpsDEA(HPS_ROWS));
+t3run(); t4run();
+quizInit(false);
+newVariant(store.get('seed', 2026));
+let start = 'plan'; try { const hsh = location.hash.replace('#', ''); start = TABS.includes(hsh) ? hsh : store.get('tab', 'plan'); } catch (e) { }
+showTab(start);
+
+})();
+</script>
+</body>
+</html>
