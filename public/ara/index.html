@@ -29,7 +29,8 @@
   --good: #52C78F; --good-soft: #153021; --warn: #E7AF55; --warn-soft: #33290F; --bad: #F27A70; --bad-soft: #3B1D1A; color-scheme: dark }
 * { box-sizing: border-box }
 body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body); }
-.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 20px; padding-block: 0 64px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 20px; padding-block: 8px 40px; }
+.foot { padding-top: 28px; font-size: 12.5px; color: var(--muted); }
 h1, h2, h3, h4 { text-wrap: balance; margin: 0; }
 h1 { font: 700 clamp(24px, 4.2vw, 38px)/1.1 var(--display); letter-spacing: -0.01em; }
 h2 { font: 600 clamp(19px, 2.6vw, 24px)/1.25 var(--display); letter-spacing: -0.005em; }
@@ -188,28 +189,6 @@ svg text { font-family: var(--body); }
 </head>
 <body>
 <div class="wrap">
-  <header class="top">
-    <div class="lead">
-      <span class="eyebrow">Advanced Research and Analysis · пересдача</span>
-      <h1>Тренажёр ARA</h1>
-      <div class="chips">
-        <span class="chip hot">пт 09.10 · 18:00</span>
-        <span class="chip">ауд. 105 (Fedotov I.) или 211 (Khokhlova A.) — уточнить слот</span>
-        <span class="chip">open-book онлайн · 120 мин</span>
-        <span class="chip">70 баллов · сдано от 50 с проектами</span>
-      </div>
-    </div>
-    <div class="count">
-      <svg class="frontier-mark" viewBox="0 0 140 70" aria-hidden="true">
-        <polyline class="fl" fill="none" stroke-width="2" points="14,4 22,30 48,48 92,58 136,62"/>
-        <circle class="pe" cx="22" cy="30" r="3"/><circle class="pe" cx="48" cy="48" r="3"/><circle class="pe" cx="92" cy="58" r="3"/>
-        <circle class="pt" cx="60" cy="24" r="2.5"/><circle class="pt" cx="88" cy="36" r="2.5"/><circle class="pt" cx="40" cy="14" r="2.5"/><circle class="pt" cx="118" cy="44" r="2.5"/>
-      </svg>
-      <span class="eyebrow">до начала экзамена</span>
-      <b id="cd">—</b>
-      <span class="small muted" id="sync"></span>
-    </div>
-  </header>
 
   <nav class="tabs" role="tablist" aria-label="Разделы">
     <button data-tab="plan" role="tab"><span>00</span>План</button>
@@ -1080,6 +1059,7 @@ predict tej_hn, jlms     // exp(-E[u|e])
     </div>
     <div id="mout" class="stack" style="gap:18px"></div>
   </section>
+  <p class="foot" id="sync"></p>
 </div>
 <script>
 /* ===== Чистые расчётные функции: LP-симплекс, DEA, SFA, APIS ===== */
@@ -1713,14 +1693,7 @@ function showTab(id) {
 }
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { showTab(b.dataset.tab); window.scrollTo({ top: 0 }); });
 
-const EXAM = new Date('2026-10-09T18:00:00+03:00');
-function tick() {
-  const ms = EXAM - Date.now();
-  if (ms <= 0) { $('cd').textContent = ms > -7.2e6 ? 'идёт экзамен' : 'экзамен прошёл'; return; }
-  const h = Math.floor(ms / 3.6e6), m = Math.floor(ms % 3.6e6 / 6e4);
-  $('cd').textContent = (h >= 24 ? Math.floor(h / 24) + ' д ' + (h % 24) + ' ч ' : h + ' ч ') + m + ' мин';
-}
-tick(); setInterval(tick, 30000);
+
 
 const CHECK = [
   ['Сегодня, 8 октября', [
