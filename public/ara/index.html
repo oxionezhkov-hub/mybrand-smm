@@ -149,6 +149,29 @@ table.t tr.sel td { background: var(--accent-soft); }
 .chk-in.ok { border-color: var(--good); background: var(--good-soft); }
 .chk-in.no { border-color: var(--bad); background: var(--bad-soft); }
 
+/* теория */
+.toc { display: flex; flex-wrap: wrap; gap: 6px; }
+.toc button { font: 500 13px/1.2 var(--body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; cursor: pointer; }
+.toc button:hover { border-color: var(--accent); }
+article.th { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; display: grid; gap: 14px; min-width: 0; scroll-margin-top: 60px; }
+article.th h3 { font: 600 19px/1.3 var(--display); display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; align-items: baseline; }
+article.th h3 .tn { font: 700 20px/1 var(--display); color: var(--accent); grid-row: span 2; }
+article.th h3 .ru-t { font: 500 14px/1.35 var(--body); color: var(--muted); grid-column: 2; }
+.bi { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.bi > div { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.bi > div[lang="en"] { padding-right: 24px; border-right: 1px solid var(--line); }
+.bi > div::before { font: 600 11px/1 var(--mono); letter-spacing: 0.08em; color: var(--muted); }
+.bi > div[lang="en"]::before { content: "EN"; }
+.bi > div[lang="ru"]::before { content: "RU"; }
+.th p, .th li { max-width: 68ch; }
+.exam { background: var(--accent-soft); border-radius: 8px; padding: 10px 12px; font-size: 14px; max-width: none !important; }
+[data-lang="ru"] .bi > div[lang="en"], [data-lang="en"] .bi > div[lang="ru"] { display: none; }
+[data-lang="ru"] .bi, [data-lang="en"] .bi { grid-template-columns: minmax(0, 1fr); }
+[data-lang="ru"] .bi > div[lang="en"], [data-lang="en"] .bi > div[lang="en"] { border-right: 0; padding-right: 0; }
+[data-lang="en"] article.th h3 .ru-t { display: none; }
+.lang-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+@media (max-width: 860px) { .bi { grid-template-columns: minmax(0, 1fr); } .bi > div[lang="en"] { border-right: 0; padding-right: 0; padding-bottom: 16px; border-bottom: 1px solid var(--line); } }
+a.btn { text-decoration: none; display: inline-block; }
 svg text { font-family: var(--body); }
 .ax { stroke: var(--muted); stroke-width: 1; }
 .grid-l { stroke: var(--line); stroke-width: 1; }
@@ -190,6 +213,7 @@ svg text { font-family: var(--body); }
 
   <nav class="tabs" role="tablist" aria-label="Разделы">
     <button data-tab="plan" role="tab"><span>00</span>План</button>
+    <button data-tab="theory" role="tab"><span>T</span>Теория</button>
     <button data-tab="t1" role="tab"><span>01</span>DEA-модели</button>
     <button data-tab="t2" role="tab"><span>02</span>Фаррелл и экономика</button>
     <button data-tab="t3" role="tab"><span>03</span>DPF и SFA</button>
@@ -265,6 +289,531 @@ svg text { font-family: var(--body); }
         </div>
       </div>
     </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="panel-head">
+          <span class="eyebrow">Программы</span>
+          <h2>Где взять Stata</h2>
+          <p class="small muted">Stata платная, свободно скачать её нельзя. Варианты по порядку, начните сегодня.</p>
+        </div>
+        <ol class="steps small">
+          <li><b>Компьютеры в аудитории.</b> По программе курса часть занятий идёт в компьютерном классе с установленными Stata, DEA-Solver, PIM-DEA и APIS. Спросите у преподавателя или учебного офиса, стоят ли Stata и DEA-Solver на компьютерах в ауд. 105 и 211.</li>
+          <li><b>Лицензия университета.</b> Напишите в IT-службу ВШМ СПбГУ или преподавателю: есть ли студенческий доступ к Stata для своего ноутбука.</li>
+          <li><b>Временная лицензия от StataCorp.</b> Студентам на курсе дают бесплатную лицензию на 7 дней через форму <a href="https://www.stata.com/customer-service/short-term-license" target="_blank" rel="noopener">stata.com/customer-service/short-term-license</a>. Нужны ФИО, университет и ссылка на ваш профиль на сайте вуза; ссылка на скачивание приходит на почту. Сколько ждать обработки, не гарантируется, поэтому отправляйте заявку сразу.</li>
+          <li><b>Команда sfcross ставится из интернета:</b> <code>ssc install sfcross</code>. Сделайте это сегодня. Если не получится, во встроенной команде Stata <code>frontier</code> есть hnormal, exponential и tnormal (gamma нет): <code>frontier lny lnx1 lnx2, distribution(hnormal)</code>, затем <code>predict te, te</code>.</li>
+          <li><b>Если Stata не будет совсем:</b> вкладка 03 считает OLS, DPF и три SFA-модели. Числа для таблиц у вас будут, но файлов Stata для загрузки нет; предупредите преподавателя заранее.</li>
+        </ol>
+        <p class="small muted">DEA-Solver уже лежит в материалах курса (<code>DEA-SOLVER-LV8.xlsm</code>). Ему нужен Excel с включёнными макросами, надёжнее всего на Windows.</p>
+      </div>
+      <div class="card">
+        <div class="panel-head">
+          <span class="eyebrow">Офлайн</span>
+          <h2>Если пропадёт интернет</h2>
+        </div>
+        <ul class="clean small">
+          <li><b>Все расчёты идут в браузере.</b> Если страница уже открыта, она работает без сети целиком: теория, калькуляторы, тест, таймер.</li>
+          <li><b>Страница сохраняется в браузере.</b> После первого открытия с интернетом адрес <code>/ara/</code> откроется и без сети (на том же устройстве и в том же браузере).</li>
+          <li><b>Файл на ноутбуке.</b> Скачайте страницу кнопкой ниже и откройте двойным щелчком: работает без сети, но прогресс тогда хранится только в этом браузере.</li>
+          <li><b>Прогресс без сети</b> сохраняется в браузере и отправится на сервер, когда вы снова откроете страницу онлайн.</li>
+          <li><b>Сам экзамен онлайн:</b> вариант и загрузка ответов — в Blackboard. Держите запасной канал, например раздачу интернета с телефона.</li>
+        </ul>
+        <div class="row" id="dlrow"><a class="btn primary" id="dlbtn" href="/ara/" download="ARA-trainer.html">Скачать страницу файлом</a><span class="small muted" id="offstat"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== ТЕОРИЯ ========== -->
+  <section class="panel" id="tab-theory" role="tabpanel" hidden>
+    <div class="panel-head">
+      <span class="eyebrow">Theory from zero · Теория с нуля</span>
+      <h2>Всё, что нужно понять к экзамену</h2>
+      <p class="muted">Каждая тема на английском (как в экзамене и учебниках) и на русском. Читайте по порядку: темы опираются друг на друга. В конце каждой темы — что именно спрашивают в варианте.</p>
+    </div>
+    <div class="row" role="group" aria-label="Язык">
+      <span class="small muted">Показывать:</span>
+      <button class="btn small lang-btn" data-lang="both">EN + RU</button>
+      <button class="btn small lang-btn" data-lang="ru">Только RU</button>
+      <button class="btn small lang-btn" data-lang="en">Only EN</button>
+    </div>
+    <nav class="toc" id="toc" aria-label="Темы"></nav>
+
+    <article class="th" id="th-1" data-title="1. Big picture">
+      <h3><span class="tn">1</span> Big picture: performance, productivity, efficiency <span class="ru-t">Общая картина: результативность, производительность, эффективность</span></h3>
+      <div class="bi">
+        <div lang="en">
+          <p><b>Performance measurement</b> is quantifying how well a unit turns resources into results (Neely: “the process of quantifying the efficiency and effectiveness of action”).</p>
+          <p><b>Productivity</b> is a ratio: output / input. With one input it is a partial productivity (e.g. energy per tonne of fuel); with all inputs combined it is total factor productivity (TFP).</p>
+          <p><b>Efficiency</b> compares a unit with the <b>best possible</b> result, not with the average. The best possible results form the <b>frontier</b>: maximum output for given inputs, or minimum inputs for given output. A unit on the frontier is efficient (score 1); a unit inside it is inefficient (score &lt; 1).</p>
+          <p>The units being compared are called <b>DMUs</b> (decision-making units): firms, hospitals, heat &amp; power stations.</p>
+          <p><b>Frontier analysis</b> builds the frontier from data and measures each DMU's distance to it. Two families:</p>
+          <ul class="clean"><li><b>Parametric</b> (econometrics): assume a formula for the frontier, e.g. Cobb–Douglas. Methods: DPF, SFA.</li><li><b>Non-parametric</b> (linear programming): no formula, the frontier is built from the best observed DMUs. Methods: DEA (CCR, BCC), FDH.</li></ul>
+          <p>Benchmarking = comparing with best practice to find how much and where to improve. Frontier methods are formal benchmarking.</p>
+        </div>
+        <div lang="ru">
+          <p><b>Измерение результативности</b> — количественная оценка того, насколько хорошо единица превращает ресурсы в результат (Нили: «процесс количественной оценки эффективности и результативности действий»).</p>
+          <p><b>Производительность</b> — отношение выпуска к затратам. По одному ресурсу это частная производительность (энергия на тонну топлива), по всем сразу — совокупная факторная производительность (TFP).</p>
+          <p><b>Эффективность</b> сравнивает единицу с <b>лучшим возможным</b> результатом, а не со средним. Лучшие возможные результаты образуют <b>границу (frontier)</b>: максимум выпуска при данных затратах или минимум затрат при данном выпуске. Единица на границе эффективна (оценка 1), внутри — неэффективна (оценка &lt; 1).</p>
+          <p>Сравниваемые единицы называют <b>DMU</b> (decision-making units): фирмы, больницы, ТЭЦ.</p>
+          <p><b>Граничный анализ</b> строит границу по данным и измеряет расстояние до неё. Два семейства:</p>
+          <ul class="clean"><li><b>Параметрические</b> (эконометрика): границу задают формулой, например Кобба–Дугласа. Методы: DPF, SFA.</li><li><b>Непараметрические</b> (линейное программирование): формулы нет, граница строится по лучшим наблюдаемым DMU. Методы: DEA (CCR, BCC), FDH.</li></ul>
+          <p>Бенчмаркинг — сравнение с лучшей практикой, чтобы понять, где и насколько улучшаться. Граничные методы — формализованный бенчмаркинг.</p>
+        </div>
+      </div>
+      <p class="exam"><b>На экзамене:</b> напрямую не спрашивают, но без этой рамки не понять остальные темы. В выводах всегда пишите, что оценка — расстояние до границы лучшей практики.</p>
+    </article>
+
+    <article class="th" id="th-2" data-title="2. Technology">
+      <h3><span class="tn">2</span> Production technology <span class="ru-t">Технология производства</span></h3>
+      <div class="bi">
+        <div lang="en">
+          <p>Inputs x = (x₁,…,xₙ), outputs y = (y₁,…,yₘ). A <b>production plan</b> is a pair (x, y).</p>
+          <p>The <b>technology set</b> (graph) T = {(x, y): x can produce y} is the set of all feasible plans. Two views of the same set:</p>
+          <ul class="clean"><li><b>Input set</b> L(y): all input bundles that can produce y.</li><li><b>Output set</b> P(x): all output bundles that x can produce.</li></ul>
+          <p>Their boundaries are <b>isoquants</b>. The input isoquant Isoq L(y) contains bundles that cannot be shrunk radially and still produce y.</p>
+          <p><b>Technical efficiency (Pareto–Koopmans)</b>: a plan is efficient if you cannot increase any output or decrease any input without worsening something else.</p>
+          <p>Assumptions about T decide which DEA model you get:</p>
+          <ul class="clean"><li><b>Free disposability</b>: more input can always produce at least the same output (you can waste). Gives <b>FDH</b>.</li><li>+ <b>Convexity</b>: mixtures of feasible plans are feasible. Gives <b>BCC</b> (VRS).</li><li>+ <b>Constant returns to scale</b>: if (x, y) is feasible, so is (kx, ky). Gives <b>CCR</b> (CRS).</li></ul>
+          <p>Built from n observed DMUs with input matrix X and output matrix Y:</p>
+        </div>
+        <div lang="ru">
+          <p>Ресурсы x = (x₁,…,xₙ), продукты y = (y₁,…,yₘ). <b>Производственный план</b> — пара (x, y).</p>
+          <p><b>Технологическое множество</b> (граф) T = {(x, y): из x можно произвести y} — все допустимые планы. Два взгляда на него:</p>
+          <ul class="clean"><li><b>Множество затрат</b> L(y): все наборы ресурсов, из которых можно получить y.</li><li><b>Множество выпусков</b> P(x): все наборы продуктов, которые можно получить из x.</li></ul>
+          <p>Их границы — <b>изокванты</b>. Входная изокванта Isoq L(y) — наборы, которые нельзя пропорционально уменьшить, сохранив выпуск y.</p>
+          <p><b>Техническая эффективность по Парето–Купмансу</b>: план эффективен, если нельзя увеличить ни один выпуск или уменьшить ни один ресурс, не ухудшив чего-то другого.</p>
+          <p>Предпосылки о T определяют модель DEA:</p>
+          <ul class="clean"><li><b>Свободное распоряжение</b> (free disposability): из большего ресурса можно получить не меньше. Даёт <b>FDH</b>.</li><li>+ <b>Выпуклость</b>: смесь допустимых планов допустима. Даёт <b>BCC</b> (переменная отдача, VRS).</li><li>+ <b>Постоянная отдача</b>: если (x, y) допустим, то и (kx, ky). Даёт <b>CCR</b> (CRS).</li></ul>
+          <p>По n наблюдаемым DMU с матрицей ресурсов X и выпусков Y:</p>
+        </div>
+      </div>
+      <div class="formula">T_CCR = {(x, y): Xλ ≤ x, Yλ ≥ y, λ ≥ 0}
+T_BCC = T_CCR ∩ {Σλⱼ = 1}
+T_FDH = T_BCC ∩ {λⱼ ∈ {0, 1}}        ⇒   T_FDH ⊆ T_BCC ⊆ T_CCR</div>
+      <p class="exam"><b>На экзамене (часть 1, задание i):</b> «write down the technological set T for firm #5». Пишете систему: для каждого ресурса Σλⱼxᵢⱼ ≤ xᵢ,₅, для каждого продукта Σλⱼyᵣⱼ ≥ yᵣ,₅, λ ≥ 0. Готовый текст даёт вкладка 01.</p>
+    </article>
+
+    <article class="th" id="th-3" data-title="3. Production function">
+      <h3><span class="tn">3</span> Production function and returns to scale <span class="ru-t">Производственная функция и отдача от масштаба</span></h3>
+      <div class="bi">
+        <div lang="en">
+          <p>With one output, the frontier is a <b>production function</b> y = f(x): the maximum output from inputs x.</p>
+          <ul class="clean">
+            <li>Average product AP₁ = f(x)/x₁; marginal product MP₁ = ∂f/∂x₁.</li>
+            <li>Output elasticity eᵢ = ∂ln y / ∂ln xᵢ: % change in y when xᵢ rises by 1%.</li>
+            <li>MRTS = MP₁/MP₂ = slope of the isoquant (how much x₂ replaces one unit of x₁).</li>
+          </ul>
+          <p><b>Returns to scale</b>: multiply all inputs by k &gt; 1. If output rises exactly k times — constant (CRS); less — decreasing (DRS); more — increasing (IRS). Scale elasticity = Σ eᵢ.</p>
+          <p>Functional forms used in the course:</p>
+          <ul class="clean">
+            <li><b>Linear</b> y = a₁x₁ + a₂x₂: perfect substitutes, straight-line isoquant, CRS.</li>
+            <li><b>Leontief</b> y = min(x₁/a, x₂/b): fixed proportions, L-shaped isoquant.</li>
+            <li><b>Cobb–Douglas</b> y = A·x₁^α·x₂^β. In logs: ln y = ln A + α ln x₁ + β ln x₂. α, β are elasticities; α + β = 1 CRS, &lt; 1 DRS, &gt; 1 IRS.</li>
+            <li><b>Translog</b>: Cobb–Douglas plus ½(ln x₁)², ½(ln x₂)² and ln x₁·ln x₂ terms. More flexible.</li>
+          </ul>
+        </div>
+        <div lang="ru">
+          <p>При одном продукте граница — <b>производственная функция</b> y = f(x): максимальный выпуск из ресурсов x.</p>
+          <ul class="clean">
+            <li>Средний продукт AP₁ = f(x)/x₁; предельный MP₁ = ∂f/∂x₁.</li>
+            <li>Эластичность выпуска eᵢ = ∂ln y / ∂ln xᵢ: на сколько % вырастет y при росте xᵢ на 1%.</li>
+            <li>MRTS = MP₁/MP₂ — наклон изокванты (сколько x₂ заменяет единицу x₁).</li>
+          </ul>
+          <p><b>Отдача от масштаба</b>: умножаем все ресурсы на k &gt; 1. Выпуск вырос ровно в k раз — постоянная (CRS); меньше — убывающая (DRS); больше — возрастающая (IRS). Эластичность масштаба = Σ eᵢ.</p>
+          <p>Формы в курсе:</p>
+          <ul class="clean">
+            <li><b>Линейная</b> y = a₁x₁ + a₂x₂: совершенные заменители, изокванта — прямая, CRS.</li>
+            <li><b>Леонтьева</b> y = min(x₁/a, x₂/b): фиксированные пропорции, изокванта-угол.</li>
+            <li><b>Кобба–Дугласа</b> y = A·x₁^α·x₂^β. В логарифмах: ln y = ln A + α ln x₁ + β ln x₂. α, β — эластичности; α + β = 1 — CRS, &lt; 1 — DRS, &gt; 1 — IRS.</li>
+            <li><b>Транслог</b>: Кобб–Дуглас плюс ½(ln x₁)², ½(ln x₂)² и ln x₁·ln x₂. Гибче.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="exam"><b>На экзамене (часть 3):</b> после OLS пишут «0,153 + 0,543 = 0,696 &lt; 1 ⇒ decreasing returns to scale». Коэффициенты ln–ln модели называйте elasticities.</p>
+    </article>
+
+    <article class="th" id="th-4" data-title="4. Farrell">
+      <h3><span class="tn">4</span> Farrell efficiency: TE, AE, OE <span class="ru-t">Эффективность по Фарреллу</span></h3>
+      <div class="bi">
+        <div lang="en">
+          <p>Farrell (1957) splits overall inefficiency into a technical and a price part. Setting: CRS frontier, two inputs, known input prices w₁, w₂.</p>
+          <ul class="clean">
+            <li><b>B</b> — the actual plan.</li>
+            <li><b>B′</b> — where the ray OB crosses the isoquant: same input mix, no waste.</li>
+            <li><b>S</b> — the cost-minimising point on the isoquant (isocost tangent to it, or a corner for a linear frontier).</li>
+            <li><b>F</b> — where the ray OB crosses the minimal isocost line.</li>
+          </ul>
+          <div class="formula">TE = OB′/OB = C(B′)/C(B)   technical: wasted inputs
+AE = OF/OB′ = C(S)/C(B′)   allocative: wrong input mix for these prices
+OE = OF/OB  = C(S)/C(B)  = TE × AE</div>
+          <p>Points on one ray differ only by scale, so distance ratios equal cost ratios: that is why the exam answer uses costs.</p>
+          <p><b>Algorithm:</b> 1) f(x_actual) &gt; y? then inefficient. 2) B′: scale x by θ so f(θx) = y; TE = θ. 3) S: cost minimum for y (linear: use only the input with the lower wᵢ/aᵢ; Cobb–Douglas: x₂/x₁ = βw₁/(αw₂)). 4) C(S), then AE = C(S)/C(B′), OE = C(S)/C(B). 5) Check TE·AE = OE.</p>
+        </div>
+        <div lang="ru">
+          <p>Фаррелл (1957) делит общую неэффективность на техническую и ценовую. Условия: граница с постоянной отдачей, два ресурса, известны цены w₁, w₂.</p>
+          <ul class="clean">
+            <li><b>B</b> — фактический план.</li>
+            <li><b>B′</b> — пересечение луча OB с изоквантой: та же структура ресурсов, без перерасхода.</li>
+            <li><b>S</b> — точка минимума издержек на изокванте (касание изокосты; у линейной границы — угол).</li>
+            <li><b>F</b> — пересечение луча OB с минимальной изокостой.</li>
+          </ul>
+          <div class="formula">TE = OB′/OB = C(B′)/C(B)   техническая: лишние ресурсы
+AE = OF/OB′ = C(S)/C(B′)   аллокативная: неверная структура при этих ценах
+OE = OF/OB  = C(S)/C(B)  = TE × AE</div>
+          <p>Точки на одном луче отличаются только масштабом, поэтому отношения отрезков равны отношениям издержек — так и считают в ответе.</p>
+          <p><b>Алгоритм:</b> 1) f(x_факт) &gt; y? Значит неэффективен. 2) B′: сжать x в θ раз, чтобы f(θx) = y; TE = θ. 3) S: минимум издержек для y (линейная — только ресурс с меньшим wᵢ/aᵢ; Кобб–Дуглас — x₂/x₁ = βw₁/(αw₂)). 4) C(S), затем AE = C(S)/C(B′), OE = C(S)/C(B). 5) Проверка TE·AE = OE.</p>
+        </div>
+      </div>
+      <p class="exam"><b>На экзамене (часть 2, 2026):</b> y = 3x₁ + 5x₂, x = (30; 15), y = 110, цены 7,5 и 15. Ответ: TE = 0,667, AE = 0,917, OE = 0,611. Калькулятор и готовый текст — во вкладке 02.</p>
+    </article>
+
+    <article class="th" id="th-5" data-title="5. Distance functions">
+      <h3><span class="tn">5</span> Distance functions <span class="ru-t">Функции расстояния</span></h3>
+      <div class="bi">
+        <div lang="en">
+          <p>Shephard's distance functions describe a multi-input, multi-output technology without prices and measure efficiency directly.</p>
+          <div class="formula">Input:  Dᵢ(y, x) = max{λ: x/λ ∈ L(y)} ≥ 1,  TE_input = 1/Dᵢ
+Output: Dₒ(x, y) = min{μ: y/μ ∈ P(x)} ≤ 1,  TE_output = Dₒ</div>
+          <p>Dᵢ = 1.25 means inputs can be divided by 1.25 (cut by 20%) and still produce y: TE = 0.8. A DMU on the isoquant has Dᵢ = 1.</p>
+          <p>Properties of Dᵢ: decreasing in y, increasing in x, homogeneous of degree 1 in x, concave in x. Under CRS Dᵢ = 1/Dₒ.</p>
+          <p>DEA computes exactly these: input-oriented θ* = 1/Dᵢ, output-oriented η* = 1/Dₒ.</p>
+        </div>
+        <div lang="ru">
+          <p>Функции расстояния Шепарда описывают технологию со многими ресурсами и продуктами без цен и сразу измеряют эффективность.</p>
+          <div class="formula">Входная:  Dᵢ(y, x) = max{λ: x/λ ∈ L(y)} ≥ 1,  TE_вход = 1/Dᵢ
+Выходная: Dₒ(x, y) = min{μ: y/μ ∈ P(x)} ≤ 1,  TE_выход = Dₒ</div>
+          <p>Dᵢ = 1,25 значит: ресурсы можно разделить на 1,25 (сократить на 20%) и всё равно получить y, TE = 0,8. На изокванте Dᵢ = 1.</p>
+          <p>Свойства Dᵢ: убывает по y, растёт по x, однородна степени 1 по x, вогнута по x. При CRS Dᵢ = 1/Dₒ.</p>
+          <p>DEA считает именно их: входная θ* = 1/Dᵢ, выходная η* = 1/Dₒ.</p>
+        </div>
+      </div>
+      <p class="exam"><b>На экзамене:</b> как теоретический вопрос или тест в Blackboard: определение, связь с TE, свойства.</p>
+    </article>
+
+    <article class="th" id="th-6" data-title="6. Cost function">
+      <h3><span class="tn">6</span> Cost function, economies of scale and scope <span class="ru-t">Функция издержек, экономия от масштаба и разнообразия</span></h3>
+      <div class="bi">
+        <div lang="en">
+          <p>C(w, y) = min {w·x : x ∈ L(y)} — the minimum cost of producing y at input prices w.</p>
+          <p>Properties: non-decreasing in w and y, <b>homogeneous of degree 1 in w</b> (double all prices → cost doubles), concave in w. Shephard's lemma: xᵢ* = ∂C/∂wᵢ.</p>
+          <p>For C = g(w)·h(y) with g = ∏wᵢ^aᵢ, homogeneity requires Σaᵢ = 1.</p>
+          <p><b>Economies of scale</b>: average cost falls as output grows.</p>
+          <p><b>Economies of scope</b>: producing together is cheaper than separately:</p>
+          <div class="formula">C(q₁, q₂) &lt; C(q₁, 0) + C(0, q₂)
+SC = [C(q₁,0) + C(0,q₂) − C(q₁,q₂)] / C(q₁,q₂) &gt; 0
+Cost complementarity: ∂²C/∂q₁∂q₂ &lt; 0  ⇒ economies of scope</div>
+          <p>If two products sit in separate additive terms of C, their cross derivative is 0: no cost complementarity between them.</p>
+        </div>
+        <div lang="ru">
+          <p>C(w, y) = min {w·x : x ∈ L(y)} — минимальные издержки выпуска y при ценах ресурсов w.</p>
+          <p>Свойства: не убывает по w и y, <b>однородна степени 1 по w</b> (цены удвоились — издержки удвоились), вогнута по w. Лемма Шепарда: xᵢ* = ∂C/∂wᵢ.</p>
+          <p>Для C = g(w)·h(y) с g = ∏wᵢ^aᵢ однородность требует Σaᵢ = 1.</p>
+          <p><b>Экономия от масштаба</b>: средние издержки падают с ростом выпуска.</p>
+          <p><b>Экономия от разнообразия (scope)</b>: вместе производить дешевле, чем по отдельности:</p>
+          <div class="formula">C(q₁, q₂) &lt; C(q₁, 0) + C(0, q₂)
+SC = [C(q₁,0) + C(0,q₂) − C(q₁,q₂)] / C(q₁,q₂) &gt; 0
+Комплементарность издержек: ∂²C/∂q₁∂q₂ &lt; 0  ⇒ экономия от разнообразия</div>
+          <p>Если два продукта стоят в разных слагаемых C, смешанная производная равна 0: комплементарности между ними нет.</p>
+        </div>
+      </div>
+      <p class="exam"><b>На экзамене (часть 2, 2020):</b> дана функция издержек для 3 продуктов. Нужно назвать меры (SC, cost complementarity), для каждой пары посчитать смешанную производную и сказать, где есть экономия. Проверьте и однородность по ценам.</p>
+    </article>
+
+    <article class="th" id="th-7" data-title="7. Average PF (OLS)">
+      <h3><span class="tn">7</span> Average production function (OLS) <span class="ru-t">Средняя производственная функция (МНК)</span></h3>
+      <div class="bi">
+        <div lang="en">
+          <p>Regress ln y on ln x₁, ln x₂ by OLS: ln y = β₀ + β₁ ln x₁ + β₂ ln x₂ + ε.</p>
+          <p>OLS fits through the <b>middle</b> of the data: it describes the average station, not best practice. ε &gt; 0 means better than average.</p>
+          <p>How to read the output:</p>
+          <ul class="clean">
+            <li><b>Coefficients</b> β₁, β₂: elasticities (see topic 3).</li>
+            <li><b>t-statistic / p-value</b>: is the coefficient different from 0? p &lt; 0.05 → significant at 5%.</li>
+            <li><b>R²</b>: share of variation in ln y explained (0.36 = 36%).</li>
+            <li><b>F-test</b>: are all slopes jointly zero? Small p → the model as a whole is significant.</li>
+          </ul>
+          <p>A = e^β₀ gives the multiplicative form y = A·x₁^β₁·x₂^β₂.</p>
+        </div>
+        <div lang="ru">
+          <p>Регрессия ln y на ln x₁, ln x₂ методом МНК: ln y = β₀ + β₁ ln x₁ + β₂ ln x₂ + ε.</p>
+          <p>МНК проводит линию через <b>середину</b> данных: описывает среднюю станцию, а не лучшую практику. ε &gt; 0 — лучше среднего.</p>
+          <p>Как читать вывод:</p>
+          <ul class="clean">
+            <li><b>Коэффициенты</b> β₁, β₂: эластичности (тема 3).</li>
+            <li><b>t-статистика / p-value</b>: отличается ли коэффициент от 0? p &lt; 0,05 — значим на 5%.</li>
+            <li><b>R²</b>: доля объяснённой вариации ln y (0,36 = 36%).</li>
+            <li><b>F-тест</b>: все ли наклоны одновременно нули? Малое p — модель в целом значима.</li>
+          </ul>
+          <p>A = e^β₀ даёт мультипликативную форму y = A·x₁^β₁·x₂^β₂.</p>
+        </div>
+      </div>
+      <div class="formula">Stata:  regress lny lnx1 lnx2
+Excel:  Данные → Анализ данных → Регрессия (Y = ln y, X = ln x1, ln x2)</div>
+      <p class="exam"><b>На экзамене (часть 3):</b> «estimate the average production function and provide statistical characteristics»: уравнение, t, p, R², F, вывод об отдаче.</p>
+    </article>
+
+    <article class="th" id="th-8" data-title="8. DPF (COLS)">
+      <h3><span class="tn">8</span> Deterministic production frontier (COLS) <span class="ru-t">Детерминированная граница (COLS)</span></h3>
+      <div class="bi">
+        <div lang="en">
+          <p>Model: ln yᵢ = f(xᵢ; β) − uᵢ, uᵢ ≥ 0. <b>All</b> deviation from the frontier is treated as inefficiency; there is no noise.</p>
+          <p><b>Corrected OLS (COLS)</b>: keep the OLS slopes, shift the intercept up by the largest residual:</p>
+          <div class="formula">β₀^DPF = β₀^OLS + max eᵢ
+uᵢ = max e − eᵢ ≥ 0
+TEᵢ = exp(−uᵢ) = yᵢ / yᵢ*    (output-oriented)</div>
+          <p>Exactly one DMU (the one with the largest residual) ends up on the frontier with TE = 1.</p>
+          <p><b>Weaknesses:</b> one outlier defines the whole frontier; luck and measurement errors are counted as inefficiency, so TE comes out low (in the 2026 variant mean TE = 0.26).</p>
+          <p>MOLS (modified OLS) shifts by the expected E[u] under an assumed distribution instead of the maximum.</p>
+        </div>
+        <div lang="ru">
+          <p>Модель: ln yᵢ = f(xᵢ; β) − uᵢ, uᵢ ≥ 0. <b>Всё</b> отклонение от границы считается неэффективностью, шума нет.</p>
+          <p><b>Скорректированный МНК (COLS)</b>: наклоны из МНК сохраняем, константу поднимаем на максимальный остаток:</p>
+          <div class="formula">β₀^DPF = β₀^OLS + max eᵢ
+uᵢ = max e − eᵢ ≥ 0
+TEᵢ = exp(−uᵢ) = yᵢ / yᵢ*    (выходная ориентация)</div>
+          <p>На границе оказывается ровно одна DMU — с наибольшим остатком, TE = 1.</p>
+          <p><b>Недостатки:</b> один выброс задаёт всю границу; удача и ошибки измерения записываются в неэффективность, поэтому TE занижена (в варианте 2026 средняя 0,26).</p>
+          <p>MOLS сдвигает не на максимум, а на ожидаемое E[u] при выбранном распределении.</p>
+        </div>
+      </div>
+      <p class="exam"><b>На экзамене (часть 3):</b> «construct the DPF, write its equation, calculate TE for every station, min/mean/max». Do-файл во вкладке 03 делает это тремя строками.</p>
+    </article>
+
+    <article class="th" id="th-9" data-title="9. SFA">
+      <h3><span class="tn">9</span> Stochastic frontier analysis (SFA) <span class="ru-t">Стохастическая граница (SFA)</span></h3>
+      <div class="bi">
+        <div lang="en">
+          <p>Aigner, Lovell &amp; Schmidt (1977); Meeusen &amp; van den Broeck (1977). The error has <b>two parts</b>:</p>
+          <div class="formula">ln yᵢ = xᵢ′β + vᵢ − uᵢ
+vᵢ ~ N(0, σᵥ²)   noise: weather, luck, measurement error (symmetric)
+uᵢ ≥ 0           inefficiency (one-sided)
+cost frontier:  ln Cᵢ = … + vᵢ + uᵢ</div>
+          <p>Distribution of u (the four models in the exam): <b>half-normal</b> N⁺(0, σᵤ²); <b>exponential</b>; <b>truncated normal</b> N⁺(μ, σᵤ²); <b>gamma</b>. Estimated by <b>maximum likelihood</b> (ML).</p>
+          <p>Key parameters: λ = σᵤ/σᵥ; σ² = σᵤ² + σᵥ²; γ = σᵤ²/σ² (share of inefficiency in total variance: γ → 0 means no inefficiency, OLS is enough; γ → 1 means almost deterministic frontier).</p>
+          <p><b>Is there inefficiency at all?</b></p>
+          <ul class="clean">
+            <li>Skewness of OLS residuals must be <b>negative</b> (v − u leans left). Positive = “wrong skewness”: ML sets σᵤ = 0 and SFA = OLS.</li>
+            <li><b>LR test</b> H₀: σᵤ = 0. LR = 2(lnL_SFA − lnL_OLS). Critical value at 5% is <b>2.706</b> (mixed χ²: ½χ²(0) + ½χ²(1)). LR &gt; 2.706 → inefficiency is significant.</li>
+          </ul>
+          <p><b>Unit TE.</b> u is not observed, only ε. We predict it from ε:</p>
+          <ul class="clean"><li>JLMS: E[u|ε], TE = exp(−E[u|ε]) — Stata <code>jlms</code>.</li><li>Battese–Coelli: TE = E[exp(−u)|ε] — Stata <code>bc</code> (not for gamma).</li></ul>
+          <p>TE = 0.7: the station produces 70% of what is possible with its inputs; it could raise output by 1/0.7 − 1 = 43%.</p>
+          <p>Comparing models: lnL / AIC, significance of σᵤ and λ, convergence (gamma often fails), Spearman rank correlation of TE.</p>
+        </div>
+        <div lang="ru">
+          <p>Айгнер, Ловелл и Шмидт (1977); Мёзен и ван ден Брук (1977). Ошибка состоит из <b>двух частей</b>:</p>
+          <div class="formula">ln yᵢ = xᵢ′β + vᵢ − uᵢ
+vᵢ ~ N(0, σᵥ²)   шум: погода, удача, ошибки измерения (симметричный)
+uᵢ ≥ 0           неэффективность (односторонняя)
+граница издержек: ln Cᵢ = … + vᵢ + uᵢ</div>
+          <p>Распределение u (четыре модели в экзамене): <b>полунормальное</b> N⁺(0, σᵤ²); <b>экспоненциальное</b>; <b>усечённое нормальное</b> N⁺(μ, σᵤ²); <b>гамма</b>. Оценка — <b>метод максимального правдоподобия</b> (ML).</p>
+          <p>Ключевые параметры: λ = σᵤ/σᵥ; σ² = σᵤ² + σᵥ²; γ = σᵤ²/σ² (доля неэффективности в общей дисперсии: γ → 0 — неэффективности нет, хватает МНК; γ → 1 — почти детерминированная граница).</p>
+          <p><b>Есть ли неэффективность вообще?</b></p>
+          <ul class="clean">
+            <li>Асимметрия остатков МНК должна быть <b>отрицательной</b> (v − u скошено влево). Положительная — «wrong skewness»: ML даёт σᵤ = 0 и SFA = OLS.</li>
+            <li><b>LR-тест</b> H₀: σᵤ = 0. LR = 2(lnL_SFA − lnL_OLS). Критическое значение на 5% — <b>2,706</b> (смесь ½χ²(0) + ½χ²(1)). LR &gt; 2,706 — неэффективность значима.</li>
+          </ul>
+          <p><b>TE отдельной единицы.</b> u не наблюдается, только ε. Прогнозируем по ε:</p>
+          <ul class="clean"><li>JLMS: E[u|ε], TE = exp(−E[u|ε]) — в Stata <code>jlms</code>.</li><li>Battese–Coelli: TE = E[exp(−u)|ε] — в Stata <code>bc</code> (кроме gamma).</li></ul>
+          <p>TE = 0,7: станция выпускает 70% возможного при своих ресурсах; может нарастить выпуск на 1/0,7 − 1 = 43%.</p>
+          <p>Сравнение моделей: lnL / AIC, значимость σᵤ и λ, сходимость (gamma часто не сходится), ранговая корреляция Спирмена между TE.</p>
+        </div>
+      </div>
+      <p class="exam"><b>На экзамене (часть 3):</b> четыре SFA в Stata (<code>sfcross …, distribution(…)</code>), таблица параметров с z, TE всех станций, min/mean/max, сравнение с DPF, согласованность, выбор модели. Типичный правильный вывод: «SFA лучше DPF по сути, ранги согласованы, выбираю half-normal/exponential по AIC».</p>
+    </article>
+
+    <article class="th" id="th-10" data-title="10. DEA: CCR">
+      <h3><span class="tn">10</span> DEA: the idea and the CCR model <span class="ru-t">DEA: идея и модель CCR</span></h3>
+      <div class="bi">
+        <div lang="en">
+          <p>Data Envelopment Analysis (Charnes, Cooper, Rhodes, 1978) builds the frontier as an envelope of the best DMUs by linear programming. No formula, no noise.</p>
+          <p><b>Ratio idea</b> (multiplier form): efficiency = Σuᵣyᵣ / Σvᵢxᵢ (virtual output / virtual input). Each DMU picks the weights u, v most favourable to itself, subject to no DMU scoring above 1.</p>
+          <p><b>Envelopment form</b> (what DEA-Solver solves): find a combination of DMUs (weights λⱼ) that uses at most θ times my inputs and produces at least my outputs; make θ as small as possible.</p>
+          <div class="formula">CCR-I (input-oriented, DMU o):
+  min θ
+  s.t. Σⱼ λⱼ xᵢⱼ ≤ θ·xᵢₒ    for every input i
+       Σⱼ λⱼ yᵣⱼ ≥ yᵣₒ      for every output r
+       λⱼ ≥ 0
+
+CCR-O (output-oriented):
+  max η
+  s.t. Σⱼ λⱼ xᵢⱼ ≤ xᵢₒ
+       Σⱼ λⱼ yᵣⱼ ≥ η·yᵣₒ
+       λⱼ ≥ 0          score = 1/η*</div>
+          <p>θ* = 1: nobody does better, the DMU is on the frontier. θ* = 0.8: the same outputs could be made with 80% of the inputs.</p>
+          <p>Under CRS input and output orientation give the same score (θ* = 1/η*).</p>
+          <p>Limits: deterministic (noise = inefficiency), sensitive to outliers, needs enough DMUs: n ≥ max{m·s, 3(m+s)}.</p>
+        </div>
+        <div lang="ru">
+          <p>Анализ среды функционирования (DEA; Чарнс, Купер, Роудс, 1978) строит границу как оболочку лучших DMU методом линейного программирования. Формулы нет, шума нет.</p>
+          <p><b>Идея отношения</b> (мультипликативная форма): эффективность = Σuᵣyᵣ / Σvᵢxᵢ (взвешенный выпуск / взвешенные затраты). Каждая DMU выбирает самые выгодные для себя веса u, v при условии, что ни одна DMU не получит больше 1.</p>
+          <p><b>Огибающая форма</b> (её решает DEA-Solver): найти комбинацию DMU (веса λⱼ), которая тратит не больше θ моих ресурсов и выпускает не меньше моего; сделать θ минимальным.</p>
+          <div class="formula">CCR-I (входная ориентация, DMU o):
+  min θ
+  при Σⱼ λⱼ xᵢⱼ ≤ θ·xᵢₒ    для каждого ресурса i
+      Σⱼ λⱼ yᵣⱼ ≥ yᵣₒ      для каждого продукта r
+      λⱼ ≥ 0
+
+CCR-O (выходная ориентация):
+  max η
+  при Σⱼ λⱼ xᵢⱼ ≤ xᵢₒ
+      Σⱼ λⱼ yᵣⱼ ≥ η·yᵣₒ
+      λⱼ ≥ 0          оценка = 1/η*</div>
+          <p>θ* = 1: никто не делает лучше, DMU на границе. θ* = 0,8: тот же выпуск можно получить из 80% ресурсов.</p>
+          <p>При CRS входная и выходная ориентации дают одну оценку (θ* = 1/η*).</p>
+          <p>Ограничения: детерминированность (шум = неэффективность), чувствительность к выбросам, нужно достаточно DMU: n ≥ max{m·s, 3(m+s)}.</p>
+        </div>
+      </div>
+      <p class="exam"><b>На экзамене (часть 1):</b> записать CCR-O для фирмы №5 с числами из таблицы. Это ровно форма выше: подставьте столбец каждой фирмы как коэффициенты при λⱼ.</p>
+    </article>
+
+    <article class="th" id="th-11" data-title="11. BCC, FDH, scale">
+      <h3><span class="tn">11</span> BCC, FDH and scale efficiency <span class="ru-t">BCC, FDH и эффективность масштаба</span></h3>
+      <div class="bi">
+        <div lang="en">
+          <p><b>BCC</b> (Banker, Charnes, Cooper, 1984) adds <b>Σλⱼ = 1</b>: variable returns to scale. A DMU is compared only with convex mixtures of DMUs of similar size; the frontier hugs the data tighter.</p>
+          <p><b>FDH</b> (Deprins, Simar, Tulkens, 1984) = BCC with <b>λⱼ ∈ {0,1}</b>: exactly one λ = 1, so a DMU is compared only with real observed DMUs that dominate it (use no more of every input and produce no less of every output). Staircase frontier. It is a mixed-integer problem, solved by simple enumeration of dominating units.</p>
+          <p>Why FDH comes from BCC, not CCR: FDH keeps Σλ = 1 and only replaces λ ≥ 0 with λ ∈ {0,1}; CCR has no Σλ = 1 to keep.</p>
+          <p>Nesting T_FDH ⊆ T_BCC ⊆ T_CCR gives:</p>
+          <div class="formula">θ_FDH ≥ θ_BCC ≥ θ_CCR        (for every DMU)
+#efficient: FDH ≥ BCC ≥ CCR
+Scale efficiency: SE = θ_CCR / θ_BCC ≤ 1
+θ_CCR = θ_BCC (pure technical) × SE</div>
+          <p>Returns to scale of a DMU: from Σλⱼ* in CCR — &lt; 1 increasing, = 1 constant, &gt; 1 decreasing.</p>
+          <p>BCC-I and BCC-O find the same set of efficient DMUs but different scores for inefficient ones.</p>
+        </div>
+        <div lang="ru">
+          <p><b>BCC</b> (Банкер, Чарнс, Купер, 1984) добавляет <b>Σλⱼ = 1</b>: переменная отдача от масштаба. DMU сравнивается только со смесями DMU похожего размера, граница плотнее облегает данные.</p>
+          <p><b>FDH</b> (Депринс, Симар, Тюлкенс, 1984) = BCC с <b>λⱼ ∈ {0,1}</b>: ровно одна λ = 1, DMU сравнивается только с реальными DMU, которые её доминируют (каждого ресурса не больше, каждого продукта не меньше). Граница-лесенка. Задача смешанного целочисленного программирования, решается перебором доминирующих.</p>
+          <p>Почему FDH из BCC, а не из CCR: FDH сохраняет Σλ = 1 и лишь заменяет λ ≥ 0 на λ ∈ {0,1}; в CCR условия Σλ = 1 нет.</p>
+          <p>Вложенность T_FDH ⊆ T_BCC ⊆ T_CCR даёт:</p>
+          <div class="formula">θ_FDH ≥ θ_BCC ≥ θ_CCR        (для каждой DMU)
+число эффективных: FDH ≥ BCC ≥ CCR
+Эффективность масштаба: SE = θ_CCR / θ_BCC ≤ 1
+θ_CCR = θ_BCC (чисто техническая) × SE</div>
+          <p>Отдача от масштаба DMU — по Σλⱼ* в CCR: &lt; 1 возрастающая, = 1 постоянная, &gt; 1 убывающая.</p>
+          <p>BCC-I и BCC-O находят одно и то же множество эффективных DMU, но разные оценки у неэффективных.</p>
+        </div>
+      </div>
+      <p class="exam"><b>На экзамене:</b> часть 1 — записать BCC-O и FDH (и объяснить, почему FDH можно). Часть 4 — «explain the difference in the number of efficient units»: ответ через вложенность множеств выше.</p>
+    </article>
+
+    <article class="th" id="th-12" data-title="12. Slacks, peers, projections">
+      <h3><span class="tn">12</span> Slacks, reference sets, frontier equations, projections <span class="ru-t">Слэки, эталоны, уравнения границы, проекции</span></h3>
+      <div class="bi">
+        <div lang="en">
+          <p>After the radial cut by θ some inputs may still be reducible, or some outputs still increasable: these leftovers are <b>slacks</b> (s⁻ for inputs, s⁺ for outputs). They appear where the frontier runs parallel to an axis.</p>
+          <p>DEA-Solver works in two phases: first the smallest θ, then the largest slacks with θ fixed.</p>
+          <ul class="clean"><li><b>Efficient</b> (Pareto–Koopmans): θ* = 1 and all slacks = 0.</li><li><b>Weakly efficient</b>: θ* = 1 but some slack &gt; 0.</li></ul>
+          <p><b>Reference set</b> (peers) of DMU o: the efficient DMUs with λⱼ* &gt; 0. They are its benchmarks. DMUs that appear in many reference sets are robust best practice.</p>
+          <p><b>Frontier equations</b> (course style) say that the target point is a λ-combination of the peers:</p>
+          <div class="formula">input i:   θ*·xᵢₒ − sᵢ⁻ = Σⱼ λⱼ* xᵢⱼ
+output r:  yᵣₒ + sᵣ⁺ = Σⱼ λⱼ* yᵣⱼ
+e.g. 0.7506 × 617 638 = 0.436 × 421 206 + 0.311 × 422 930 + 0.264 × 561 864</div>
+          <p><b>Projection</b> (target) = the point on the frontier:</p>
+          <div class="formula">input orientation:  x̂ = θ*x − s⁻,   ŷ = y + s⁺
+output orientation: x̂ = x − s⁻,    ŷ = η*y + s⁺
+change % = (projection − data) / data × 100</div>
+          <p>For FDH the projection is simply the data of the one dominating DMU.</p>
+          <p>Interpretation template: “DMU 39 can cut gas and oil by 25% (to 463 569 and 26 287) with no loss of electricity and heat, following the practice of DMUs 4, 6 and 35.”</p>
+        </div>
+        <div lang="ru">
+          <p>После радиального сжатия на θ какие-то ресурсы ещё можно уменьшить, а продукты — увеличить: эти остатки — <b>слэки</b> (s⁻ по ресурсам, s⁺ по продуктам). Они возникают там, где граница идёт параллельно оси.</p>
+          <p>DEA-Solver работает в две фазы: сначала минимальное θ, затем максимальные слэки при этом θ.</p>
+          <ul class="clean"><li><b>Эффективна</b> (по Парето–Купмансу): θ* = 1 и все слэки = 0.</li><li><b>Слабо эффективна</b>: θ* = 1, но есть слэк &gt; 0.</li></ul>
+          <p><b>Reference set</b> (эталоны) DMU o — эффективные DMU с λⱼ* &gt; 0. Это её образцы. DMU, которые встречаются в reference sets многих, — устойчивая лучшая практика.</p>
+          <p><b>Уравнения границы</b> (как в курсе) показывают, что целевая точка — λ-комбинация эталонов:</p>
+          <div class="formula">ресурс i:  θ*·xᵢₒ − sᵢ⁻ = Σⱼ λⱼ* xᵢⱼ
+продукт r: yᵣₒ + sᵣ⁺ = Σⱼ λⱼ* yᵣⱼ
+напр. 0,7506 × 617 638 = 0,436 × 421 206 + 0,311 × 422 930 + 0,264 × 561 864</div>
+          <p><b>Проекция</b> (цель) — точка на границе:</p>
+          <div class="formula">входная ориентация:  x̂ = θ*x − s⁻,   ŷ = y + s⁺
+выходная ориентация: x̂ = x − s⁻,    ŷ = η*y + s⁺
+изменение % = (проекция − факт) / факт × 100</div>
+          <p>У FDH проекция — просто данные одной доминирующей DMU.</p>
+          <p>Шаблон интерпретации: «DMU 39 может сократить газ и мазут на 25% (до 463 569 и 26 287) без потери электроэнергии и тепла, ориентируясь на DMU 4, 6 и 35».</p>
+        </div>
+      </div>
+      <p class="exam"><b>На экзамене (часть 4):</b> для двух неэффективных DMU по каждой модели — reference sets, frontier equations, projections с интерпретацией, плюс два самых частых эталона CCR-I. Вкладка 04 выдаёт всё это готовыми таблицами.</p>
+    </article>
+
+    <article class="th" id="th-13" data-title="13. DEA-Solver output">
+      <h3><span class="tn">13</span> Reading DEA-Solver output <span class="ru-t">Как читать результаты DEA-Solver</span></h3>
+      <div class="bi">
+        <div lang="en">
+          <ul class="clean">
+            <li><b>Summary</b>: model, number of DMUs, mean/max/min score, number of efficient DMUs.</li>
+            <li><b>Score</b>: score θ* (or 1/η* for output models), rank, reference set with λ. This is the main sheet.</li>
+            <li><b>Rank</b>: DMUs sorted by score; all efficient ones share rank 1.</li>
+            <li><b>Weight</b>: multiplier weights v (inputs), u (outputs), u₀ for BCC.</li>
+            <li><b>Slack</b>: s⁻ and s⁺ per DMU.</li>
+            <li><b>Projection</b>: Data, Projection, Difference, % for each input and output. Copy these rows into the projections table.</li>
+          </ul>
+        </div>
+        <div lang="ru">
+          <ul class="clean">
+            <li><b>Summary</b>: модель, число DMU, средняя/максимальная/минимальная оценка, число эффективных.</li>
+            <li><b>Score</b>: оценка θ* (или 1/η* у выходных моделей), ранг, reference set с λ. Главный лист.</li>
+            <li><b>Rank</b>: DMU по убыванию оценки; все эффективные делят ранг 1.</li>
+            <li><b>Weight</b>: веса v (ресурсы), u (продукты), u₀ у BCC.</li>
+            <li><b>Slack</b>: s⁻ и s⁺ по каждой DMU.</li>
+            <li><b>Projection</b>: Data, Projection, Difference, % по каждому ресурсу и продукту. Эти строки переносите в таблицу проекций.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="exam"><b>На экзамене:</b> файлы с результатами CCR-I, BCC-I, FDH нужно приложить в Blackboard. Без них часть 4 могут не засчитать.</p>
+    </article>
+
+    <article class="th" id="th-14" data-title="14. DEA vs SFA">
+      <h3><span class="tn">14</span> Parametric vs non-parametric <span class="ru-t">Параметрические и непараметрические методы</span></h3>
+      <div class="tw"><table class="t">
+        <thead><tr><th class="l"></th><th class="l">DPF (COLS)</th><th class="l">SFA</th><th class="l">DEA / FDH</th></tr></thead>
+        <tbody>
+          <tr><td class="l">Functional form · Форма функции</td><td class="l">needed · нужна</td><td class="l">needed · нужна</td><td class="l">none · не нужна</td></tr>
+          <tr><td class="l">Noise · Шум</td><td class="l">ignored · нет</td><td class="l">separated (v) · отделён</td><td class="l">ignored · нет</td></tr>
+          <tr><td class="l">Many outputs · Много продуктов</td><td class="l">aggregate first · свести в один</td><td class="l">aggregate first · свести в один</td><td class="l">yes · да</td></tr>
+          <tr><td class="l">Statistical tests · Тесты</td><td class="l">OLS only · только МНК</td><td class="l">yes (z, LR) · да</td><td class="l">no · нет</td></tr>
+          <tr><td class="l">Outliers · Выбросы</td><td class="l">very sensitive · очень чувствителен</td><td class="l">robust · устойчив</td><td class="l">sensitive · чувствителен</td></tr>
+          <tr><td class="l">Benchmarks · Эталоны</td><td class="l">—</td><td class="l">—</td><td class="l">peers, projections · есть</td></tr>
+          <tr><td class="l">Method · Метод</td><td class="l">OLS + shift</td><td class="l">maximum likelihood</td><td class="l">linear programming</td></tr>
+        </tbody>
+      </table></div>
+      <p class="exam"><b>На экзамене:</b> так обосновывают выбор модели и объясняют, почему у DPF самые низкие TE, а у разных моделей ранги согласованы.</p>
+    </article>
+
+    <article class="th" id="th-15" data-title="15. Performance frameworks">
+      <h3><span class="tn">15</span> Performance measurement frameworks <span class="ru-t">Системы измерения результативности</span></h3>
+      <div class="bi">
+        <div lang="en">
+          <p>From lecture 1 and the readings; useful for theory questions and quizzes.</p>
+          <ul class="clean">
+            <li><b>Benchmarking stages</b> (lecture 1, 9 steps): object → goal → KPIs (data selection) → sample of units → data collection → construct the best-practice benchmark → compare each unit with it → analyse relative positions and improvement opportunities → learning (benchlearning).</li>
+            <li><b>KPIs</b> are simple ratios; frontier methods combine many inputs and outputs into one score.</li>
+            <li><b>Performance Prism</b> (Neely &amp; Adams): five facets — stakeholder satisfaction, strategies, processes, capabilities, stakeholder contribution.</li>
+            <li><b>7 deadly sins</b> (Hammer, MIT SMR 2007): vanity, provincialism, narcissism, laziness, pettiness, inanity, frivolity — measuring what flatters or is easy instead of what drives results.</li>
+            <li><b>Pidd (2010)</b>: models are simplifications to support decisions; their value is in use, not in precision.</li>
+          </ul>
+        </div>
+        <div lang="ru">
+          <p>Из лекции 1 и литературы; пригодится для теоретических вопросов и тестов.</p>
+          <ul class="clean">
+            <li><b>Этапы бенчмаркинга</b> (лекция 1, 9 шагов): объект → цель → KPI (выбор данных) → выборка единиц → сбор данных → построение эталона лучшей практики → сравнение каждой единицы с ним → анализ позиций и возможностей улучшения → обучение (benchlearning).</li>
+            <li><b>KPI</b> — простые отношения; граничные методы сводят много ресурсов и продуктов в одну оценку.</li>
+            <li><b>Performance Prism</b> (Нили и Адамс): пять граней — удовлетворённость стейкхолдеров, стратегии, процессы, возможности, вклад стейкхолдеров.</li>
+            <li><b>7 смертных грехов</b> (Хаммер, MIT SMR 2007): тщеславие, провинциализм, нарциссизм, лень, мелочность, бессмысленность, легкомыслие — мерить то, что льстит или удобно, а не то, что движет результатом.</li>
+            <li><b>Пидд (2010)</b>: модель — упрощение для поддержки решений; её ценность в использовании, а не в точности.</li>
+          </ul>
+        </div>
+      </div>
+    </article>
+
+    <article class="th" id="th-16" data-title="16. Glossary">
+      <h3><span class="tn">16</span> Glossary <span class="ru-t">Словарь терминов</span></h3>
+      <div class="tw"><table class="t">
+        <thead><tr><th class="l">English</th><th class="l">Русский</th></tr></thead>
+        <tbody id="gloss"></tbody>
+      </table></div>
+    </article>
   </section>
 
   <!-- ========== ЧАСТЬ 1 ========== -->
@@ -1155,7 +1704,7 @@ const hpsDEA = rows => ['H&P\t(I)Natural gas\t(I)Furnace oil\t(O)Electricity\t(O
 const hpsLn = rows => ['HPS\tln_gas\tln_oil\tln_energy', ...rows.map(r => [r.name.replace('H&P ', 'HPS '), Math.log(r.gas).toFixed(4), Math.log(r.oil).toFixed(4), Math.log(energyGJ(r)).toFixed(4)].join('\t'))].join('\n');
 
 /* ===== вкладки, отсчёт, чек-лист ===== */
-const TABS = ['plan', 't1', 't2', 't3', 't4', 'quiz', 'mock'];
+const TABS = ['plan', 'theory', 't1', 't2', 't3', 't4', 'quiz', 'mock'];
 function showTab(id) {
   if (!TABS.includes(id)) id = 'plan';
   TABS.forEach(t => { $('tab-' + t).hidden = t !== id; document.querySelector(`[data-tab="${t}"]`).setAttribute('aria-selected', String(t === id)); });
@@ -1788,6 +2337,50 @@ function newVariant(seed) {
   $('m4open').onclick = () => { $('t4data').value = deaTxt; showTab('t4'); t4run(); window.scrollTo({ top: 0 }); };
 }
 $('mnew').onclick = () => newVariant(1000 + Math.floor(Math.random() * 9000));
+
+/* ===== Теория: язык, оглавление, словарь ===== */
+const GLOSS = [
+  ['Decision-making unit (DMU)', 'Оцениваемая единица (фирма, станция, больница)'], ['Frontier, best-practice frontier', 'Граница, граница лучшей практики'],
+  ['Technology set (graph), T', 'Технологическое множество'], ['Input / output', 'Ресурс (затрата) / продукт (выпуск)'],
+  ['Input set L(y) / output set P(x)', 'Множество затрат / множество выпусков'], ['Isoquant / isocost', 'Изокванта / изокоста'],
+  ['Free disposability', 'Свободное распоряжение'], ['Convexity', 'Выпуклость'],
+  ['Technical efficiency (TE)', 'Техническая эффективность'], ['Allocative (price) efficiency (AE)', 'Аллокативная (ценовая) эффективность'],
+  ['Overall (economic, cost) efficiency (OE)', 'Общая (экономическая) эффективность'], ['Pareto–Koopmans efficiency', 'Эффективность по Парето–Купмансу'],
+  ['Returns to scale: CRS / VRS / IRS / DRS', 'Отдача от масштаба: постоянная / переменная / возрастающая / убывающая'], ['Scale efficiency (SE)', 'Эффективность масштаба'],
+  ['Distance function (input / output)', 'Функция расстояния (входная / выходная)'], ['Output elasticity', 'Эластичность выпуска'],
+  ['Marginal rate of technical substitution (MRTS)', 'Предельная норма технического замещения'], ['Cost function', 'Функция издержек'],
+  ['Economies of scale / scope', 'Экономия от масштаба / от разнообразия'], ['Cost complementarity', 'Комплементарность издержек'],
+  ['Average production function', 'Средняя производственная функция'], ['Ordinary least squares (OLS)', 'Метод наименьших квадратов (МНК)'],
+  ['Deterministic production frontier (DPF)', 'Детерминированная граница производства'], ['Corrected OLS (COLS)', 'Скорректированный МНК'],
+  ['Stochastic frontier analysis (SFA)', 'Стохастический граничный анализ'], ['Composed error ε = v − u', 'Составная ошибка'],
+  ['Noise v / inefficiency u', 'Шум / неэффективность'], ['Half-normal / exponential / truncated normal / gamma', 'Полунормальное / экспоненциальное / усечённое нормальное / гамма'],
+  ['Maximum likelihood (ML)', 'Метод максимального правдоподобия'], ['Log-likelihood, lnL', 'Логарифм функции правдоподобия'],
+  ['Likelihood-ratio (LR) test', 'Тест отношения правдоподобия'], ['Skewness', 'Асимметрия (скошенность)'],
+  ['Data envelopment analysis (DEA)', 'Анализ среды функционирования, «оболочечный» анализ'], ['Envelopment form / multiplier form', 'Огибающая / мультипликативная форма'],
+  ['Input-oriented / output-oriented', 'Ориентация на ресурсы / на выпуск'], ['Free disposal hull (FDH)', 'Оболочка свободного распоряжения'],
+  ['Slack', 'Остаточный избыток ресурса или недовыпуск'], ['Weakly efficient', 'Слабо эффективная'],
+  ['Reference set, peers', 'Эталонное множество, эталоны'], ['Frontier equation', 'Уравнение границы'],
+  ['Projection, target', 'Проекция, целевые значения'], ['Benchmarking', 'Бенчмаркинг, сравнение с лучшей практикой'],
+  ['Spearman rank correlation', 'Ранговая корреляция Спирмена'], ['Key performance indicator (KPI)', 'Ключевой показатель результативности']
+];
+$('gloss').innerHTML = GLOSS.map(([e, r]) => `<tr><td class="l">${e}</td><td class="l">${r}</td></tr>`).join('');
+$('toc').innerHTML = [...document.querySelectorAll('article.th')].map(a => `<button data-go="${a.id}">${esc(a.dataset.title)}</button>`).join('');
+$('toc').querySelectorAll('button').forEach(b => b.onclick = () => document.getElementById(b.dataset.go).scrollIntoView({ behavior: 'smooth', block: 'start' }));
+function setLang(l) {
+  $('tab-theory').dataset.lang = l;
+  document.querySelectorAll('.lang-btn').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === l)));
+  store.set('lang', l);
+}
+document.querySelectorAll('.lang-btn').forEach(b => b.onclick = () => setLang(b.dataset.lang));
+setLang(store.get('lang', 'both'));
+
+/* ===== Офлайн ===== */
+if (CAN_SYNC && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/ara/sw.js', { scope: '/ara/' }).then(() => { $('offstat').textContent = 'Офлайн-режим включён на этом устройстве.'; }).catch(() => { $('offstat').textContent = 'Браузер не дал включить офлайн-режим, скачайте файл.'; });
+} else if (!CAN_SYNC) {
+  $('dlbtn').hidden = true;
+  $('offstat').textContent = location.protocol === 'file:' ? 'Вы открыли сохранённый файл: всё работает без сети, прогресс хранится в этом браузере.' : 'Скачать файл можно на странице tasktracker.oxion-ezhkov.workers.dev/ara/';
+}
 
 /* ===== старт ===== */
 t1render();
