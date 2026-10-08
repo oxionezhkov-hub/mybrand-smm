@@ -82,7 +82,9 @@ crons = [
                  # for meetings whose recording.transcript_completed webhook never fires
 ]
 
-# Static presentation deck (public/vebinar-slides/index.html) served at /vebinar-slides.
+# Static pages from ./public: the presentation deck (public/vebinar-slides/index.html) at
+# /vebinar-slides and the ARA exam trainer (public/ara/index.html) at /ara/, whose progress
+# is stored in KV via /ara/api/progress.
 # Matched assets are served directly by Cloudflare; everything else (webhook, /debug/morning, /)
 # falls through to the Worker script below.
 [assets]
