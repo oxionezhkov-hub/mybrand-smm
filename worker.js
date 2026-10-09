@@ -2524,12 +2524,15 @@ async function inboxTgReq(env, method, params = {}) {
   return res.json();
 }
 
+// INBOX_CMO_TOKEN — отдельный токен для CRM лички на воркере cmo-razbory
+// (репозиторий cmo-community, страница /crm): тот же доступ к API, но его
+// можно отозвать, не трогая INBOX_ACCESS_TOKEN у /message и sales CRM.
 function inboxAuthOk(request, env, url) {
-  if (!env.INBOX_ACCESS_TOKEN) return false;
   const authHeader = request.headers.get('Authorization') || '';
   const bearer = authHeader.match(/^Bearer\s+(.+)$/i)?.[1];
   const token = bearer || url.searchParams.get('token');
-  return token === env.INBOX_ACCESS_TOKEN;
+  if (!token) return false;
+  return [env.INBOX_ACCESS_TOKEN, env.INBOX_CMO_TOKEN].some(t => t && token === t);
 }
 
 async function inboxLoadConversations(env) {
@@ -2777,7 +2780,7 @@ function inboxConvSummary(c) {
 
 async function handleInboxApi(request, env, url, ctx) {
   if (!inboxAuthOk(request, env, url)) {
-    return jsonResponse({ error: env.INBOX_ACCESS_TOKEN ? 'unauthorized' : 'INBOX_ACCESS_TOKEN secret not configured' }, 401);
+    return jsonResponse({ error: env.INBOX_ACCESS_TOKEN || env.INBOX_CMO_TOKEN ? 'unauthorized' : 'INBOX_ACCESS_TOKEN secret not configured' }, 401);
   }
 
   const parts = url.pathname.split('/').filter(Boolean); // ['message','api', resource, chatId, sub, subId]
