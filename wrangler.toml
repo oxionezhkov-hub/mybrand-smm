@@ -43,6 +43,11 @@ binding = "AI"
 #   INBOX_ACCESS_TOKEN   — required to use the /message page and its API at all (fails
 #                          closed if unset). Any long random string — the page asks for
 #                          it once and remembers it in the browser (localStorage).
+#   INBOX_CMO_TOKEN      — optional second token for the same inbox API, used by the
+#                          "CRM лички" page (/crm) on the cmo-razbory worker (cmo-community
+#                          repo), which calls this worker through a service binding. Any long
+#                          random string — the SAME value as INBOX_API_TOKEN on cmo-razbory.
+#                          Revocable separately from INBOX_ACCESS_TOKEN.
 #   CRM_SYNC_SECRET      — links the inbox's personal Telegram chats to the agency sales CRM
 #                          (cantor-agency-web /sales-crm, "mainweb" worker): last message per
 #                          client, AI-updated status / next step / date, new Avito leads added
