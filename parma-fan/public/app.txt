@@ -1,0 +1,1024 @@
+/* Шестой игрок — fan desktop for BETCITY PARMA. Vanilla JS, no build step. */
+'use strict';
+
+const TEAM_ID = 3059;
+const TICKETS = 'https://scena24.ru/v2/?org=parma';
+const ARENA = { name: 'УДС «Молот»', address: 'Пермь, ул. Лебедева, 13', lat: 58.0240637, lon: 56.2959713 };
+const CITY = {
+  'Пермь': [58.0105, 56.2502], 'Москва': [55.7558, 37.6173], 'Казань': [55.7963, 49.1088],
+  'Санкт-Петербург': [59.9386, 30.3141], 'Екатеринбург': [56.8389, 60.6057], 'Краснодар': [45.0355, 38.9753],
+  'Саратов': [51.5331, 46.0342], 'Красноярск': [56.0153, 92.8932], 'Самара': [53.1959, 50.1002],
+  'Владивосток': [43.1155, 131.8855], 'Нижний Новгород': [56.3269, 44.0059], 'Минск': [53.9006, 27.559],
+  'Александровац': [44.9086, 17.3014], 'Лакташи': [44.9086, 17.3014], 'Сочи': [43.5855, 39.7231],
+  'Новосибирск': [55.0084, 82.9357], 'Уфа': [54.7388, 55.9721], 'Химки': [55.8970, 37.4297],
+  'Тюмень': [57.1530, 65.5343], 'Челябинск': [55.1644, 61.4368], 'Оренбург': [51.7682, 55.0969],
+  'Ереван': [40.1792, 44.4991], 'Астана': [51.1694, 71.4491], 'Мытищи': [55.9116, 37.7308],
+};
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const icon = (id) => `<svg><use href="#${id}"/></svg>`;
+const fmt1 = (v) => (v == null || Number.isNaN(v) ? '—' : (Math.round(v * 10) / 10).toLocaleString('ru-RU'));
+const isUs = (id) => Number(id) === TEAM_ID;
+const shortName = (n) => (n || '').replace('БЕТСИТИ ПАРМА', 'Парма').replace('ПАРМА', 'Парма');
+const titleCase = (s) => (s || '').toLowerCase().replace(/(^|[\s-])\S/g, (m) => m.toUpperCase());
+
+const MSK = 'Europe/Moscow';
+const dtf = (opts) => new Intl.DateTimeFormat('ru-RU', { timeZone: MSK, ...opts });
+const fDay = dtf({ day: 'numeric' });
+const fMonShort = dtf({ month: 'short' });
+const fDate = dtf({ day: 'numeric', month: 'long' });
+const fWeekday = dtf({ weekday: 'short' });
+const fFull = dtf({ weekday: 'long', day: 'numeric', month: 'long' });
+const mskParts = (ts) => {
+  const p = Object.fromEntries(dtf({ year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(ts)).map((x) => [x.type, x.value]));
+  return { y: Number(p.year), m: Number(p.month), d: Number(p.day) };
+};
+const dayKey = (ts) => { const p = mskParts(ts); return `${p.y}-${String(p.m).padStart(2, '0')}-${String(p.d).padStart(2, '0')}`; };
+const gameWhen = (g) => `${fFull.format(new Date(g.ts))}${g.hasTime ? ', ' + g.timeMsk + ' МСК' : ' · время уточняется'}`;
+const permTime = (g) => {
+  if (!g.hasTime) return '';
+  return dtf({ hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Yekaterinburg' }).format(new Date(g.ts));
+};
+
+async function api(path) {
+  const r = await fetch(path);
+  let d = null;
+  try { d = await r.json(); } catch {}
+  if (!r.ok) throw new Error((d && d.error) || `Ошибка ${r.status}`);
+  return d;
+}
+
+const cache = {};
+function load(key, path, ttl = 60_000) {
+  const c = cache[key];
+  if (c && Date.now() - c.t < ttl) return c.p;
+  const p = api(path).catch((e) => { delete cache[key]; throw e; });
+  cache[key] = { p, t: Date.now() };
+  return p;
+}
+const getSchedule = () => load('schedule', '/api/schedule', 60_000);
+const getTeam = () => load('team', '/api/team', 600_000);
+const getStandings = () => load('standings', '/api/standings', 300_000);
+const getSeasons = () => load('seasons', '/api/seasons', 3600_000);
+const getSeason = (id) => load('season:' + id, '/api/season?id=' + id, 3600_000);
+const getLive = (id) => api('/api/live' + (id ? '?game=' + id : ''));
+const getBoard = () => load('board', '/api/scoreboard', 15_000);
+
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function countUp(root = document) {
+  for (const el of $$('[data-count]', root)) {
+    const target = Number(el.dataset.count);
+    if (!Number.isFinite(target)) continue;
+    const dec = Number(el.dataset.dec || 0);
+    const dur = 900;
+    const t0 = performance.now();
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / dur);
+      const e = 1 - Math.pow(1 - k, 3);
+      el.textContent = (target * e).toLocaleString('ru-RU', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+}
+
+const ridgeSvg = (cls = 'ridge') => `<svg class="${cls}" viewBox="0 0 120 24" preserveAspectRatio="none"><use href="#ridge"/></svg>`;
+const skeleton = (h = 160) => `<div class="skeleton" style="min-height:${h}px"></div>`;
+const errBox = (e) => `<div class="err">Не удалось загрузить данные: ${esc(e.message || e)}. Попробуйте обновить страницу.</div>`;
+const teamImg = (t, size = 28) => `<img src="${esc(t.logo)}" alt="" width="${size}" height="${size}" loading="lazy">`;
+
+// ── Router ─────────────────────────────────────────────────────────────────
+
+const ROUTES = {
+  '': { title: 'Матч-центр', render: renderHome },
+  live: { title: 'Онлайн-табло', render: renderLive },
+  calendar: { title: 'Календарь', render: renderCalendar },
+  tournaments: { title: 'Турниры', render: renderTournaments },
+  team: { title: 'Команда', render: renderTeam },
+  arena: { title: 'Арена и карта', render: renderArena },
+  ai: { title: 'Пармыч · ИИ', render: renderAi },
+};
+
+let cleanup = [];
+function onLeave(fn) { cleanup.push(fn); }
+
+async function route() {
+  for (const fn of cleanup.splice(0)) { try { fn(); } catch {} }
+  const [name, ...args] = location.hash.replace(/^#\/?/, '').split('/');
+  const r = ROUTES[name] || ROUTES[''];
+  document.body.dataset.route = name || 'home';
+  $('#pageTitle').textContent = r.title;
+  for (const a of $$('#nav a')) a.classList.toggle('active', (a.dataset.route === (name || 'home')) || (!name && a.dataset.route === 'home'));
+  const view = $('#view');
+  view.innerHTML = skeleton(320);
+  window.scrollTo({ top: 0 });
+  try {
+    await r.render(view, args);
+  } catch (e) {
+    console.error(e);
+    view.innerHTML = errBox(e);
+  }
+  $$('#view > *').forEach((el, i) => el.style.setProperty('--i', i));
+}
+window.addEventListener('hashchange', route);
+
+getSchedule().then((s) => { $('#kicker').textContent = `${s.season.name} · ${s.comps.length} турнира`; }).catch(() => {});
+
+// ── Countdown ──────────────────────────────────────────────────────────────
+
+function countdownHtml() {
+  const cell = (k, label) => `<div class="cd-cell"><div class="cd-digits" data-cd="${k}"><div class="flip"><span>0</span></div><div class="flip"><span>0</span></div></div><small>${label}</small></div>`;
+  return `<div class="cd">${cell('d', 'дней')}<div class="cd-colon">:</div>${cell('h', 'часов')}<div class="cd-colon">:</div>${cell('m', 'минут')}<div class="cd-colon">:</div>${cell('s', 'секунд')}</div>`;
+}
+function startCountdown(root, ts) {
+  const tick = () => {
+    let s = Math.max(0, Math.floor((ts - Date.now()) / 1000));
+    const v = { d: Math.min(99, Math.floor(s / 86400)), h: Math.floor((s % 86400) / 3600), m: Math.floor((s % 3600) / 60), s: s % 60 };
+    for (const k of Object.keys(v)) {
+      const box = $(`[data-cd="${k}"]`, root);
+      if (!box) continue;
+      const str = String(v[k]).padStart(2, '0');
+      $$('.flip', box).forEach((f, i) => {
+        const span = f.firstElementChild;
+        if (span.textContent !== str[i]) {
+          span.textContent = str[i];
+          f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+        }
+      });
+    }
+  };
+  tick();
+  const id = setInterval(tick, 1000);
+  onLeave(() => clearInterval(id));
+  return id;
+}
+
+// ── Sidebar live widget ────────────────────────────────────────────────────
+
+async function updateSide() {
+  const box = $('#sideLive');
+  try {
+    const { live, focus } = await getLive();
+    if (live && live.status === 2) {
+      const [a, b] = live.teams;
+      box.innerHTML = `<a href="#/live"><div class="sl-k"><span class="pulse"></span>${live.pregame ? 'Разминка · скоро старт' : `Онлайн · ${esc(live.periodLabel || '')} ${esc(live.clock)}`}</div>
+        <div class="sl-row"><span class="sl-team">${teamImg(a, 22)}<span>${esc(shortName(a.name))}</span></span><span class="sl-score">${a.score}</span></div>
+        <div class="sl-row"><span class="sl-team">${teamImg(b, 22)}<span>${esc(shortName(b.name))}</span></span><span class="sl-score">${b.score}</span></div></a>`;
+      return;
+    }
+    const g = focus && focus.game;
+    if (g) {
+      const left = g.ts - Date.now();
+      const d = Math.floor(left / 86400000), h = Math.floor((left % 86400000) / 3600000), m = Math.floor((left % 3600000) / 60000);
+      box.innerHTML = `<a href="#/live"><div class="sl-k">${left > 0 ? 'Следующий матч' : 'Матч начинается'}</div>
+        <div class="sl-row"><span class="sl-team">${teamImg(g.home, 22)}<span>${esc(shortName(g.home.name))}</span></span></div>
+        <div class="sl-row"><span class="sl-team">${teamImg(g.away, 22)}<span>${esc(shortName(g.away.name))}</span></span></div>
+        <div class="sl-cd">${left > 0 ? `${d ? d + 'д ' : ''}${String(h).padStart(2, '0')}ч ${String(m).padStart(2, '0')}м` : 'скоро старт'}</div></a>`;
+    } else box.innerHTML = '';
+  } catch { box.innerHTML = ''; }
+}
+updateSide();
+setInterval(updateSide, 30_000);
+
+// ── Home ───────────────────────────────────────────────────────────────────
+
+function heroHtml(focus, live) {
+  const g = focus && focus.game;
+  if (!g && !live) return `<section class="hero"><div class="hero-mid" style="grid-column:1/-1"><span class="hero-badge">Межсезонье</span><p class="muted">Расписание ещё не опубликовано.</p></div></section>`;
+  const isLive = live && live.status === 2;
+  const done = live && live.finished;
+  const A = live ? live.teams[0] : g.home;
+  const B = live ? live.teams[1] : g.away;
+  const meta = g
+    ? `<span>${icon('i-cal')}<b>${esc(gameWhen(g))}</b>${g.hasTime ? ` · в Перми ${permTime(g)}` : ''}</span><span>${icon('i-pin')}${esc(g.arena || '')}${g.city ? ', ' + esc(g.city) : ''}</span>${g.tv ? `<span>${icon('i-tv')}${esc(g.tv)}</span>` : ''}<span>${icon('i-cup')}${esc(g.league)} · ${esc(g.stage)}</span>`
+    : '';
+  const mid = isLive || done
+    ? `<span class="hero-badge ${isLive ? 'live' : ''}">${isLive ? (live.pregame ? '<span class="pulse"></span> Протокол открыт · скоро вбрасывание' : '<span class="pulse"></span> Идёт матч · ' + esc(live.periodLabel || '') + ' · ' + esc(live.clock)) : 'Матч завершён'}</span>
+       <div class="hero-score"><span>${A.score}</span><span class="sep">:</span><span>${B.score}</span></div>`
+    : `<span class="hero-badge">${focus.reason === 'soon' ? 'Скоро старт' : 'До матча'}</span>${countdownHtml()}`;
+  const tickets = g && g.isHome && g.status === 0 ? `<a class="btn btn-orange" href="${TICKETS}" target="_blank" rel="noopener">${icon('i-ticket')}Купить билет</a>` : '';
+  return `<section class="hero">
+    ${ridgeSvg('ridge hero-ridge')}
+    <div class="hero-meta">${meta}</div>
+    <div class="hero-team">${teamImg(A, 116)}<b>${esc(shortName(A.name))}</b><small>${esc(A.city || '')}</small></div>
+    <div class="hero-mid">${mid}</div>
+    <div class="hero-team">${teamImg(B, 116)}<b>${esc(shortName(B.name))}</b><small>${esc(B.city || '')}</small></div>
+    <div class="hero-actions">
+      <a class="btn ${isLive ? 'btn-orange' : ''}" href="#/live">${icon('i-live')}${isLive ? 'Смотреть табло' : done ? 'Протокол матча' : 'Онлайн-табло'}</a>
+      ${g && g.status === 0 ? `<a class="btn" href="/api/calendar.ics?game=${g.id}">${icon('i-plus')}В календарь</a>` : ''}
+      ${tickets}
+      <button class="btn" type="button" data-ask="${esc(g ? `Расскажи про матч ${g.home.name} — ${g.away.name}: чего ждать и на кого смотреть?` : 'Что нового у Пармы?')}">${icon('i-ai')}Превью от Пармыча</button>
+    </div>
+  </section>`;
+}
+
+async function renderHome(view) {
+  const [sched, team, standings, liveRes] = await Promise.all([
+    getSchedule(), getTeam().catch(() => null), getStandings().catch(() => null), getLive().catch(() => ({ live: null, focus: null })),
+  ]);
+  const games = sched.games;
+  const finished = games.filter((g) => g.status === 1);
+  const last5 = finished.slice(-5);
+  const upcoming = games.filter((g) => g.status === 0 && g.ts > Date.now() - 3 * 3600e3).slice(0, 4);
+  const main = standings && standings.comps.find((c) => c.id === sched.mainCompId);
+  const table = main && main.stages.find((s) => s.type === 'table');
+  const usRow = table && table.table.find((r) => isUs(r.teamId));
+  const homeFinished = finished.filter((g) => g.isHome && g.attendance);
+  const avgAtt = homeFinished.length ? homeFinished.reduce((s, g) => s + g.attendance, 0) / homeFinished.length : null;
+  const mainFinished = finished.filter((g) => g.compId === sched.mainCompId);
+  const allowed = mainFinished.length ? mainFinished.reduce((s, g) => s + g.opponent.score, 0) / mainFinished.length : null;
+  const wins = finished.filter((g) => g.result === 'W').length;
+
+  const kpis = `<section class="panel kpis">
+    <div class="kpi"><span class="label">Место · ВТБ</span><b>${usRow ? `<span data-count="${usRow.place}">0</span><small>/${table.table.length}</small>` : '—'}</b><p>${usRow ? `${usRow.w}–${usRow.l} в регулярке` : 'Сезон стартует'}</p></div>
+    <div class="kpi"><span class="label">Баланс сезона</span><b><span data-count="${wins}">0</span><small>–${finished.length - wins}</small></b><p>все турниры, ${finished.length} матчей</p></div>
+    <div class="kpi"><span class="label">Набираем</span><b>${team && team.team ? `<span data-count="${team.team.pts}" data-dec="1">0</span>` : '—'}</b><p>очков за игру в ВТБ</p></div>
+    <div class="kpi"><span class="label">Пропускаем</span><b>${allowed != null ? `<span data-count="${allowed}" data-dec="1">0</span>` : '—'}</b><p>очков за игру в ВТБ</p></div>
+    <div class="kpi"><span class="label">3-очковые</span><b>${team && team.team ? `<span data-count="${team.team.fg3p}" data-dec="1">0</span><small>%</small>` : '—'}</b><p>${avgAtt ? `дома в среднем ${Math.round(avgAtt).toLocaleString('ru-RU')} зрителей` : 'точность из-за дуги'}</p></div>
+  </section>`;
+
+  const form = last5.length
+    ? `<section class="panel"><div class="panel-head"><h2>Форма · последние ${last5.length}</h2><a href="#/calendar">Весь календарь ${icon('i-arrow')}</a></div>
+      <div class="form-row">${last5.map((g) => `<div class="form-item" data-game="${g.id}">
+        <div class="fi-top">${teamImg(g.opponent, 34)}<span class="wl ${g.result}">${g.result === 'W' ? 'В' : 'П'}</span></div>
+        <div class="fi-score">${g.home.score}:${g.away.score}</div>
+        <div class="fi-meta">${g.isHome ? 'дома' : 'в гостях'} · ${esc(shortName(g.opponent.name))}<br>${esc(fDate.format(new Date(g.ts)))}</div>
+      </div>`).join('')}</div></section>`
+    : '';
+
+  let leaders = '';
+  if (team) {
+    const ps = team.players.filter((p) => p.stats && p.stats.games);
+    const best = (k) => ps.reduce((a, p) => ((p.stats[k] ?? -1) > (a?.stats[k] ?? -1) ? p : a), null);
+    const cats = [['pts', 'Очки', 'очк'], ['reb', 'Подборы', 'подб'], ['ast', 'Передачи', 'пер'], ['eff', 'КПИ', 'кпи']];
+    leaders = `<section class="panel"><div class="panel-head"><h2>Лидеры · ВТБ</h2><a href="#/team">Весь состав ${icon('i-arrow')}</a></div>
+      <div class="leaders">${cats.map(([k, label, unit]) => {
+        const p = best(k);
+        if (!p) return `<div class="leader"><span class="label">${label}</span><p class="muted">нет данных</p></div>`;
+        return `<div class="leader" data-player="${p.id}"><img class="ph" src="${esc(p.photo)}" alt="" loading="lazy"><span class="label lk">${label}</span>
+          <div class="lv"><span data-count="${p.stats[k]}" data-dec="1">0</span><small>${unit}/игру</small></div><div class="ln">${esc(p.first)} ${esc(p.last)}</div></div>`;
+      }).join('')}</div></section>`;
+  }
+
+  const mini = table
+    ? `<section class="panel"><div class="panel-head"><h2>${esc(main.name)}</h2><a href="#/tournaments">Все таблицы ${icon('i-arrow')}</a></div>
+      <table class="mini-table"><thead><tr><th>#</th><th>Команда</th><th class="n">И</th><th class="n">В–П</th></tr></thead><tbody>
+      ${table.table.map((r) => `<tr class="${isUs(r.teamId) ? 'us' : ''}"><td class="pl">${r.place}</td><td><span class="tm">${teamImg(r, 24)}${esc(shortName(r.name))}</span></td><td class="n">${r.g}</td><td class="n">${r.w}–${r.l}</td></tr>`).join('')}
+      </tbody></table></section>`
+    : '';
+
+  const next = upcoming.length
+    ? `<section class="panel"><div class="panel-head"><h2>Ближайшие матчи</h2><a href="/api/calendar.ics">${icon('i-plus')}Подписаться на сезон</a></div>
+      <div class="glist">${upcoming.map(gameRow).join('')}</div></section>`
+    : '';
+
+  view.innerHTML = `${heroHtml(liveRes.focus, liveRes.live)}
+    <div class="home-grid">
+      <div class="span-12">${kpis}</div>
+      <div class="span-12">${form}</div>
+      <div class="span-7 grid">${leaders}${next}</div>
+      <div class="span-5">${mini}</div>
+      <div class="span-12" id="tickerBox"></div>
+    </div>`;
+  countUp(view);
+  const g = liveRes.focus && liveRes.focus.game;
+  if (g && !(liveRes.live && (liveRes.live.status === 2 || liveRes.live.finished))) startCountdown($('.hero', view), g.ts);
+  wireCommon(view, sched, team);
+
+  getBoard().then((b) => {
+    const box = $('#tickerBox', view);
+    if (!box || !b.games.length) return;
+    const items = b.games.map((g) => `<div class="tk" data-live="${g.id}">${teamImg(g.home, 22)}<span>${esc(shortName(g.home.name))}</span>
+      <span class="tk-s">${g.status === 0 ? '–:–' : `${g.home.score}:${g.away.score}`}</span><span>${esc(shortName(g.away.name))}</span>${teamImg(g.away, 22)}
+      <span class="tk-t ${g.status === 2 ? 'live' : ''}">${g.status === 2 ? '● LIVE' : g.status === 1 ? 'ФИНАЛ' : esc(fDate.format(new Date(g.ts))) + (g.hasTime ? ' ' + g.timeMsk : '')}</span></div>`).join('');
+    box.innerHTML = `<section class="panel"><div class="panel-head"><h2>Единая лига ВТБ · табло тура</h2><a href="#/live">Все матчи онлайн ${icon('i-arrow')}</a></div>
+      <div class="ticker"><div class="ticker-track">${items}${items}</div></div></section>`;
+    $$('[data-live]', box).forEach((el) => el.addEventListener('click', () => (location.hash = '#/live/' + el.dataset.live)));
+  }).catch(() => {});
+
+  // Refresh the hero while a game is on.
+  if (liveRes.live && liveRes.live.status === 2) {
+    const id = setInterval(async () => {
+      try {
+        const r = await getLive();
+        const hero = $('.hero', view);
+        if (hero && r.live) hero.outerHTML = heroHtml(r.focus, r.live);
+      } catch {}
+    }, 15_000);
+    onLeave(() => clearInterval(id));
+  }
+}
+
+function gameRow(g) {
+  const res = g.status === 1 ? `<span class="wl ${g.result}">${g.result === 'W' ? 'В' : 'П'}</span> ${g.home.score}:${g.away.score}` : g.status === 2 ? '<span class="pulse"></span> LIVE' : g.hasTime ? g.timeMsk : '—';
+  return `<div class="gl" data-game="${g.id}">
+    <div class="gd"><b>${fDay.format(new Date(g.ts))}</b><small>${esc(fMonShort.format(new Date(g.ts)).replace('.', ''))}</small></div>
+    <div><div class="go">${teamImg(g.opponent, 28)}${g.isHome ? '' : '@ '}${esc(shortName(g.opponent.name))}</div>
+      <div class="gm">${esc(fWeekday.format(new Date(g.ts)))} · ${g.isHome ? 'дома' : 'в гостях'} · ${esc(g.league)}</div></div>
+    <div class="gr">${res}</div></div>`;
+}
+
+function wireCommon(root, sched, team) {
+  $$('[data-game]', root).forEach((el) => el.addEventListener('click', () => {
+    const g = sched && sched.games.find((x) => x.id === Number(el.dataset.game));
+    if (g) openGame(g);
+  }));
+  $$('[data-player]', root).forEach((el) => el.addEventListener('click', () => {
+    const p = team && team.players.find((x) => x.id === Number(el.dataset.player));
+    if (p) openPlayer(p, team);
+  }));
+  $$('[data-ask]', root).forEach((el) => el.addEventListener('click', () => openDrawer(el.dataset.ask)));
+}
+
+// ── Game modal ─────────────────────────────────────────────────────────────
+
+function openModal(html) {
+  const m = $('#modal');
+  $('#modalBox').innerHTML = `<button class="icon-btn modal-close" data-close type="button" aria-label="Закрыть">${icon('i-x')}</button>${html}`;
+  m.classList.add('open');
+  m.setAttribute('aria-hidden', 'false');
+  $$('[data-close]', m).forEach((el) => (el.onclick = closeModal));
+}
+function closeModal() {
+  const m = $('#modal');
+  m.classList.remove('open');
+  m.setAttribute('aria-hidden', 'true');
+}
+
+function openGame(g) {
+  const score = g.status === 0 ? `<span class="s">vs</span>` : `<span class="s">${g.home.score}:${g.away.score}</span>`;
+  openModal(`<div class="gm-head"><span class="label">${esc(g.league)} · ${esc(g.stage)}</span>
+      <div class="gm-teams"><div class="t">${teamImg(g.home, 58)}${esc(shortName(g.home.name))}</div>${score}<div class="t r">${teamImg(g.away, 58)}${esc(shortName(g.away.name))}</div></div></div>
+    <div class="gm-body">
+      <div class="gm-row">${icon('i-cal')}<b>${esc(gameWhen(g))}</b>${g.hasTime ? `<span>· в Перми ${permTime(g)}</span>` : ''}</div>
+      <div class="gm-row">${icon('i-pin')}<span><b>${esc(g.arena || '—')}</b>${g.city ? ', ' + esc(g.city) : ''}</span></div>
+      ${g.tv ? `<div class="gm-row">${icon('i-tv')}<span>${esc(g.tv)}</span></div>` : ''}
+      ${g.attendance ? `<div class="gm-row">${icon('i-team')}<span><b>${g.attendance.toLocaleString('ru-RU')}</b> зрителей</span></div>` : ''}
+      <div class="gm-actions">
+        <a class="btn ${g.status === 2 ? 'btn-orange' : ''}" href="#/live/${g.id}">${icon('i-live')}${g.status === 0 ? 'Онлайн-табло' : g.status === 2 ? 'Смотреть онлайн' : 'Протокол и статистика'}</a>
+        ${g.status === 0 ? `<a class="btn" href="/api/calendar.ics?game=${g.id}">${icon('i-plus')}Добавить в календарь</a>` : ''}
+        ${g.status === 0 && g.isHome ? `<a class="btn btn-orange" href="${TICKETS}" target="_blank" rel="noopener">${icon('i-ticket')}Билеты</a>` : ''}
+        <button class="btn" type="button" id="gmAsk">${icon('i-ai')}Спросить Пармыча</button>
+      </div>
+    </div>`);
+  $('#gmAsk').onclick = () => {
+    closeModal();
+    openDrawer(g.status === 1
+      ? `Разбери матч ${g.home.name} — ${g.away.name} ${g.home.score}:${g.away.score} (${fDate.format(new Date(g.ts))}).`
+      : `Что известно про матч ${g.home.name} — ${g.away.name} ${fDate.format(new Date(g.ts))}? Где смотреть и как добраться?`);
+  };
+  $$('#modalBox a[href^="#/"]').forEach((a) => a.addEventListener('click', closeModal));
+}
+
+// ── Live ───────────────────────────────────────────────────────────────────
+
+function wormSvg(prog, teams) {
+  if (!prog || prog.length < 2) return '<div class="empty">График появится после первых очков</div>';
+  const W = 900, H = 180, P = 26;
+  const tMax = Math.max(40, prog[prog.length - 1].t);
+  const diffs = prog.map((p) => p.a - p.b);
+  const m = Math.max(8, ...diffs.map(Math.abs));
+  const x = (t) => P + (t / tMax) * (W - P * 2);
+  const y = (d) => H / 2 - (d / m) * (H / 2 - 16);
+  let path = `M${x(0)},${y(0)}`;
+  let prev = 0;
+  for (const p of prog) { path += ` L${x(p.t).toFixed(1)},${y(prev).toFixed(1)} L${x(p.t).toFixed(1)},${y(p.a - p.b).toFixed(1)}`; prev = p.a - p.b; }
+  const area = `${path} L${x(prog[prog.length - 1].t)},${H / 2} L${x(0)},${H / 2} Z`;
+  const qs = [10, 20, 30, 40, 45, 50].filter((q) => q <= tMax);
+  const usTop = isUs(teams[0].id);
+  return `<svg class="worm" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <defs><clipPath id="up"><rect x="0" y="0" width="${W}" height="${H / 2}"/></clipPath><clipPath id="dn"><rect x="0" y="${H / 2}" width="${W}" height="${H / 2}"/></clipPath></defs>
+    <line class="axis" x1="${P}" x2="${W - P}" y1="${H / 2}" y2="${H / 2}"/>
+    ${qs.map((q) => `<line class="qline" x1="${x(q)}" x2="${x(q)}" y1="8" y2="${H - 8}"/><text x="${x(q) - 4}" y="${H - 2}" text-anchor="end">${q}'</text>`).join('')}
+    <path d="${area}" clip-path="url(#up)" fill="${usTop ? 'rgba(255,81,0,.28)' : 'rgba(46,91,216,.35)'}" stroke="none"/>
+    <path d="${area}" clip-path="url(#dn)" fill="${usTop ? 'rgba(46,91,216,.35)' : 'rgba(255,81,0,.28)'}" stroke="none"/>
+    <path class="draw" d="${path}" stroke="#EEF2FA" stroke-width="1.6" fill="none" vector-effect="non-scaling-stroke"/>
+    <text x="${P}" y="14">${esc(shortName(teams[0].name))} ▲</text><text x="${P}" y="${H - 14}">${esc(shortName(teams[1].name))} ▼</text>
+  </svg>`;
+}
+
+function boxTable(t) {
+  if (!t.players.length) return '<div class="empty">Статистика игроков появится по ходу матча</div>';
+  const hasAst = t.players.some((p) => p.ast != null);
+  return `<div style="overflow-x:auto"><table class="box"><thead><tr><th>Игрок</th><th>Очк</th><th>2-очк</th><th>3-очк</th><th>Штр</th><th>Подб</th>${hasAst ? '<th>Пер</th>' : ''}<th>Пх</th><th>Бш</th><th>Фол</th>${t.players.some((p) => p.min) ? '<th>Мин</th><th>+/−</th>' : ''}</tr></thead><tbody>
+    ${t.players.map((p) => `<tr><td><span class="nm">${esc(p.num)}</span>${esc(p.name)}</td><td class="pts">${p.pts}</td><td>${esc(p.fg2 || '—')}</td><td>${esc(p.fg3 || '—')}</td><td>${esc(p.ft || '—')}</td><td>${p.reb ?? 0}</td>${hasAst ? `<td>${p.ast ?? 0}</td>` : ''}<td>${p.stl ?? 0}</td><td>${p.blk ?? 0}</td><td>${p.pf ?? 0}</td>${t.players.some((x) => x.min) ? `<td>${esc(p.min || '—')}</td><td>${p.pm ?? '—'}</td>` : ''}</tr>`).join('')}
+  </tbody></table></div>${t.boxSource === 'derived' ? '<p class="muted" style="padding:10px 14px;margin:0;font-size:12px">Онлайн-подсчёт по ходу матча. Официальный протокол появится после финальной сирены.</p>' : ''}`;
+}
+
+function boardHtml(live) {
+  const [a, b] = live.teams;
+  const isLive = live.status === 2;
+  const n = Math.max(4, a.periods.length);
+  const head = Array.from({ length: n }, (_, i) => `<th>${i < 4 ? i + 1 : 'ОТ' + (i - 3)}</th>`).join('');
+  const row = (t, o) => `<tr><td>${esc(shortName(t.name))}</td>${Array.from({ length: n }, (_, i) => `<td class="${(t.periods[i] ?? 0) > (o.periods[i] ?? 0) ? 'hi' : ''}">${t.periods[i] ?? '–'}</td>`).join('')}<td class="tot">${t.score}</td></tr>`;
+  return `<div class="board" id="board">
+    <div class="board-top"><span>${isLive ? (live.pregame ? '<span class="pulse"></span>&nbsp; Онлайн-протокол открыт · разминка' : '<span class="pulse"></span>&nbsp; Онлайн') : live.finished ? 'Финальная сирена' : 'Матч не начался'}</span><span>${esc(live.league || '')} · ${esc(live.stage || '')}</span></div>
+    <div class="board-main">
+      <div class="bt"><img src="${esc(a.logo)}" alt=""><b>${esc(shortName(a.name))}</b><small>${esc(a.city || '')}</small>${a.coach ? `<small>тренер ${esc(a.coach)}</small>` : ''}</div>
+      <span class="led" data-team="0">${a.score}</span>
+      <div class="clock"><span class="c-time" id="clock">${esc(live.finished ? '00:00' : live.clock)}</span><span class="c-per">${esc(live.finished ? 'Финал' : live.periodLabel || 'до старта')}</span></div>
+      <span class="led" data-team="1">${b.score}</span>
+      <div class="bt"><img src="${esc(b.logo)}" alt=""><b>${esc(shortName(b.name))}</b><small>${esc(b.city || '')}</small>${b.coach ? `<small>тренер ${esc(b.coach)}</small>` : ''}</div>
+    </div>
+    <table class="qtable"><thead><tr><th>Команда</th>${head}<th>Итог</th></tr></thead><tbody>${row(a, b)}${row(b, a)}</tbody></table>
+    <div class="board-top" style="margin-top:16px"><span>${esc(live.venue || '')}</span><span>${live.attendance ? live.attendance.toLocaleString('ru-RU') + ' зрителей' : ''}${live.tv ? ' · ТВ: ' + esc(live.tv) : ''}</span></div>
+  </div>`;
+}
+
+function feedHtml(live) {
+  if (!live.feed.length) return '<div class="empty">События появятся после стартового вбрасывания</div>';
+  return live.feed.map((f) => {
+    const t = live.teams[f.team - 1];
+    const c = isUs(t.id) ? 'var(--orange)' : 'var(--royal)';
+    return `<div class="feed-item ${f.pts ? 'score' : ''}"><span class="ft">${f.period <= 4 ? f.period + 'Ч' : 'ОТ'} ${esc(f.clock)}</span>
+      <span class="fp" style="--c:${c}">${f.player ? esc(f.player) + ' — ' : esc(shortName(t.name)) + ' — '}${f.pts ? `<b>${esc(f.text)}</b>` : esc(f.text)}</span>
+      <span class="fs">${f.a}:${f.b}</span></div>`;
+  }).join('');
+}
+
+async function renderLive(view, args) {
+  const sched = await getSchedule();
+  let gameId = Number(args[0]) || null;
+  let res;
+  if (gameId) res = { live: await getLive(gameId).then((r) => r.live), focus: null };
+  else res = await getLive();
+  const focus = res.focus;
+  let live = res.live;
+  if (!gameId && live) gameId = live.gameId;
+
+  const past = sched.games.filter((g) => g.status !== 0).reverse();
+  const pastOpts = past.map((g) => `<option value="${g.id}" ${g.id === gameId ? 'selected' : ''}>${esc(fDate.format(new Date(g.ts)))} · ${esc(shortName(g.home.name))} ${g.home.score}:${g.away.score} ${esc(shortName(g.away.name))}</option>`).join('');
+
+  let left;
+  if (live) {
+    left = `${boardHtml(live)}
+      <section class="panel" style="margin-top:20px"><div class="panel-head"><h2>Динамика счёта</h2><span class="label">разница по минутам</span></div><div class="panel-pad" id="worm">${wormSvg(live.progression, live.teams)}</div></section>
+      <section class="panel" style="margin-top:20px">
+        <div class="tabs" id="liveTabs"><button class="tab on" data-tab="feed">Ход матча</button><button class="tab" data-tab="0">${esc(shortName(live.teams[0].name))}</button><button class="tab" data-tab="1">${esc(shortName(live.teams[1].name))}</button></div>
+        <div id="liveTab" class="feed">${feedHtml(live)}</div>
+      </section>`;
+  } else {
+    const g = focus && focus.game;
+    left = g
+      ? `<section class="hero" style="grid-template-columns:1fr auto 1fr">
+          ${ridgeSvg('ridge hero-ridge')}
+          <div class="hero-meta"><span>${icon('i-cal')}<b>${esc(gameWhen(g))}</b></span><span>${icon('i-pin')}${esc(g.arena || '')}</span>${g.tv ? `<span>${icon('i-tv')}${esc(g.tv)}</span>` : ''}</div>
+          <div class="hero-team">${teamImg(g.home, 96)}<b>${esc(shortName(g.home.name))}</b></div>
+          <div class="hero-mid"><span class="hero-badge">Табло включится со стартом матча</span>${countdownHtml()}</div>
+          <div class="hero-team">${teamImg(g.away, 96)}<b>${esc(shortName(g.away.name))}</b></div>
+        </section>
+        <p class="muted" style="margin:16px 2px">Табло обновляется автоматически каждые 10 секунд — оставьте вкладку открытой. Счёт, четверти, ход матча и статистика игроков приходят из официального онлайн-протокола лиги.</p>`
+      : `<div class="empty panel">Ближайших матчей нет</div>`;
+  }
+
+  view.innerHTML = `<div class="live-wrap">
+    <div>${left}</div>
+    <aside class="grid">
+      <section class="panel"><div class="panel-head"><h2>Протоколы Пармы</h2></div>
+        <div class="panel-pad" style="padding:14px 18px"><select id="pastSel" style="width:100%;background:var(--ink);color:var(--text);border:1px solid var(--line-2);border-radius:4px;padding:10px;font:inherit">
+          <option value="">Текущий / ближайший матч</option>${pastOpts}</select></div></section>
+      <section class="panel board-list"><div class="panel-head"><h2>Лига · табло</h2><span class="label" id="boardUpd"></span></div><div id="boardList">${skeleton(200)}</div></section>
+    </aside></div>`;
+
+  if (!live && focus && focus.game) startCountdown($('.hero', view), focus.game.ts);
+  $('#pastSel').onchange = (e) => (location.hash = e.target.value ? '#/live/' + e.target.value : '#/live');
+
+  let activeTab = 'feed';
+  const bindTabs = () => {
+    $$('#liveTabs .tab').forEach((b) => (b.onclick = () => {
+      activeTab = b.dataset.tab;
+      $$('#liveTabs .tab').forEach((x) => x.classList.toggle('on', x === b));
+      paintTab();
+    }));
+  };
+  const paintTab = () => {
+    const box = $('#liveTab');
+    if (!box || !live) return;
+    box.innerHTML = activeTab === 'feed' ? feedHtml(live) : boxTable(live.teams[Number(activeTab)]);
+  };
+  if (live) bindTabs();
+
+  // Local clock tick between polls while the game clock is running.
+  let clockSec = live ? live.clockSec : 0;
+  let clockAt = Date.now();
+  const tickId = setInterval(() => {
+    if (!live || !live.clockRunning) return;
+    const s = Math.max(0, clockSec - Math.floor((Date.now() - clockAt) / 1000));
+    const el = $('#clock');
+    if (el) el.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  }, 1000);
+  onLeave(() => clearInterval(tickId));
+
+  const paintBoard = async () => {
+    try {
+      const b = await getBoard();
+      const box = $('#boardList');
+      if (!box) return;
+      const days = {};
+      for (const g of b.games) (days[dayKey(g.ts)] ||= []).push(g);
+      box.innerHTML = Object.entries(days).map(([k, gs]) => `<div class="bl-day label">${esc(fFull.format(new Date(gs[0].ts)))}</div>` + gs.map((g) => `
+        <div class="bl-game ${g.id === gameId ? 'on' : ''} ${isUs(g.home.id) || isUs(g.away.id) ? 'us' : ''}" data-id="${g.id}">
+          <div class="tm ${isUs(g.home.id) ? 'u' : ''}">${teamImg(g.home, 20)}${esc(shortName(g.home.name))}</div><div class="sc">${g.status === 0 ? '' : g.home.score}</div>
+          <div class="tm ${isUs(g.away.id) ? 'u' : ''}">${teamImg(g.away, 20)}${esc(shortName(g.away.name))}</div><div class="sc">${g.status === 0 ? '' : g.away.score}</div>
+          <div class="st">${g.status === 2 ? '<span class="pulse"></span> идёт матч' : g.status === 1 ? 'завершён' : g.hasTime ? g.timeMsk + ' МСК' : 'время уточняется'}</div>
+        </div>`).join('')).join('') || '<div class="empty">Матчей нет</div>';
+      $$('.bl-game', box).forEach((el) => (el.onclick = () => (location.hash = '#/live/' + el.dataset.id)));
+      $('#boardUpd').textContent = 'обновлено ' + dtf({ hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date());
+    } catch {}
+  };
+  paintBoard();
+
+  const poll = async () => {
+    try {
+      const r = gameId ? { live: (await getLive(gameId)).live } : await getLive();
+      if (!r.live) {
+        if (!live) return;
+      }
+      if (!live && r.live) { route(); return; }
+      if (!r.live) return;
+      const prev = live;
+      live = r.live;
+      clockSec = live.clockSec; clockAt = Date.now();
+      const board = $('#board');
+      if (board) {
+        board.outerHTML = boardHtml(live);
+        live.teams.forEach((t, i) => {
+          if (prev && prev.teams[i].score !== t.score) {
+            const el = $(`.led[data-team="${i}"]`);
+            if (el) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+          }
+        });
+      }
+      if (prev && prev.progression.length !== live.progression.length) $('#worm').innerHTML = wormSvg(live.progression, live.teams);
+      paintTab();
+    } catch {}
+    paintBoard();
+  };
+  const isActive = live ? live.status === 2 : focus && focus.game && focus.game.ts - Date.now() < 30 * 60e3;
+  const pid = setInterval(poll, isActive ? 10_000 : 60_000);
+  onLeave(() => clearInterval(pid));
+}
+
+// ── Calendar ───────────────────────────────────────────────────────────────
+
+const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+const calState = { y: null, m: null, comp: 'all' };
+
+async function renderCalendar(view) {
+  const sched = await getSchedule();
+  if (calState.y == null) {
+    const next = sched.games.find((g) => g.status !== 1 && g.ts > Date.now() - 86400e3) || sched.games[sched.games.length - 1];
+    const p = mskParts(next ? next.ts : Date.now());
+    calState.y = p.y; calState.m = p.m;
+  }
+  const paint = () => {
+    const games = sched.games.filter((g) => calState.comp === 'all' || g.compId === Number(calState.comp));
+    const byDay = {};
+    for (const g of games) (byDay[dayKey(g.ts)] ||= []).push(g);
+    const first = new Date(Date.UTC(calState.y, calState.m - 1, 1));
+    const startDow = (first.getUTCDay() + 6) % 7;
+    const daysIn = new Date(Date.UTC(calState.y, calState.m, 0)).getUTCDate();
+    const today = dayKey(Date.now());
+    const cells = [];
+    const total = Math.ceil((startDow + daysIn) / 7) * 7;
+    for (let i = 0; i < total; i++) {
+      const d = new Date(Date.UTC(calState.y, calState.m - 1, 1 + i - startDow));
+      const key = d.toISOString().slice(0, 10);
+      const out = d.getUTCMonth() !== calState.m - 1;
+      const gs = byDay[key] || [];
+      cells.push(`<div class="cal-day ${out ? 'out' : ''} ${key === today ? 'today' : ''}"><span class="d">${d.getUTCDate()}</span>
+        ${gs.map((g) => `<div class="cal-game ${g.isHome ? 'home' : ''}" data-game="${g.id}"><div class="cg-t">${teamImg(g.opponent, 18)}<span>${g.isHome ? '' : '@'}${esc(shortName(g.opponent.name))}</span></div>
+          <div class="cg-s"><span>${g.status === 1 ? `<span class="${g.result}">${g.result === 'W' ? 'В' : 'П'}</span> ${g.home.score}:${g.away.score}` : g.status === 2 ? '● LIVE' : g.hasTime ? g.timeMsk : '—'}</span><span>${esc(g.league.split(' ')[0])}</span></div></div>`).join('')}
+      </div>`);
+    }
+    const monthGames = games.filter((g) => { const p = mskParts(g.ts); return p.y === calState.y && p.m === calState.m; });
+    view.innerHTML = `<div class="toolbar"><div class="chips" id="compChips">
+        <button class="chip ${calState.comp === 'all' ? 'on' : ''}" data-comp="all">Все турниры</button>
+        ${sched.comps.map((c) => `<button class="chip ${String(calState.comp) === String(c.id) ? 'on' : ''}" data-comp="${c.id}">${esc(c.name)}</button>`).join('')}
+      </div><a class="btn btn-sm" href="/api/calendar.ics">${icon('i-plus')}Весь сезон в мой календарь (.ics)</a></div>
+      <div class="cal-wrap">
+        <section class="panel">
+          <div class="cal-head"><h2>${MONTHS[calState.m - 1]} <span class="muted">${calState.y}</span></h2>
+            <div class="cal-nav"><button class="icon-btn" id="calPrev" aria-label="Назад">${icon('i-left')}</button><button class="btn btn-sm" id="calToday">Сегодня</button><button class="icon-btn" id="calNext" aria-label="Вперёд">${icon('i-right')}</button></div></div>
+          <div class="cal-grid">${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d) => `<div class="cal-dow">${d}</div>`).join('')}${cells.join('')}</div>
+          <div class="cal-legend"><span><i class="h"></i>домашний матч · УДС «Молот»</span><span><i></i>выезд</span><span>Время — московское</span></div>
+        </section>
+        <section class="panel"><div class="panel-head"><h2>Матчи месяца</h2><span class="label">${monthGames.length}</span></div>
+          <div class="glist">${monthGames.map(gameRow).join('') || '<div class="empty">В этом месяце матчей нет</div>'}</div></section>
+      </div>`;
+    $$('#compChips .chip', view).forEach((b) => (b.onclick = () => { calState.comp = b.dataset.comp; paint(); }));
+    $('#calPrev').onclick = () => { calState.m--; if (calState.m < 1) { calState.m = 12; calState.y--; } paint(); };
+    $('#calNext').onclick = () => { calState.m++; if (calState.m > 12) { calState.m = 1; calState.y++; } paint(); };
+    $('#calToday').onclick = () => { const p = mskParts(Date.now()); calState.y = p.y; calState.m = p.m; paint(); };
+    wireCommon(view, sched, null);
+    $$('#view > *').forEach((el, i) => el.style.setProperty('--i', i));
+  };
+  paint();
+}
+
+// ── Tournaments ────────────────────────────────────────────────────────────
+
+const tState = { comp: null, season: null };
+
+function stageHtml(s) {
+  if (s.type === 'playoff') {
+    return `<div class="series">${s.series.map((p) => `<div class="sr ${isUs(p.t1.id) || isUs(p.t2.id) ? 'us' : ''}"><div class="sr-r">${esc(p.round)}${p.final ? ' · завершена' : ''}</div>
+      <div class="sr-t"><span>${esc(shortName(p.t1.name))}</span><b>${p.t1.score ?? 0}</b></div><div class="sr-t"><span>${esc(shortName(p.t2.name))}</span><b>${p.t2.score ?? 0}</b></div></div>`).join('')}</div>`;
+  }
+  const maxPct = 100;
+  return `<div style="overflow-x:auto"><table class="t-table"><thead><tr><th class="tn">#</th><th class="tn">Команда</th><th>И</th><th>В</th><th>П</th><th>%</th><th>Забито</th><th>Пропущено</th><th>+/−</th><th>Очки</th><th class="tn">Форма</th></tr></thead><tbody>
+    ${s.table.map((r) => `<tr class="${isUs(r.teamId) ? 'us' : ''}"><td class="pl">${r.place}</td>
+      <td class="tn"><span class="tm">${teamImg(r, 30)}<span>${esc(shortName(r.name))}<small>${esc(r.city || '')}</small></span></span></td>
+      <td>${r.g}</td><td>${r.w}</td><td>${r.l}</td><td><span class="bar" style="width:${Math.round(((r.pct ?? 0) / maxPct) * 50)}px"></span>${r.pct ?? '—'}</td>
+      <td>${r.pf ?? '—'}</td><td>${r.pa ?? '—'}</td><td>${r.diff != null ? (r.diff > 0 ? '+' : '') + r.diff : '—'}</td><td><b>${r.pts ?? '—'}</b></td>
+      <td class="tn"><span class="form">${r.form.map((f) => `<span class="wl ${f}">${f === 'W' ? 'В' : f === 'L' ? 'П' : '·'}</span>`).join('')}</span></td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+async function renderTournaments(view) {
+  const [st, seasons] = await Promise.all([getStandings(), getSeasons()]);
+  if (!tState.comp && st.comps[0]) tState.comp = st.comps[0].id;
+  if (!tState.season && seasons[1]) tState.season = seasons[1].id;
+  const comp = st.comps.find((c) => c.id === tState.comp) || st.comps[0];
+  view.innerHTML = `<section class="panel">
+      <div class="tabs" id="compTabs">${st.comps.map((c) => `<button class="tab ${c.id === comp.id ? 'on' : ''}" data-id="${c.id}">${esc(c.name)}</button>`).join('')}</div>
+      ${comp ? comp.stages.map((s) => `<div class="panel-head"><h2>${esc(s.name)}</h2><span class="label">${esc(st.season.name)}</span></div>${stageHtml(s)}`).join('') : '<div class="empty">Нет данных</div>'}
+    </section>
+    <section style="margin-top:28px">
+      <div class="toolbar"><div><span class="kicker">с ${esc(seasons[seasons.length - 1].name.replace('Сезон ', ''))}</span><h2 class="h2" style="font-size:22px;margin-top:6px">История по сезонам и лигам</h2></div></div>
+      <section class="panel" style="margin-bottom:20px"><div class="panel-head"><h2>Итоговое место в Единой лиге ВТБ</h2><span class="label" id="chartNote">загружаем сезоны…</span></div><div class="panel-pad" id="placeChart">${skeleton(180)}</div></section>
+      <div class="hist">
+        <section class="panel seasons">${seasons.map((s) => `<button class="season-btn ${s.id === tState.season ? 'on' : ''}" data-id="${s.id}"><b>${esc(s.name.replace('Сезон ', ''))}</b><span id="sb-${s.id}"></span></button>`).join('')}</section>
+        <section class="panel" id="seasonBox">${skeleton(260)}</section>
+      </div>
+    </section>`;
+  $$('#compTabs .tab', view).forEach((b) => (b.onclick = () => { tState.comp = Number(b.dataset.id); renderTournaments(view); }));
+  $$('.season-btn', view).forEach((b) => (b.onclick = () => {
+    tState.season = Number(b.dataset.id);
+    $$('.season-btn', view).forEach((x) => x.classList.toggle('on', x === b));
+    paintSeason();
+  }));
+
+  const paintSeason = async () => {
+    const box = $('#seasonBox');
+    box.innerHTML = skeleton(260);
+    try {
+      const s = await getSeason(tState.season);
+      box.innerHTML = `<div class="panel-head"><h2>${esc(s.season.name)}</h2><span class="label">${s.comps.length} турнир(а)</span></div>` +
+        (s.comps.map((c) => `<div class="comp-res"><h3>${esc(c.name)}</h3>${c.results.length ? c.results.map((r) => r.place != null
+          ? `<div class="res-row"><span class="place-badge p${r.place}">${r.place}</span><span class="rs">${esc(r.stage)}${r.of ? ` · из ${r.of}` : ''}</span><span class="rr">${r.w || r.l ? `${r.w}–${r.l}` : ''}</span></div>`
+          : `<div class="res-row"><span class="wl ${r.won ? 'W' : 'L'}">${r.won ? 'В' : 'П'}</span><span class="rs">${esc(r.stage)} · vs ${esc(shortName(r.vs))}</span><span class="rr">${esc(r.series.replace('–', /\d{2,}/.test(r.series) ? ':' : '–'))}</span></div>`).join('') : '<p class="muted" style="margin:0">Нет итогов в протоколе</p>'}</div>`).join('') || '<div class="empty">Нет данных</div>');
+    } catch (e) { box.innerHTML = errBox(e); }
+  };
+  paintSeason();
+
+  // Place-by-season chart for the VTB League, loaded progressively.
+  const points = [];
+  let alive = true;
+  onLeave(() => (alive = false));
+  for (const s of [...seasons].reverse()) {
+    if (!alive) return;
+    try {
+      const sum = await getSeason(s.id);
+      const vtb = sum.comps.find((c) => /ВТБ/i.test(c.name));
+      const fin = vtb && (vtb.results.find((r) => /Итог/i.test(r.stage)) || vtb.results.find((r) => r.place != null));
+      const badge = $('#sb-' + s.id);
+      const anyPlace = fin || sum.comps.flatMap((c) => c.results).find((r) => r.place != null);
+      if (badge && anyPlace) badge.innerHTML = `<span class="place-badge p${anyPlace.place}">${anyPlace.place}</span>`;
+      if (fin) points.push({ label: s.name.replace('Сезон ', '').replace(/20(\d\d)\/20(\d\d)/, '$1/$2'), place: fin.place, of: fin.of });
+      if (alive) paintChart();
+    } catch {}
+  }
+  const note = $('#chartNote');
+  if (note) note.textContent = points.length ? `${points.length} сезонов в лиге` : 'нет данных';
+
+  function paintChart() {
+    const box = $('#placeChart');
+    if (!box || !points.length) return;
+    const W = 1000, H = 220, P = 34;
+    const maxPlace = Math.max(12, ...points.map((p) => p.of || p.place));
+    const x = (i) => P + (points.length === 1 ? (W - 2 * P) / 2 : (i / (points.length - 1)) * (W - 2 * P));
+    const y = (pl) => 20 + ((pl - 1) / (maxPlace - 1)) * (H - 56);
+    const d = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.place).toFixed(1)}`).join(' ');
+    box.innerHTML = `<svg class="place-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      ${[1, 4, 8, 12].filter((v) => v <= maxPlace).map((v) => `<line x1="${P}" x2="${W - P}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(255,255,255,.07)" stroke-dasharray="3 5"/><text x="4" y="${y(v) + 4}">${v}</text>`).join('')}
+      <rect x="${P}" y="${y(1) - 6}" width="${W - 2 * P}" height="${y(8) - y(1) + 12}" fill="rgba(57,217,138,.05)"/>
+      <path d="${d}" stroke="var(--orange)" stroke-width="2.5" fill="none" vector-effect="non-scaling-stroke"/>
+      ${points.map((p, i) => `<circle class="pt" cx="${x(i)}" cy="${y(p.place)}" r="7"/><text class="pt-l" x="${x(i)}" y="${y(p.place) - 13}" text-anchor="middle">${p.place}</text><text x="${x(i)}" y="${H - 6}" text-anchor="middle">${esc(p.label)}</text>`).join('')}
+    </svg><p class="muted" style="margin:6px 0 0;font-size:12px">Зелёная зона — места 1–8 (плей-офф). Ниже — хуже.</p>`;
+  }
+}
+
+// ── Team ───────────────────────────────────────────────────────────────────
+
+const POS = [['all', 'Все'], ['g', 'Защитники'], ['f', 'Форварды'], ['c', 'Центровые']];
+const posGroup = (p) => (/центр/i.test(p.position) ? 'c' : /форвард/i.test(p.position) ? 'f' : 'g');
+const teamState = { pos: 'all', sort: 'number' };
+
+function playerCard(p, i) {
+  const s = p.stats || {};
+  return `<article class="card" data-player="${p.id}" style="--i:${i}">
+    <div class="card-photo"><span class="big-num">${esc(p.number)}</span><img src="${esc(p.photo)}" alt="${esc(p.first + ' ' + p.last)}" loading="lazy">
+      <span class="card-flag">${esc(p.countryCode || '')}</span>${p.captain ? '<span class="card-cap">C</span>' : ''}</div>
+    <div class="card-body"><span class="card-num">${esc(p.number)}</span>
+      <div class="card-name"><small>${esc(p.first)}</small>${esc(p.last)}</div>
+      <div class="card-pos">${esc(p.position)} · ${p.height || '—'} см · ${p.age} ${plural(p.age, 'год', 'года', 'лет')}</div>
+      <div class="card-stats"><div><b>${fmt1(s.pts)}</b><small>очк</small></div><div><b>${fmt1(s.reb)}</b><small>подб</small></div><div><b>${fmt1(s.ast)}</b><small>пер</small></div></div>
+    </div></article>`;
+}
+function plural(n, a, b, c) { n = Math.abs(n) % 100; const n1 = n % 10; if (n > 10 && n < 20) return c; if (n1 > 1 && n1 < 5) return b; if (n1 === 1) return a; return c; }
+
+function tilt(root) {
+  for (const card of $$('.card', root)) {
+    card.addEventListener('pointermove', (e) => {
+      const r = card.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
+      card.style.setProperty('--ry', `${(px - 0.5) * 10}deg`);
+      card.style.setProperty('--rx', `${(0.5 - py) * 10}deg`);
+      card.style.setProperty('--mx', `${px * 100}%`);
+      card.style.setProperty('--my', `${py * 100}%`);
+    });
+    card.addEventListener('pointerleave', () => { card.style.setProperty('--rx', '0deg'); card.style.setProperty('--ry', '0deg'); });
+  }
+}
+
+async function renderTeam(view) {
+  const team = await getTeam();
+  const paint = () => {
+    let ps = team.players.filter((p) => teamState.pos === 'all' || posGroup(p) === teamState.pos);
+    const k = teamState.sort;
+    ps = [...ps].sort((a, b) => k === 'number' ? Number(a.number) - Number(b.number) : k === 'height' ? (b.height || 0) - (a.height || 0) : k === 'age' ? a.age - b.age : ((b.stats || {})[k] ?? -1) - ((a.stats || {})[k] ?? -1));
+    const head = team.coaches.find((c) => /главн/i.test(c.post));
+    const rest = team.coaches.filter((c) => c !== head);
+    view.innerHTML = `<section class="panel team-avg kpis" style="grid-template-columns:repeat(4,1fr)">
+        <div class="kpi"><span class="label">Игроков в заявке</span><b><span data-count="${team.players.length}">0</span></b><p>${team.players.filter((p) => p.countryCode !== 'RU').length} легионер(а)</p></div>
+        <div class="kpi"><span class="label">Средний возраст</span><b><span data-count="${team.avg.age || 0}" data-dec="1">0</span></b><p>лет</p></div>
+        <div class="kpi"><span class="label">Средний рост</span><b><span data-count="${team.avg.height || 0}" data-dec="1">0</span><small>см</small></b><p>самый высокий — ${esc(team.players.reduce((a, p) => (p.height > a.height ? p : a)).last)}</p></div>
+        <div class="kpi"><span class="label">Средний вес</span><b><span data-count="${team.avg.weight || 0}" data-dec="1">0</span><small>кг</small></b><p>${esc(team.season.name)}</p></div>
+      </section>
+      <div class="toolbar"><div class="chips" id="posChips">${POS.map(([k, l]) => `<button class="chip ${teamState.pos === k ? 'on' : ''}" data-pos="${k}">${l}</button>`).join('')}</div>
+        <label class="sort">Сортировать <select id="sortSel">${[['number', 'по номеру'], ['pts', 'по очкам'], ['reb', 'по подборам'], ['ast', 'по передачам'], ['eff', 'по КПИ'], ['height', 'по росту'], ['age', 'по возрасту']].map(([v, l]) => `<option value="${v}" ${teamState.sort === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
+      <div class="roster">${ps.map(playerCard).join('')}</div>
+      <section style="margin-top:34px"><div class="toolbar"><div><span class="kicker">Штаб</span><h2 class="h2" style="font-size:22px;margin-top:6px">Тренерский состав</h2></div></div>
+        <div class="coaches">${[head, ...rest].filter(Boolean).map((c, i) => `<div class="coach ${c === head ? 'head' : ''}" style="--i:${i}"><img src="${esc(c.photo)}" alt="" loading="lazy"><div><b>${esc(c.first)} ${esc(c.last)}</b><div class="post">${esc(c.post)}</div><small>${esc([c.first, c.middle, c.last].filter(Boolean).join(' '))}${c.age ? ` · ${c.age} ${plural(c.age, 'год', 'года', 'лет')}` : ''}</small></div></div>`).join('')}</div>
+      </section>`;
+    countUp(view);
+    tilt(view);
+    $$('#posChips .chip', view).forEach((b) => (b.onclick = () => { teamState.pos = b.dataset.pos; paint(); }));
+    $('#sortSel').onchange = (e) => { teamState.sort = e.target.value; paint(); };
+    wireCommon(view, null, team);
+    $$('#view > *').forEach((el, i) => el.style.setProperty('--i', i));
+  };
+  paint();
+}
+
+function openPlayer(p, team) {
+  const s = p.stats || {};
+  const maxOf = (k) => Math.max(1, ...team.players.map((x) => (x.stats && x.stats[k]) || 0));
+  const bars = [['Очки', 'pts'], ['Подборы', 'reb'], ['Передачи', 'ast'], ['Перехваты', 'stl'], ['Блок-шоты', 'blk'], ['КПИ', 'eff']];
+  const ring = (v, label, made) => {
+    const C = 2 * Math.PI * 38;
+    const pct = Math.max(0, Math.min(100, v || 0));
+    return `<div class="ring"><svg viewBox="0 0 92 92"><circle class="bg" cx="46" cy="46" r="38"/><circle class="fg" cx="46" cy="46" r="38" stroke-dasharray="${C}" stroke-dashoffset="${C}" data-off="${C * (1 - pct / 100)}"/></svg><b>${v != null ? fmt1(v) + '%' : '—'}</b><small>${label}</small><small style="text-transform:none">${esc(made || '')}</small></div>`;
+  };
+  openModal(`<div class="pm">
+    <div class="pm-photo"><span class="big-num">${esc(p.number)}</span><img src="${esc(p.photo)}" alt=""></div>
+    <div class="pm-body"><span class="kicker">#${esc(p.number)} · ${esc(p.position)}${p.captain ? ' · капитан' : ''}</span>
+      <h2><small>${esc(p.first)} · ${esc(p.firstEn || '')} ${esc(p.lastEn || '')}</small>${esc(p.last)}</h2>
+      <div class="pm-facts"><div><span class="label">Рост</span><b>${p.height || '—'} см</b></div><div><span class="label">Вес</span><b>${p.weight || '—'} кг</b></div><div><span class="label">Возраст</span><b>${p.age}</b></div><div><span class="label">Страна</span><b>${esc(p.country || '—')}</b></div></div>
+      ${s.games ? `<span class="label">Сезон в Единой лиге ВТБ · ${s.games} игр · ${esc(s.min || '—')} мин в среднем</span>
+      <div class="pm-bars" style="margin-top:14px">${bars.map(([l, k]) => `<div class="pm-bar"><span>${l}</span><div class="track"><div class="fill" data-w="${Math.round(((s[k] || 0) / maxOf(k)) * 100)}"></div></div><b>${fmt1(s[k])}</b></div>`).join('')}</div>
+      <div class="rings">${ring(s.fg2p, '2-очк', s.fg2)}${ring(s.fg3p, '3-очк', s.fg3)}${ring(s.ftp, 'штрафные', s.ft)}</div>`
+      : '<p class="muted">Пока без игровой статистики в сезоне.</p>'}
+      <div class="gm-actions" style="margin-top:22px"><button class="btn" type="button" id="pmAsk">${icon('i-ai')}Спросить Пармыча про игрока</button></div>
+    </div></div>`);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    $$('#modalBox .fill').forEach((f) => (f.style.width = f.dataset.w + '%'));
+    $$('#modalBox .ring .fg').forEach((c) => (c.style.strokeDashoffset = c.dataset.off));
+  }));
+  $('#pmAsk').onclick = () => { closeModal(); openDrawer(`Расскажи про ${p.first} ${p.last} (#${p.number}): роль в команде и как он играет в этом сезоне.`); };
+}
+
+// ── Arena & map ────────────────────────────────────────────────────────────
+
+const toRad = (d) => (d * Math.PI) / 180;
+function km(a, b) {
+  const R = 6371, dLat = toRad(b[0] - a[0]), dLon = toRad(b[1] - a[1]);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLon / 2) ** 2;
+  return Math.round(2 * R * Math.asin(Math.sqrt(h)));
+}
+
+const FAQ = [
+  ['Где купить билеты?', 'Единственный официальный билетный оператор — Сцена24: на сайте, в приложении «БЕТСИТИ ПАРМА» или в офисе клуба (ул. Лебедева, 13, офис 119, УДС «Молот»). В одном заказе — до 5 билетов.'],
+  ['Есть ли скидки?', '50% — дети 6–14 лет, студенты очной формы, люди с инвалидностью, пенсионеры и ветераны; 30% — по карте «Профсоюзный дисконт»; 10% — владельцам абонемента прошлого сезона. Нужен подтверждающий документ.'],
+  ['Нужен ли билет ребёнку?', 'До 5 лет включительно — бесплатно, если ребёнок не занимает отдельное место. С 6 лет нужен билет, детский (6–14 лет) — со скидкой 50%.'],
+  ['Можно ли вернуть билет?', 'В день матча и за 2 дня до него возврат не производится. За 3 дня и раньше — с комиссией 25%. Вместо возврата можно обменять билет на другой матч через менеджера клуба: +7 (967) 905-44-81.'],
+  ['Во сколько приходить?', 'На билете указано афишное время — начало шоу и представления команд. На сайте и здесь — время вбрасывания. Приходите к афишному, чтобы спокойно занять места.'],
+  ['Нужно ли печатать электронный билет?', 'Нет — достаточно открыть билет на телефоне. Скриншоты и фото могут не считаться турникетом: заранее откройте файл и прибавьте яркость.'],
+];
+
+async function renderArena(view) {
+  const sched = await getSchedule();
+  const perm = [ARENA.lat, ARENA.lon];
+  const trips = {};
+  for (const g of sched.games) {
+    if (g.city === 'Пермь' || !CITY[g.city]) continue;
+    const t = (trips[g.city] ||= { city: g.city, games: [], ll: CITY[g.city] });
+    t.games.push(g);
+  }
+  const tripList = Object.values(trips).map((t) => ({ ...t, km: km(perm, t.ll) })).sort((a, b) => b.km - a.km);
+  const total = tripList.reduce((s, t) => s + t.km * 2 * t.games.length, 0);
+  const nextHome = sched.games.find((g) => g.isHome && g.status === 0 && g.ts > Date.now());
+
+  view.innerHTML = `<div class="arena-wrap">
+    <div class="grid">
+      <div id="map"></div>
+      <section class="panel kpis" style="grid-template-columns:repeat(3,1fr)">
+        <div class="kpi"><span class="label">Выездных городов</span><b><span data-count="${tripList.length}">0</span></b><p>в сезоне ${esc(sched.season.name.replace('Сезон ', ''))}</p></div>
+        <div class="kpi"><span class="label">Налёт команды</span><b><span data-count="${total}">0</span><small>км</small></b><p>туда и обратно по прямой</p></div>
+        <div class="kpi"><span class="label">Самый дальний</span><b style="font-size:24px">${esc(tripList[0] ? tripList[0].city : '—')}</b><p>${tripList[0] ? tripList[0].km.toLocaleString('ru-RU') + ' км от «Молота»' : ''}</p></div>
+      </section>
+    </div>
+    <aside class="grid">
+      <section class="panel"><div class="panel-head"><h2>${esc(ARENA.name)}</h2><span class="label">дом</span></div>
+        <div class="panel-pad" style="display:grid;gap:12px">
+          <div class="gm-row">${icon('i-pin')}<b>${esc(ARENA.address)}</b></div>
+          <div class="gm-row">${icon('i-cal')}<span>${nextHome ? `Следующий домашний: <b>${esc(fDate.format(new Date(nextHome.ts)))}</b> vs ${esc(shortName(nextHome.opponent.name))}${nextHome.hasTime ? ', ' + nextHome.timeMsk + ' МСК (' + permTime(nextHome) + ' по Перми)' : ''}` : 'Домашних матчей в расписании нет'}</span></div>
+          <div class="gm-actions">
+            <a class="btn btn-orange btn-sm" href="${TICKETS}" target="_blank" rel="noopener">${icon('i-ticket')}Билеты</a>
+            <a class="btn btn-sm" href="https://yandex.ru/maps/?rtext=~${ARENA.lat},${ARENA.lon}&rtt=mt" target="_blank" rel="noopener">${icon('i-route')}Маршрут · Яндекс</a>
+            <a class="btn btn-sm" href="https://2gis.ru/perm/geo/${ARENA.lon},${ARENA.lat}" target="_blank" rel="noopener">2ГИС</a>
+          </div>
+          <p class="muted" style="margin:0;font-size:13px">Билетный менеджер: +7 (967) 905-44-81, Telegram @parmatickets</p>
+        </div></section>
+      <section class="panel"><div class="panel-head"><h2>Выезды сезона</h2><span class="label">км от Перми</span></div>
+        <div>${tripList.map((t) => `<div class="trip" data-city="${esc(t.city)}">${teamImg(t.games[0].opponent, 30)}<div><b>${esc(t.city)}</b><small>${t.games.map((g) => `${esc(shortName(g.opponent.name))} · ${esc(fDate.format(new Date(g.ts)))}`).join('<br>')}</small></div><span class="km">${t.km.toLocaleString('ru-RU')}</span></div>`).join('')}</div></section>
+      <section class="panel faq"><div class="panel-head"><h2>Болельщику</h2></div>${FAQ.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</section>
+    </aside></div>`;
+  countUp(view);
+
+  const ready = () => typeof L !== 'undefined';
+  for (let i = 0; i < 50 && !ready(); i++) await new Promise((r) => setTimeout(r, 100));
+  if (!ready()) { $('#map').innerHTML = '<div class="empty">Карта не загрузилась</div>'; return; }
+  const map = L.map('map', { zoomControl: true, scrollWheelZoom: true, attributionControl: true }).setView(perm, 4);
+  onLeave(() => map.remove());
+  const esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/';
+  L.tileLayer(esri + 'World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16, attribution: 'Tiles &copy; Esri — Esri, HERE, Garmin, &copy; OpenStreetMap contributors' }).addTo(map);
+  L.tileLayer(esri + 'World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16, pane: 'shadowPane' }).addTo(map);
+  const crest = '/img?u=' + encodeURIComponent('https://parmabasket.ru/upload/teams/3059.png');
+  L.marker(perm, { icon: L.divIcon({ className: '', html: `<div class="pin-home"><img src="${crest}" alt=""></div>`, iconSize: [46, 46], iconAnchor: [23, 23] }) })
+    .addTo(map).bindPopup(`<b>${ARENA.name}</b><br>${ARENA.address}<br><span style="color:var(--muted)">домашняя арена «Пармы»</span>`);
+  const bounds = [perm];
+  const markers = {};
+  for (const t of tripList) {
+    bounds.push(t.ll);
+    L.polyline([perm, t.ll], { color: '#FF5100', weight: 1.6, opacity: 0.7, className: 'route-line' }).addTo(map);
+    markers[t.city] = L.marker(t.ll, { icon: L.divIcon({ className: '', html: `<div class="pin-away">${teamImg(t.games[0].opponent, 24)}</div>`, iconSize: [34, 34], iconAnchor: [17, 17] }) })
+      .addTo(map).bindPopup(`<b>${esc(t.city)}</b><br>${t.games.map((g) => `${esc(shortName(g.opponent.name))} — ${esc(g.arena || '')}, ${esc(fDate.format(new Date(g.ts)))}${g.status === 1 ? ` (${g.home.score}:${g.away.score})` : ''}`).join('<br>')}<br><span style="color:var(--orange)">${t.km.toLocaleString('ru-RU')} км от Перми</span>`);
+  }
+  map.fitBounds(bounds, { padding: [40, 40] });
+  $$('.trip', view).forEach((el) => (el.onclick = () => { const m = markers[el.dataset.city]; if (m) { map.flyTo(m.getLatLng(), 6, { duration: 1.2 }); m.openPopup(); } }));
+}
+
+// ── AI chat ────────────────────────────────────────────────────────────────
+
+const SUGGEST = [
+  'Какой сейчас счёт у Пармы?',
+  'Когда следующий домашний матч и как купить билет со скидкой?',
+  'Кто самый результативный игрок Пармы в сезоне?',
+  'Какое место Парма занимает в Единой лиге ВТБ?',
+  'Расскажи про тренерский штаб',
+  'Объясни правило 24 секунд простыми словами',
+];
+const chat = { messages: [], busy: false, views: new Set() };
+try { chat.messages = JSON.parse(sessionStorage.getItem('parmych') || '[]'); } catch {}
+
+function mdLite(s) {
+  const lines = esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').split('\n');
+  let html = '', inList = false;
+  for (const raw of lines) {
+    const l = raw.trim();
+    if (/^[-•*]\s+/.test(l)) { if (!inList) { html += '<ul>'; inList = true; } html += `<li>${l.replace(/^[-•*]\s+/, '')}</li>`; continue; }
+    if (inList) { html += '</ul>'; inList = false; }
+    if (l) html += `<p>${l.replace(/^#+\s*/, '')}</p>`;
+  }
+  if (inList) html += '</ul>';
+  return html;
+}
+
+function chatHtml(withHello = true) {
+  return `<div class="chat-log"></div><div class="chat-sugg"></div>
+    <form class="chat-form"><textarea rows="1" placeholder="Спросите про матч, игрока, билеты или баскетбол…"></textarea><button type="submit" aria-label="Отправить">${icon('i-send')}</button></form>`;
+}
+
+function mountChat(root) {
+  root.innerHTML = chatHtml();
+  const v = { root, log: $('.chat-log', root), sugg: $('.chat-sugg', root), form: $('.chat-form', root), ta: $('textarea', root) };
+  chat.views.add(v);
+  v.form.onsubmit = (e) => { e.preventDefault(); ask(v.ta.value); v.ta.value = ''; v.ta.style.height = ''; };
+  v.ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); v.form.requestSubmit(); } });
+  v.ta.addEventListener('input', () => { v.ta.style.height = 'auto'; v.ta.style.height = Math.min(160, v.ta.scrollHeight) + 'px'; });
+  paintChat(v);
+  return v;
+}
+
+function paintChat(v) {
+  const hello = `<div class="chat-hello"><h3>Привет, я Пармыч</h3><p>Знаю расписание, состав, статистику, таблицы и счёт идущего матча — всё из официального протокола лиги. Спрашивайте что угодно: от «кто сегодня набрал больше всех» до «как работает фол в нападении».</p></div>`;
+  v.log.innerHTML = (chat.messages.length ? '' : hello) + chat.messages.map((m) => `<div class="msg ${m.role === 'user' ? 'user' : 'bot'}">${m.role === 'user' ? esc(m.content) : m.content ? mdLite(m.content) : '<span class="typing"><i></i><i></i><i></i></span>'}</div>`).join('');
+  v.sugg.innerHTML = chat.messages.length ? '' : SUGGEST.map((q) => `<button class="chip" type="button">${esc(q)}</button>`).join('');
+  $$('.chip', v.sugg).forEach((b) => (b.onclick = () => ask(b.textContent)));
+  $('button[type=submit]', v.form).disabled = chat.busy;
+  v.log.scrollTop = v.log.scrollHeight;
+}
+const paintAll = () => { for (const v of chat.views) if (document.body.contains(v.root)) paintChat(v); else chat.views.delete(v); };
+
+async function ask(q) {
+  q = (q || '').trim();
+  if (!q || chat.busy) return;
+  chat.busy = true;
+  chat.messages.push({ role: 'user', content: q }, { role: 'assistant', content: '' });
+  paintAll();
+  const bot = chat.messages[chat.messages.length - 1];
+  try {
+    const r = await fetch('/api/ai', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: chat.messages.slice(0, -1) }) });
+    if (!r.ok || !r.body) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'ошибка ' + r.status); }
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '', last = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const parts = buf.split('\n\n');
+      buf = parts.pop();
+      for (const p of parts) {
+        const line = p.trim();
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (payload === '[DONE]') continue;
+        try { const ev = JSON.parse(payload); if (ev.t) bot.content += ev.t; if (ev.error && !bot.content) bot.content = 'Не получилось ответить: ' + ev.error; } catch {}
+      }
+      if (performance.now() - last > 60) { last = performance.now(); paintAll(); }
+    }
+    if (!bot.content) bot.content = 'Хм, ответ пустой. Попробуйте переформулировать вопрос.';
+  } catch (e) {
+    bot.content = 'Пармыч временно недоступен: ' + e.message;
+  }
+  chat.busy = false;
+  try { sessionStorage.setItem('parmych', JSON.stringify(chat.messages.slice(-20))); } catch {}
+  paintAll();
+}
+
+let drawerView = null;
+function openDrawer(q) {
+  const d = $('#drawer');
+  if (!drawerView || !document.body.contains(drawerView.root)) drawerView = mountChat($('#drawerChat'));
+  d.classList.add('open');
+  d.setAttribute('aria-hidden', 'false');
+  setTimeout(() => drawerView.ta.focus(), 300);
+  if (q) ask(q);
+}
+function closeDrawer() { const d = $('#drawer'); d.classList.remove('open'); d.setAttribute('aria-hidden', 'true'); }
+$$('#drawer [data-close]').forEach((el) => (el.onclick = closeDrawer));
+
+async function renderAi(view) {
+  view.innerHTML = `<div class="ai-page">
+    <section class="panel"><div class="drawer-head"><div class="bot-id"><span class="bot-ava">П</span><div><b>Пармыч</b><small>ИИ-помощник болельщика · Workers AI</small></div></div>
+      <button class="btn btn-sm" id="aiReset" type="button">Новый диалог</button></div><div class="chat" id="pageChat"></div></section>
+    <aside class="ai-side">
+      <section class="panel"><h3>Что знает Пармыч</h3><ul><li>Счёт и ход идущего матча</li><li>Весь календарь сезона и результаты</li><li>Состав, рост, возраст, статистику игроков</li><li>Тренерский штаб</li><li>Турнирные таблицы всех турниров</li><li>Билеты, скидки, возврат, арену</li><li>И просто баскетбол: правила, тактику, историю</li></ul></section>
+      <section class="panel"><h3>Горячая клавиша</h3><p class="muted" style="margin:0;font-size:13.5px">Ctrl + K (⌘K) открывает Пармыча на любой странице.</p></section>
+    </aside></div>`;
+  const v = mountChat($('#pageChat'));
+  $('#aiReset').onclick = () => { chat.messages = []; try { sessionStorage.removeItem('parmych'); } catch {} paintAll(); };
+  v.ta.focus();
+}
+
+// ── Global wiring ──────────────────────────────────────────────────────────
+
+$('#askBtn').onclick = () => openDrawer();
+const fab = document.createElement('button');
+fab.className = 'fab';
+fab.type = 'button';
+fab.setAttribute('aria-label', 'Спросить Пармыча');
+fab.innerHTML = icon('i-ai');
+fab.onclick = () => openDrawer();
+document.body.appendChild(fab);
+
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openDrawer(); }
+  if (e.key === 'Escape') { closeModal(); closeDrawer(); }
+});
+
+route();
