@@ -1,0 +1,28 @@
+# Fan desktop for BC «BETCITY PARMA» (Perm) — separate Worker from the root
+# `tasktracker` one. Deployed at https://parma-fan.oxion-ezhkov.workers.dev
+#
+# Data: live/public Infobasket API (org.infobasket.su) — the same feed the
+# VTB United League site and the club site use for scoreboards, rosters,
+# schedules and standings. AI: Workers AI (no external keys needed).
+name = "parma-fan"
+main = "src/worker.js"
+compatibility_date = "2025-09-01"
+workers_dev = true
+preview_urls = false
+
+[ai]
+binding = "AI"
+
+# Long-lived cache (season history, roster) — short-lived data (live score)
+# stays in isolate memory to respect the free-plan KV write quota.
+[[kv_namespaces]]
+binding = "CACHE"
+id = "bfc99c297d974172b90a5d82d5c5dc83"
+
+# The UI (public/*) is bundled into the script as text modules and served by
+# the Worker itself — the static-assets upload flow can't be used from the
+# deploy environment.
+[[rules]]
+type = "Text"
+globs = ["**/*.html", "**/*.css", "**/*.txt"]
+fallthrough = true
