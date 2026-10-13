@@ -2,7 +2,6 @@
 'use strict';
 
 const TEAM_ID = 3059;
-const TICKETS = 'https://scena24.ru/v2/?org=parma';
 const ARENA = { name: 'УДС «Молот»', address: 'Пермь, ул. Лебедева, 13', lat: 58.0240637, lon: 56.2959713 };
 const CITY = {
   'Пермь': [58.0105, 56.2502], 'Москва': [55.7558, 37.6173], 'Казань': [55.7963, 49.1088],
@@ -23,6 +22,20 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const icon = (id) => `<svg><use href="#${id}"/></svg>`;
 const fmt1 = (v) => (v == null || Number.isNaN(v) ? '—' : (Math.round(v * 10) / 10).toLocaleString('ru-RU'));
 const isUs = (id) => Number(id) === TEAM_ID;
+// Personal accounts confirmed via the players' Basketball-Reference pages.
+const SOCIAL = {
+  Whaley: { instagram: 'zayy704' },
+  Johnson: { instagram: 'bean.iii' },
+  Martin: { instagram: '_4kpeso' },
+  Primo: { instagram: 'josh.primoo' },
+};
+const socialOf = (p) => SOCIAL[p.lastEn] || null;
+const socialLinks = (p, cls = '') => {
+  const s = socialOf(p);
+  if (!s) return '';
+  return (s.instagram ? `<a class="${cls}" href="https://instagram.com/${encodeURIComponent(s.instagram)}" target="_blank" rel="noopener" title="Instagram @${esc(s.instagram)}" data-stop>${icon('i-insta')}${cls ? '<span>@' + esc(s.instagram) + '</span>' : ''}</a>` : '') +
+    (s.telegram ? `<a class="${cls}" href="https://t.me/${encodeURIComponent(s.telegram)}" target="_blank" rel="noopener" title="Telegram @${esc(s.telegram)}" data-stop>${icon('i-tg')}${cls ? '<span>@' + esc(s.telegram) + '</span>' : ''}</a>` : '');
+};
 const shortName = (n) => (n || '').replace('БЕТСИТИ ПАРМА', 'Парма').replace('ПАРМА', 'Парма');
 const titleCase = (s) => (s || '').toLowerCase().replace(/(^|[\s-])\S/g, (m) => m.toUpperCase());
 
@@ -97,6 +110,34 @@ const ridgeSvg = (cls = 'ridge') => `<svg class="${cls}" viewBox="0 0 120 24" pr
 const skeleton = (h = 160) => `<div class="skeleton" style="min-height:${h}px"></div>`;
 const errBox = (e) => `<div class="err">Не удалось загрузить данные: ${esc(e.message || e)}. Попробуйте обновить страницу.</div>`;
 const teamImg = (t, size = 28) => `<img src="${esc(t.logo)}" alt="" width="${size}" height="${size}" loading="lazy">`;
+
+// ── Dropdown (custom, replaces native <select>) ──────────────────────────────
+
+function dropdown(opts, value, onChange, { right = false } = {}) {
+  const wrap = document.createElement('div');
+  wrap.className = 'dd';
+  const cur = () => opts.find((o) => String(o.value) === String(value)) || opts[0];
+  wrap.innerHTML = `<button type="button" class="dd-btn" aria-haspopup="listbox"><span></span>${icon('i-chev')}</button>
+    <div class="dd-menu ${right ? 'right' : ''}" role="listbox">${opts.map((o) => `<button type="button" class="dd-opt" role="option" data-v="${esc(o.value)}"><span>${esc(o.label)}</span>${icon('i-check')}</button>`).join('')}</div>`;
+  const btn = $('.dd-btn', wrap);
+  const paint = () => {
+    $('span', btn).textContent = cur().label;
+    $$('.dd-opt', wrap).forEach((b) => b.classList.toggle('on', b.dataset.v === String(value)));
+  };
+  const close = () => wrap.classList.remove('open');
+  btn.onclick = (e) => {
+    e.stopPropagation();
+    const open = !wrap.classList.contains('open');
+    $$('.dd.open').forEach((d) => d.classList.remove('open'));
+    wrap.classList.toggle('open', open);
+    if (open) { const on = $('.dd-opt.on', wrap); if (on) on.scrollIntoView({ block: 'nearest' }); }
+  };
+  $$('.dd-opt', wrap).forEach((b) => (b.onclick = () => { value = b.dataset.v; paint(); close(); onChange(value); }));
+  wrap.addEventListener('keydown', (e) => { if (e.key === 'Escape') { close(); btn.focus(); } });
+  paint();
+  return wrap;
+}
+document.addEventListener('click', () => $$('.dd.open').forEach((d) => d.classList.remove('open')));
 
 // ── Router ─────────────────────────────────────────────────────────────────
 
@@ -207,7 +248,6 @@ function heroHtml(focus, live) {
     ? `<span class="hero-badge ${isLive ? 'live' : ''}">${isLive ? (live.pregame ? '<span class="pulse"></span> Протокол открыт · скоро вбрасывание' : '<span class="pulse"></span> Идёт матч · ' + esc(live.periodLabel || '') + ' · ' + esc(live.clock)) : 'Матч завершён'}</span>
        <div class="hero-score"><span>${A.score}</span><span class="sep">:</span><span>${B.score}</span></div>`
     : `<span class="hero-badge">${focus.reason === 'soon' ? 'Скоро старт' : 'До матча'}</span>${countdownHtml()}`;
-  const tickets = g && g.isHome && g.status === 0 ? `<a class="btn btn-orange" href="${TICKETS}" target="_blank" rel="noopener">${icon('i-ticket')}Купить билет</a>` : '';
   return `<section class="hero">
     ${ridgeSvg('ridge hero-ridge')}
     <div class="hero-meta">${meta}</div>
@@ -217,7 +257,6 @@ function heroHtml(focus, live) {
     <div class="hero-actions">
       <a class="btn ${isLive ? 'btn-orange' : ''}" href="#/live">${icon('i-live')}${isLive ? 'Смотреть табло' : done ? 'Протокол матча' : 'Онлайн-табло'}</a>
       ${g && g.status === 0 ? `<a class="btn" href="/api/calendar.ics?game=${g.id}">${icon('i-plus')}В календарь</a>` : ''}
-      ${tickets}
       <button class="btn" type="button" data-ask="${esc(g ? `Расскажи про матч ${g.home.name} — ${g.away.name}: чего ждать и на кого смотреть?` : 'Что нового у Пармы?')}">${icon('i-ai')}Превью от Пармыча</button>
     </div>
   </section>`;
@@ -334,6 +373,7 @@ function wireCommon(root, sched, team) {
     const g = sched && sched.games.find((x) => x.id === Number(el.dataset.game));
     if (g) openGame(g);
   }));
+  $$('[data-stop]', root).forEach((el) => el.addEventListener('click', (e) => e.stopPropagation()));
   $$('[data-player]', root).forEach((el) => el.addEventListener('click', () => {
     const p = team && team.players.find((x) => x.id === Number(el.dataset.player));
     if (p) openPlayer(p, team);
@@ -368,7 +408,6 @@ function openGame(g) {
       <div class="gm-actions">
         <a class="btn ${g.status === 2 ? 'btn-orange' : ''}" href="#/live/${g.id}">${icon('i-live')}${g.status === 0 ? 'Онлайн-табло' : g.status === 2 ? 'Смотреть онлайн' : 'Протокол и статистика'}</a>
         ${g.status === 0 ? `<a class="btn" href="/api/calendar.ics?game=${g.id}">${icon('i-plus')}Добавить в календарь</a>` : ''}
-        ${g.status === 0 && g.isHome ? `<a class="btn btn-orange" href="${TICKETS}" target="_blank" rel="noopener">${icon('i-ticket')}Билеты</a>` : ''}
         <button class="btn" type="button" id="gmAsk">${icon('i-ai')}Спросить Пармыча</button>
       </div>
     </div>`);
@@ -411,8 +450,8 @@ function wormSvg(prog, teams) {
 function boxTable(t) {
   if (!t.players.length) return '<div class="empty">Статистика игроков появится по ходу матча</div>';
   const hasAst = t.players.some((p) => p.ast != null);
-  return `<div style="overflow-x:auto"><table class="box"><thead><tr><th>Игрок</th><th>Очк</th><th>2-очк</th><th>3-очк</th><th>Штр</th><th>Подб</th>${hasAst ? '<th>Пер</th>' : ''}<th>Пх</th><th>Бш</th><th>Фол</th>${t.players.some((p) => p.min) ? '<th>Мин</th><th>+/−</th>' : ''}</tr></thead><tbody>
-    ${t.players.map((p) => `<tr><td><span class="nm">${esc(p.num)}</span>${esc(p.name)}</td><td class="pts">${p.pts}</td><td>${esc(p.fg2 || '—')}</td><td>${esc(p.fg3 || '—')}</td><td>${esc(p.ft || '—')}</td><td>${p.reb ?? 0}</td>${hasAst ? `<td>${p.ast ?? 0}</td>` : ''}<td>${p.stl ?? 0}</td><td>${p.blk ?? 0}</td><td>${p.pf ?? 0}</td>${t.players.some((x) => x.min) ? `<td>${esc(p.min || '—')}</td><td>${p.pm ?? '—'}</td>` : ''}</tr>`).join('')}
+  return `<div style="overflow-x:auto"><table class="box"><thead><tr><th>Игрок</th><th>Очк</th><th>2-очк</th><th>3-очк</th><th>Штр</th><th>Подб</th>${hasAst ? '<th>Пер</th>' : ''}<th>Пх</th><th>Бш</th><th>Пт</th><th>Фол</th>${t.players.some((p) => p.min) ? '<th>Мин</th><th>+/−</th>' : ''}</tr></thead><tbody>
+    ${t.players.map((p) => `<tr><td><span class="nm">${esc(p.num)}</span>${esc(p.name)}</td><td class="pts">${p.pts}</td><td>${esc(p.fg2 || '—')}</td><td>${esc(p.fg3 || '—')}</td><td>${esc(p.ft || '—')}</td><td>${p.reb ?? 0}</td>${hasAst ? `<td>${p.ast ?? 0}</td>` : ''}<td>${p.stl ?? 0}</td><td>${p.blk ?? 0}</td><td>${p.tov ?? 0}</td><td>${p.pf ?? 0}</td>${t.players.some((x) => x.min) ? `<td>${esc(p.min || '—')}</td><td>${p.pm ?? '—'}</td>` : ''}</tr>`).join('')}
   </tbody></table></div>${t.boxSource === 'derived' ? '<p class="muted" style="padding:10px 14px;margin:0;font-size:12px">Онлайн-подсчёт по ходу матча. Официальный протокол появится после финальной сирены.</p>' : ''}`;
 }
 
@@ -434,6 +473,43 @@ function boardHtml(live) {
     <table class="qtable"><thead><tr><th>Команда</th>${head}<th>Итог</th></tr></thead><tbody>${row(a, b)}${row(b, a)}</tbody></table>
     <div class="board-top" style="margin-top:16px"><span>${esc(live.venue || '')}</span><span>${live.attendance ? live.attendance.toLocaleString('ru-RU') + ' зрителей' : ''}${live.tv ? ' · ТВ: ' + esc(live.tv) : ''}</span></div>
   </div>`;
+}
+
+function cmpHtml(live) {
+  const [A, B] = live.teams;
+  const a = A.stats, b = B.stats;
+  if (!a || !b) return '';
+  const pc = (v) => (v == null ? '—' : fmt1(v) + '%');
+  const sh = (m, at) => `${m}/${at}`;
+  const rows = [
+    ['Очки', A.score, B.score, A.score, B.score, true],
+    ['Броски с игры', pc(a.fgp), pc(b.fgp), a.fgp, b.fgp, true, sh(a.fgm, a.fga), sh(b.fgm, b.fga)],
+    ['2-очковые', pc(a.fg2p), pc(b.fg2p), a.fg2p, b.fg2p, true, sh(a.fg2m, a.fg2a), sh(b.fg2m, b.fg2a)],
+    ['3-очковые', pc(a.fg3p), pc(b.fg3p), a.fg3p, b.fg3p, true, sh(a.fg3m, a.fg3a), sh(b.fg3m, b.fg3a)],
+    ['Штрафные', pc(a.ftp), pc(b.ftp), a.ftp, b.ftp, true, sh(a.ftm, a.fta), sh(b.ftm, b.fta)],
+    ['Подборы', a.reb, b.reb, a.reb, b.reb, true, `${a.oreb} в нап.`, `${b.oreb} в нап.`],
+    ['Передачи', a.ast, b.ast, a.ast, b.ast, true],
+    ['Перехваты', a.stl, b.stl, a.stl, b.stl, true],
+    ['Блок-шоты', a.blk, b.blk, a.blk, b.blk, true],
+    ['Потери', a.tov, b.tov, a.tov, b.tov, false],
+    ['Фолы', a.pf, b.pf, a.pf, b.pf, false],
+    ['Очки в краске', a.paint, b.paint, a.paint, b.paint, true],
+    ['Очки скамейки', a.bench, b.bench, a.bench, b.bench, true],
+    ['Макс. отрыв', a.lead, b.lead, a.lead, b.lead, true],
+    ['Лучший рывок', a.run ? a.run + ':0' : '—', b.run ? b.run + ':0' : '—', a.run, b.run, true],
+  ];
+  const us = (t) => isUs(t.id);
+  const bar = (v, o, side, t, better) => {
+    const max = Math.max(v || 0, o || 0) || 1;
+    const lead = better ? (v || 0) >= (o || 0) : (v || 0) <= (o || 0);
+    return `<div class="bar ${side}"><i class="${us(t) ? 'us' : ''} ${lead ? '' : 'dim'}" style="width:${Math.round(((v || 0) / max) * 100)}%"></i></div>`;
+  };
+  return `<div class="panel-head"><h2>Сравнение команд</h2><span class="label">${live.boxSource === 'official' || A.boxSource === 'official' ? 'официальный протокол' : 'по ходу матча'}</span></div>
+    <div class="cmp-head"><div class="t">${teamImg(A, 28)}${esc(shortName(A.name))}</div><span class="label">vs</span><div class="t r">${esc(shortName(B.name))}${teamImg(B, 28)}</div></div>
+    <div class="cmp-chips"><span>Смен лидера<b>${live.leadChanges ?? 0}</b></span><span>Ничьих<b>${live.ties ?? 0}</b></span></div>
+    <div class="cmp">${rows.map(([l, av, bv, an, bn, better, as, bs]) => `<div class="cmp-row">
+      <div class="v">${av}${as ? `<small>${as}</small>` : ''}</div>${bar(an, bn, 'l', A, better)}<div class="lbl">${l}</div>${bar(bn, an, 'r', B, better)}<div class="v r">${bv}${bs ? `<small>${bs}</small>` : ''}</div></div>`).join('')}</div>
+    ${A.boxSource === 'derived' ? '<p class="cmp-note">Считается в реальном времени по событиям матча; после финальной сирены заменяется официальным протоколом.</p>' : ''}`;
 }
 
 function feedHtml(live) {
@@ -458,11 +534,12 @@ async function renderLive(view, args) {
   if (!gameId && live) gameId = live.gameId;
 
   const past = sched.games.filter((g) => g.status !== 0).reverse();
-  const pastOpts = past.map((g) => `<option value="${g.id}" ${g.id === gameId ? 'selected' : ''}>${esc(fDate.format(new Date(g.ts)))} · ${esc(shortName(g.home.name))} ${g.home.score}:${g.away.score} ${esc(shortName(g.away.name))}</option>`).join('');
+  const pastOpts = [{ value: '', label: 'Текущий / ближайший матч' }, ...past.map((g) => ({ value: String(g.id), label: `${fDate.format(new Date(g.ts))} · ${shortName(g.home.name)} ${g.status === 2 ? 'LIVE' : g.home.score + ':' + g.away.score} ${shortName(g.away.name)}` }))];
 
   let left;
   if (live) {
     left = `${boardHtml(live)}
+      <section class="panel" style="margin-top:20px" id="cmpPanel">${cmpHtml(live)}</section>
       <section class="panel" style="margin-top:20px"><div class="panel-head"><h2>Динамика счёта</h2><span class="label">разница по минутам</span></div><div class="panel-pad" id="worm">${wormSvg(live.progression, live.teams)}</div></section>
       <section class="panel" style="margin-top:20px">
         <div class="tabs" id="liveTabs"><button class="tab on" data-tab="feed">Ход матча</button><button class="tab" data-tab="0">${esc(shortName(live.teams[0].name))}</button><button class="tab" data-tab="1">${esc(shortName(live.teams[1].name))}</button></div>
@@ -486,13 +563,12 @@ async function renderLive(view, args) {
     <div>${left}</div>
     <aside class="grid">
       <section class="panel"><div class="panel-head"><h2>Протоколы Пармы</h2></div>
-        <div class="panel-pad" style="padding:14px 18px"><select id="pastSel" style="width:100%;background:var(--ink);color:var(--text);border:1px solid var(--line-2);border-radius:4px;padding:10px;font:inherit">
-          <option value="">Текущий / ближайший матч</option>${pastOpts}</select></div></section>
+        <div class="panel-pad" style="padding:14px 18px" id="pastSel"></div></section>
       <section class="panel board-list"><div class="panel-head"><h2>Лига · табло</h2><span class="label" id="boardUpd"></span></div><div id="boardList">${skeleton(200)}</div></section>
     </aside></div>`;
 
   if (!live && focus && focus.game) startCountdown($('.hero', view), focus.game.ts);
-  $('#pastSel').onchange = (e) => (location.hash = e.target.value ? '#/live/' + e.target.value : '#/live');
+  $('#pastSel').appendChild(dropdown(pastOpts, args[0] ? String(gameId) : '', (v) => (location.hash = v ? '#/live/' + v : '#/live')));
 
   let activeTab = 'feed';
   const bindTabs = () => {
@@ -561,6 +637,8 @@ async function renderLive(view, args) {
         });
       }
       if (prev && prev.progression.length !== live.progression.length) $('#worm').innerHTML = wormSvg(live.progression, live.teams);
+      const cmp = $('#cmpPanel');
+      if (cmp) cmp.innerHTML = cmpHtml(live);
       paintTab();
     } catch {}
     paintBoard();
@@ -730,13 +808,35 @@ function playerCard(p, i) {
   const s = p.stats || {};
   return `<article class="card" data-player="${p.id}" style="--i:${i}">
     <div class="card-photo"><span class="big-num">${esc(p.number)}</span><img src="${esc(p.photo)}" alt="${esc(p.first + ' ' + p.last)}" loading="lazy">
-      <span class="card-flag">${esc(p.countryCode || '')}</span>${p.captain ? '<span class="card-cap">C</span>' : ''}</div>
+      <span class="card-flag">${esc(p.countryCode || '')}</span>${p.captain ? '<span class="card-cap">C</span>' : ''}${socialOf(p) ? `<span class="card-social">${socialLinks(p)}</span>` : ''}</div>
     <div class="card-body"><span class="card-num">${esc(p.number)}</span>
       <div class="card-name"><small>${esc(p.first)}</small>${esc(p.last)}</div>
       <div class="card-pos">${esc(p.position)} · ${p.height || '—'} см · ${p.age} ${plural(p.age, 'год', 'года', 'лет')}</div>
       <div class="card-stats"><div><b>${fmt1(s.pts)}</b><small>очк</small></div><div><b>${fmt1(s.reb)}</b><small>подб</small></div><div><b>${fmt1(s.ast)}</b><small>пер</small></div></div>
     </div></article>`;
 }
+const getCoaches = () => load('coaches', '/api/coaches', 3600_000);
+const fBirth = (s) => { const [d, m, y] = String(s || '').split('.').map(Number); return y ? dtf({ day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(y, m - 1, d))) : ''; };
+
+function coachCard(c, isHead, i) {
+  const facts = [
+    c.birth ? `<span>Родился <b>${esc(fBirth(c.birth))}</b></span>` : '',
+    c.age ? `<span><b>${c.age}</b> ${plural(c.age, 'год', 'года', 'лет')}</span>` : '',
+    c.country ? `<span>${esc(c.country)}</span>` : '',
+    c.height ? `<span>Рост <b>${c.height}</b> см</span>` : '',
+    c.rank ? `<span><b>${esc(c.rank)}</b></span>` : '',
+    c.seasons && c.seasons.length ? `<span>В штабе «Пармы» <b>${c.seasons.length}</b> ${plural(c.seasons.length, 'сезон', 'сезона', 'сезонов')} в лиге ВТБ</span>` : '',
+  ].join('');
+  const seasons = c.seasons && c.seasons.length
+    ? `<div class="c-seasons">${c.seasons.map((s) => `<i class="${/главн/i.test(s.post) ? 'hc' : ''}" title="${esc(s.post)}">${esc(s.season.replace(/20(\d\d)\/20(\d\d)/, '$1/$2'))}</i>`).join('')}</div>` : '';
+  const bio = c.bio
+    ? `<p class="c-bio">${esc(c.bio.bio)}</p>${c.bio.highlights && c.bio.highlights.length ? `<ul class="c-hl">${c.bio.highlights.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>` : ''}`
+    : '';
+  return `<div class="coach ${isHead ? 'head' : ''}" style="--i:${i}"><img src="${esc(c.photo)}" alt="" loading="lazy"><div>
+    <div class="post">${esc(c.post)}</div><b class="c-name">${esc(c.first)} ${esc(c.last)}</b><span class="c-en">${esc([c.first, c.middle, c.last].filter(Boolean).join(' '))}${c.nameEn ? ' · ' + esc(c.nameEn) : ''}</span>
+    <div class="c-facts">${facts}</div>${bio}${seasons}</div></div>`;
+}
+
 function plural(n, a, b, c) { n = Math.abs(n) % 100; const n1 = n % 10; if (n > 10 && n < 20) return c; if (n1 > 1 && n1 < 5) return b; if (n1 === 1) return a; return c; }
 
 function tilt(root) {
@@ -768,15 +868,21 @@ async function renderTeam(view) {
         <div class="kpi"><span class="label">Средний вес</span><b><span data-count="${team.avg.weight || 0}" data-dec="1">0</span><small>кг</small></b><p>${esc(team.season.name)}</p></div>
       </section>
       <div class="toolbar"><div class="chips" id="posChips">${POS.map(([k, l]) => `<button class="chip ${teamState.pos === k ? 'on' : ''}" data-pos="${k}">${l}</button>`).join('')}</div>
-        <label class="sort">Сортировать <select id="sortSel">${[['number', 'по номеру'], ['pts', 'по очкам'], ['reb', 'по подборам'], ['ast', 'по передачам'], ['eff', 'по КПИ'], ['height', 'по росту'], ['age', 'по возрасту']].map(([v, l]) => `<option value="${v}" ${teamState.sort === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
+        <div class="sort"><span>Сортировать</span><span id="sortSel"></span></div></div>
       <div class="roster">${ps.map(playerCard).join('')}</div>
       <section style="margin-top:34px"><div class="toolbar"><div><span class="kicker">Штаб</span><h2 class="h2" style="font-size:22px;margin-top:6px">Тренерский состав</h2></div></div>
-        <div class="coaches">${[head, ...rest].filter(Boolean).map((c, i) => `<div class="coach ${c === head ? 'head' : ''}" style="--i:${i}"><img src="${esc(c.photo)}" alt="" loading="lazy"><div><b>${esc(c.first)} ${esc(c.last)}</b><div class="post">${esc(c.post)}</div><small>${esc([c.first, c.middle, c.last].filter(Boolean).join(' '))}${c.age ? ` · ${c.age} ${plural(c.age, 'год', 'года', 'лет')}` : ''}</small></div></div>`).join('')}</div>
+        <div class="coaches" id="coachBox">${[head, ...rest].filter(Boolean).map((c, i) => coachCard(c, c === head, i)).join('')}</div>
       </section>`;
+    getCoaches().then((list) => {
+      const box = $('#coachBox', view);
+      if (!box) return;
+      const h = list.find((c) => /главн/i.test(c.post));
+      box.innerHTML = [h, ...list.filter((c) => c !== h)].filter(Boolean).map((c, i) => coachCard(c, c === h, i)).join('');
+    }).catch(() => {});
     countUp(view);
     tilt(view);
     $$('#posChips .chip', view).forEach((b) => (b.onclick = () => { teamState.pos = b.dataset.pos; paint(); }));
-    $('#sortSel').onchange = (e) => { teamState.sort = e.target.value; paint(); };
+    $('#sortSel').appendChild(dropdown([['number', 'по номеру'], ['pts', 'по очкам'], ['reb', 'по подборам'], ['ast', 'по передачам'], ['eff', 'по КПИ'], ['height', 'по росту'], ['age', 'по возрасту']].map(([value, label]) => ({ value, label })), teamState.sort, (v) => { teamState.sort = v; paint(); }, { right: true }));
     wireCommon(view, null, team);
     $$('#view > *').forEach((el, i) => el.style.setProperty('--i', i));
   };
@@ -801,6 +907,7 @@ function openPlayer(p, team) {
       <div class="pm-bars" style="margin-top:14px">${bars.map(([l, k]) => `<div class="pm-bar"><span>${l}</span><div class="track"><div class="fill" data-w="${Math.round(((s[k] || 0) / maxOf(k)) * 100)}"></div></div><b>${fmt1(s[k])}</b></div>`).join('')}</div>
       <div class="rings">${ring(s.fg2p, '2-очк', s.fg2)}${ring(s.fg3p, '3-очк', s.fg3)}${ring(s.ftp, 'штрафные', s.ft)}</div>`
       : '<p class="muted">Пока без игровой статистики в сезоне.</p>'}
+      ${socialOf(p) ? `<div class="socials">${socialLinks(p, 'btn btn-sm')}</div>` : ''}
       <div class="gm-actions" style="margin-top:22px"><button class="btn" type="button" id="pmAsk">${icon('i-ai')}Спросить Пармыча про игрока</button></div>
     </div></div>`);
   requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -819,14 +926,6 @@ function km(a, b) {
   return Math.round(2 * R * Math.asin(Math.sqrt(h)));
 }
 
-const FAQ = [
-  ['Где купить билеты?', 'Единственный официальный билетный оператор — Сцена24: на сайте, в приложении «БЕТСИТИ ПАРМА» или в офисе клуба (ул. Лебедева, 13, офис 119, УДС «Молот»). В одном заказе — до 5 билетов.'],
-  ['Есть ли скидки?', '50% — дети 6–14 лет, студенты очной формы, люди с инвалидностью, пенсионеры и ветераны; 30% — по карте «Профсоюзный дисконт»; 10% — владельцам абонемента прошлого сезона. Нужен подтверждающий документ.'],
-  ['Нужен ли билет ребёнку?', 'До 5 лет включительно — бесплатно, если ребёнок не занимает отдельное место. С 6 лет нужен билет, детский (6–14 лет) — со скидкой 50%.'],
-  ['Можно ли вернуть билет?', 'В день матча и за 2 дня до него возврат не производится. За 3 дня и раньше — с комиссией 25%. Вместо возврата можно обменять билет на другой матч через менеджера клуба: +7 (967) 905-44-81.'],
-  ['Во сколько приходить?', 'На билете указано афишное время — начало шоу и представления команд. На сайте и здесь — время вбрасывания. Приходите к афишному, чтобы спокойно занять места.'],
-  ['Нужно ли печатать электронный билет?', 'Нет — достаточно открыть билет на телефоне. Скриншоты и фото могут не считаться турникетом: заранее откройте файл и прибавьте яркость.'],
-];
 
 async function renderArena(view) {
   const sched = await getSchedule();
@@ -856,15 +955,12 @@ async function renderArena(view) {
           <div class="gm-row">${icon('i-pin')}<b>${esc(ARENA.address)}</b></div>
           <div class="gm-row">${icon('i-cal')}<span>${nextHome ? `Следующий домашний: <b>${esc(fDate.format(new Date(nextHome.ts)))}</b> vs ${esc(shortName(nextHome.opponent.name))}${nextHome.hasTime ? ', ' + nextHome.timeMsk + ' МСК (' + permTime(nextHome) + ' по Перми)' : ''}` : 'Домашних матчей в расписании нет'}</span></div>
           <div class="gm-actions">
-            <a class="btn btn-orange btn-sm" href="${TICKETS}" target="_blank" rel="noopener">${icon('i-ticket')}Билеты</a>
             <a class="btn btn-sm" href="https://yandex.ru/maps/?rtext=~${ARENA.lat},${ARENA.lon}&rtt=mt" target="_blank" rel="noopener">${icon('i-route')}Маршрут · Яндекс</a>
             <a class="btn btn-sm" href="https://2gis.ru/perm/geo/${ARENA.lon},${ARENA.lat}" target="_blank" rel="noopener">2ГИС</a>
           </div>
-          <p class="muted" style="margin:0;font-size:13px">Билетный менеджер: +7 (967) 905-44-81, Telegram @parmatickets</p>
         </div></section>
       <section class="panel"><div class="panel-head"><h2>Выезды сезона</h2><span class="label">км от Перми</span></div>
         <div>${tripList.map((t) => `<div class="trip" data-city="${esc(t.city)}">${teamImg(t.games[0].opponent, 30)}<div><b>${esc(t.city)}</b><small>${t.games.map((g) => `${esc(shortName(g.opponent.name))} · ${esc(fDate.format(new Date(g.ts)))}`).join('<br>')}</small></div><span class="km">${t.km.toLocaleString('ru-RU')}</span></div>`).join('')}</div></section>
-      <section class="panel faq"><div class="panel-head"><h2>Болельщику</h2></div>${FAQ.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</section>
     </aside></div>`;
   countUp(view);
 
@@ -895,7 +991,7 @@ async function renderArena(view) {
 
 const SUGGEST = [
   'Какой сейчас счёт у Пармы?',
-  'Когда следующий домашний матч и как купить билет со скидкой?',
+  'Когда следующий домашний матч?',
   'Кто самый результативный игрок Пармы в сезоне?',
   'Какое место Парма занимает в Единой лиге ВТБ?',
   'Расскажи про тренерский штаб',
@@ -919,7 +1015,7 @@ function mdLite(s) {
 
 function chatHtml(withHello = true) {
   return `<div class="chat-log"></div><div class="chat-sugg"></div>
-    <form class="chat-form"><textarea rows="1" placeholder="Спросите про матч, игрока, билеты или баскетбол…"></textarea><button type="submit" aria-label="Отправить">${icon('i-send')}</button></form>`;
+    <form class="chat-form"><textarea rows="1" placeholder="Спросите про матч, игрока, тренера или баскетбол…"></textarea><button type="submit" aria-label="Отправить">${icon('i-send')}</button></form>`;
 }
 
 function mountChat(root) {
@@ -935,27 +1031,50 @@ function mountChat(root) {
 
 function paintChat(v) {
   const hello = `<div class="chat-hello"><h3>Привет, я Пармыч</h3><p>Знаю расписание, состав, статистику, таблицы и счёт идущего матча — всё из официального протокола лиги. Спрашивайте что угодно: от «кто сегодня набрал больше всех» до «как работает фол в нападении».</p></div>`;
-  v.log.innerHTML = (chat.messages.length ? '' : hello) + chat.messages.map((m) => `<div class="msg ${m.role === 'user' ? 'user' : 'bot'}">${m.role === 'user' ? esc(m.content) : m.content ? mdLite(m.content) : '<span class="typing"><i></i><i></i><i></i></span>'}</div>`).join('');
+  v.log.innerHTML = (chat.messages.length ? '' : hello) + chat.messages.map((m) => `<div class="msg ${m.role === 'user' ? 'user' : 'bot'} ${m._new ? '' : 'static'}">${m.role === 'user' ? esc(m.content) : m.content ? mdLite(m.content) : '<span class="typing"><i></i><i></i><i></i></span>'}</div>`).join('');
   v.sugg.innerHTML = chat.messages.length ? '' : SUGGEST.map((q) => `<button class="chip" type="button">${esc(q)}</button>`).join('');
   $$('.chip', v.sugg).forEach((b) => (b.onclick = () => ask(b.textContent)));
   $('button[type=submit]', v.form).disabled = chat.busy;
   v.log.scrollTop = v.log.scrollHeight;
 }
-const paintAll = () => { for (const v of chat.views) if (document.body.contains(v.root)) paintChat(v); else chat.views.delete(v); };
+const paintAll = () => {
+  for (const v of chat.views) if (document.body.contains(v.root)) paintChat(v); else chat.views.delete(v);
+  for (const m of chat.messages) delete m._new;
+};
+// While streaming only the last bubble changes — patch it in place (no full
+// re-render, no re-triggered animations, no flicker).
+let streamRaf = 0;
+function paintStream() {
+  if (streamRaf) return;
+  streamRaf = requestAnimationFrame(() => {
+    streamRaf = 0;
+    const m = chat.messages[chat.messages.length - 1];
+    if (!m) return;
+    const html = m.content ? mdLite(m.content) : '<span class="typing"><i></i><i></i><i></i></span>';
+    for (const v of chat.views) {
+      if (!document.body.contains(v.root)) { chat.views.delete(v); continue; }
+      const el = v.log.lastElementChild;
+      if (!el || !el.classList.contains('bot')) { paintChat(v); continue; }
+      const stick = v.log.scrollHeight - v.log.scrollTop - v.log.clientHeight < 120;
+      if (el.innerHTML !== html) el.innerHTML = html;
+      if (stick) v.log.scrollTop = v.log.scrollHeight;
+    }
+  });
+}
 
 async function ask(q) {
   q = (q || '').trim();
   if (!q || chat.busy) return;
   chat.busy = true;
-  chat.messages.push({ role: 'user', content: q }, { role: 'assistant', content: '' });
+  chat.messages.push({ role: 'user', content: q, _new: true }, { role: 'assistant', content: '', _new: true });
   paintAll();
   const bot = chat.messages[chat.messages.length - 1];
   try {
-    const r = await fetch('/api/ai', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: chat.messages.slice(0, -1) }) });
+    const r = await fetch('/api/ai', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: chat.messages.slice(0, -1).map(({ role, content }) => ({ role, content })) }) });
     if (!r.ok || !r.body) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'ошибка ' + r.status); }
     const reader = r.body.getReader();
     const dec = new TextDecoder();
-    let buf = '', last = 0;
+    let buf = '';
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -969,7 +1088,7 @@ async function ask(q) {
         if (payload === '[DONE]') continue;
         try { const ev = JSON.parse(payload); if (ev.t) bot.content += ev.t; if (ev.error && !bot.content) bot.content = 'Не получилось ответить: ' + ev.error; } catch {}
       }
-      if (performance.now() - last > 60) { last = performance.now(); paintAll(); }
+      paintStream();
     }
     if (!bot.content) bot.content = 'Хм, ответ пустой. Попробуйте переформулировать вопрос.';
   } catch (e) {
@@ -977,7 +1096,8 @@ async function ask(q) {
   }
   chat.busy = false;
   try { sessionStorage.setItem('parmych', JSON.stringify(chat.messages.slice(-20))); } catch {}
-  paintAll();
+  paintStream();
+  for (const v of chat.views) { const b = $('button[type=submit]', v.form); if (b) b.disabled = false; }
 }
 
 let drawerView = null;
@@ -997,8 +1117,8 @@ async function renderAi(view) {
     <section class="panel"><div class="drawer-head"><div class="bot-id"><span class="bot-ava">П</span><div><b>Пармыч</b><small>ИИ-помощник болельщика · Workers AI</small></div></div>
       <button class="btn btn-sm" id="aiReset" type="button">Новый диалог</button></div><div class="chat" id="pageChat"></div></section>
     <aside class="ai-side">
-      <section class="panel"><h3>Что знает Пармыч</h3><ul><li>Счёт и ход идущего матча</li><li>Весь календарь сезона и результаты</li><li>Состав, рост, возраст, статистику игроков</li><li>Тренерский штаб</li><li>Турнирные таблицы всех турниров</li><li>Билеты, скидки, возврат, арену</li><li>И просто баскетбол: правила, тактику, историю</li></ul></section>
-      <section class="panel"><h3>Горячая клавиша</h3><p class="muted" style="margin:0;font-size:13.5px">Ctrl + K (⌘K) открывает Пармыча на любой странице.</p></section>
+      <section class="panel"><h3>Что знает Пармыч</h3><ul><li>Счёт и ход идущего матча</li><li>Весь календарь сезона и результаты</li><li>Состав, рост, возраст, статистику игроков</li><li>Тренерский штаб</li><li>Турнирные таблицы всех турниров</li><li>Арену и выезды команды</li><li>И просто баскетбол: правила, тактику, историю</li></ul></section>
+      <section class="panel"><h3>Горячие клавиши</h3><p class="muted" style="margin:0;font-size:13.5px">${IS_MAC ? '⌘K' : 'Ctrl + K'} — открыть Пармыча на любой странице<br>${IS_MAC ? '⌘\\' : 'Ctrl + \\'} — свернуть или развернуть меню<br>Esc — закрыть окно</p></section>
     </aside></div>`;
   const v = mountChat($('#pageChat'));
   $('#aiReset').onclick = () => { chat.messages = []; try { sessionStorage.removeItem('parmych'); } catch {} paintAll(); };
@@ -1008,6 +1128,25 @@ async function renderAi(view) {
 // ── Global wiring ──────────────────────────────────────────────────────────
 
 $('#askBtn').onclick = () => openDrawer();
+
+// Platform-aware shortcut hint (⌘K on macOS, Ctrl K elsewhere).
+const IS_MAC = /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent);
+$('#kbdHint').textContent = IS_MAC ? '⌘ K' : 'Ctrl K';
+document.documentElement.classList.add(IS_MAC ? 'os-mac' : 'os-other');
+
+// Collapsible sidebar, remembered per browser.
+const setCollapsed = (on) => {
+  document.documentElement.classList.toggle('collapsed', on);
+  const b = $('#collapseBtn');
+  b.title = on ? 'Развернуть меню' : 'Свернуть меню';
+  b.setAttribute('aria-label', b.title);
+  $('span', b).textContent = b.title;
+  try { localStorage.setItem('parma-collapsed', on ? '1' : '0'); } catch {}
+  // Leaflet needs a nudge when its container width changes.
+  setTimeout(() => window.dispatchEvent(new Event('resize')), 380);
+};
+try { if (localStorage.getItem('parma-collapsed') === '1') setCollapsed(true); } catch {}
+$('#collapseBtn').onclick = () => setCollapsed(!document.documentElement.classList.contains('collapsed'));
 const fab = document.createElement('button');
 fab.className = 'fab';
 fab.type = 'button';
@@ -1017,7 +1156,8 @@ fab.onclick = () => openDrawer();
 document.body.appendChild(fab);
 
 document.addEventListener('keydown', (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openDrawer(); }
+  if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'k' || e.code === 'KeyK')) { e.preventDefault(); openDrawer(); }
+  if ((e.ctrlKey || e.metaKey) && (e.key === '\\' || e.code === 'Backslash')) { e.preventDefault(); $('#collapseBtn').click(); }
   if (e.key === 'Escape') { closeModal(); closeDrawer(); }
 });
 

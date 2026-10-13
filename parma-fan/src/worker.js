@@ -331,6 +331,83 @@ async function getTeam(env) {
   });
 }
 
+// ── Domain: coaching staff ──────────────────────────────────────────────────
+
+// Short verified bios (sources: Wikipedia, vtb-league.com, sports.ru).
+const COACH_BIO = {
+  "130931": {
+    "bio": "Разыгрывающий. Играл за «Спартак» (Ленинград/СПб), «Динамо» (Москва), «Автодор», «Маккаби» (Раанана), УНИКС и ЦСКА; чемпион России 2003 с ЦСКА. Как тренер выиграл молодёжный ЧЕ U-20 (2005), был ассистентом в ЦСКА (2004–2008), затем возглавлял «Спартак» СПб, ЦСКА, УНИКС, «Локомотив-Кубань», сборную России, «Автодор», «Канту», «Уралмаш». Главный тренер «Пармы» с июня 2022 года, член Зала славы Единой лиги ВТБ (2019).",
+    "highlights": [
+      "Серебро ЧМ-1994 и бронза Евробаскета-1997 как игрок",
+      "Чемпион России и Единой лиги ВТБ 2010 с ЦСКА как тренер",
+      "Еврокубок 2011 (УНИКС) и 2013 («Локомотив-Кубань»)",
+      "Зал славы Единой лиги ВТБ (2019)"
+    ]
+  },
+  "128427": {
+    "bio": "Защитник, младший брат Евгения Пашутина. Играл за «Спартак» СПб, «Автодор», «Пынар Каршияку», АСВЕЛ, ЦСКА, «Урал-Грейт» и УНИКС. Тренерскую карьеру начинал ассистентом в «Локомотиве-Кубань» и сборной России, затем возглавлял «Спартак» СПб (2018–2020) и «Локомотив-Кубань-2» (2020–2022). Ассистент в «Парме» с 2022 года.",
+    "highlights": [
+      "Двукратный победитель Евролиги (2006, 2008) с ЦСКА",
+      "Чемпион Европы 2007 со сборной России",
+      "Серебро ЧМ-1998, участник Олимпиады-2008",
+      "Еврокубок 2011 с УНИКСом"
+    ]
+  },
+  "131240": {
+    "bio": "Бывший капитан пермского «Урал-Грейта». В августе 2012 года стал первым главным тренером только что созданной «Пармы» и руководил командой в 2012–2017 годах, затем снова в 2019 и 2022 годах. Сейчас работает в штабе Евгения Пашутина.",
+    "highlights": [
+      "Бывший капитан «Урал-Грейта»",
+      "Первый главный тренер «Пармы» (2012)"
+    ]
+  },
+  "7407": {
+    "bio": "Атакующий защитник из Ленинграда. Играл за «Локомотив-Кубань» (2009–2015), «Нижний Новгород», «Парму» (2019–2021), «Уралмаш», «Барнаул», «Новосибирск» и БАРС-РГЭУ. После карьеры работал ассистентом и главным тренером БАРС-РГЭУ, ассистентом в «Металлурге» (Магнитогорск). В штаб «Пармы» вошёл в июле 2026 года.",
+    "highlights": [
+      "Еврокубок 2013 с «Локомотивом-Кубань»",
+      "Чемпион Универсиады 2013",
+      "Игрок «Пармы» в 2019–2021 годах"
+    ]
+  }
+};
+
+async function getCoaches(env) {
+  return cached(env, 'coaches:v1', 7 * 86400, async () => {
+    const team = await getTeam(env);
+    const seasons = await getSeasons(env);
+    // Posts per season with Parma, from each season's VTB League roster.
+    const history = new Map();
+    const past = seasons.slice(0, 14);
+    await Promise.all(
+      past.map(async (s) => {
+        try {
+          const comps = await getSeasonComps(env, s.id);
+          const main = comps.find((c) => /ВТБ/i.test(c.name)) || comps[0];
+          if (!main) return;
+          const r = await ib(`/Widget/TeamRoster/${TEAM_ID}`, { format: 'json', compId: main.id, lang: 'ru' });
+          for (const c of r.Coaches || []) {
+            if (!history.has(c.PersonID)) history.set(c.PersonID, []);
+            history.get(c.PersonID).push({ season: s.name.replace('Сезон ', ''), year: s.year, post: c.Post });
+          }
+        } catch {}
+      }),
+    );
+    const pages = await Promise.all(team.coaches.map((c) => ib(`/Widget/CoachPage/${c.id}`, { format: 'json' }).catch(() => null)));
+    return team.coaches.map((c, i) => {
+      const pg = pages[i] || {};
+      const rank = (pg.Players || [])[0]?.PersonRank?.RankNameRu;
+      const seasonsWith = (history.get(c.id) || []).sort((a, b) => a.year - b.year);
+      return {
+        ...c,
+        nameEn: [pg.PersonFirstNameEn, pg.PersonLastNameEn].filter(Boolean).join(' ') || null,
+        height: pg.PersonHeight || null,
+        rank: rank && rank !== '-' ? rank : null,
+        seasons: seasonsWith,
+        bio: COACH_BIO[c.id] || null,
+      };
+    });
+  });
+}
+
 // ── Domain: standings & season history ───────────────────────────────────────
 
 function flattenComps(comps, out = []) {
@@ -502,24 +579,44 @@ function buildLive(d, gameId) {
   let lastSecond = 0;
   let running = false;
 
+  // Team totals rebuilt from the play-by-play (the official box score only
+  // lands after the final buzzer). Type ids verified against finished games.
+  const blank = () => ({ ftm: 0, fta: 0, fg2m: 0, fg2a: 0, fg3m: 0, fg3a: 0, oreb: 0, dreb: 0, ast: 0, stl: 0, blk: 0, tov: 0, pf: 0, paint: 0, bench: 0, lead: 0, run: 0 });
+  const ts = { 1: blank(), 2: blank() };
+  const starters = new Set();
+  const playById = new Map();
+  let leader = 0;
+  let leadChanges = 0;
+  let ties = 0;
+  let runTeam = 0;
+  let runPts = 0;
+
   const pl = (s) => {
     const m = box[s.TeamNumber];
     if (!m.has(s.StartID))
-      m.set(s.StartID, { id: s.PersonID, num: s.DisplayNumber, name: s.PersonName2 || s.PersonName1, pts: 0, reb: 0, stl: 0, blk: 0, pf: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0 });
+      m.set(s.StartID, { id: s.PersonID, num: s.DisplayNumber, name: s.PersonName2 || s.PersonName1, pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, tov: 0, pf: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0 });
     return m.get(s.StartID);
+  };
+  const teamOf = (startId) => {
+    const s = startById.get(startId);
+    return s && (s.TeamNumber === 1 || s.TeamNumber === 2) ? s.TeamNumber : null;
   };
 
   for (const p of plays) {
+    playById.set(p.PlayID, p);
     if (p.PlayPeriod > 0) {
       lastPeriod = p.PlayPeriod;
       lastSecond = p.PlaySecond;
     }
-    if (p.PlayTypeID === 71) running = true;
-    if (p.PlayTypeID === 70) running = false;
-    const s = startById.get(p.StartID);
-    const tn = s && (s.TeamNumber === 1 || s.TeamNumber === 2) ? s.TeamNumber : null;
-    const isPlayer = s && s.StartType === 1;
     const type = p.PlayTypeID;
+    if (type === 71) running = true;
+    if (type === 70) running = false;
+    const s = startById.get(p.StartID);
+    const tn = teamOf(p.StartID);
+    const isPlayer = s && s.StartType === 1;
+    const parent = p.ParentPlayID != null ? playById.get(p.ParentPlayID) : null;
+    if (type === 8 && p.PlayPeriod === 1 && p.PlaySecond === 0) starters.add(p.StartID);
+
     if (tn && [1, 2, 3].includes(type)) {
       const pts = type === 1 ? o.FreeThrowValue || 1 : type === 2 ? o.FieldGoalValue || 2 : o.LongShotValue || 3;
       score[tn] += pts;
@@ -527,6 +624,24 @@ function buildLive(d, gameId) {
       while (periods[1].length <= per) periods[1].push(0), periods[2].push(0);
       periods[tn][per] += pts;
       progression.push({ t: Math.round((base(p.PlayPeriod) + p.PlaySecond / 10) / 6) / 10, a: score[1], b: score[2] });
+      const t = ts[tn];
+      if (type === 1) t.ftm++, t.fta++;
+      else if (type === 2) {
+        t.fg2m++, t.fg2a++;
+        if ([1, 2, 3].includes(p.PlayZone)) t.paint += pts;
+      } else t.fg3m++, t.fg3a++;
+      if (isPlayer && !starters.has(p.StartID)) t.bench += pts;
+      // Leads, lead changes, runs.
+      const diff = score[1] - score[2];
+      const now = diff > 0 ? 1 : diff < 0 ? 2 : 0;
+      if (now && leader && now !== leader) leadChanges++;
+      if (!now && leader) ties++;
+      if (now) leader = now;
+      ts[1].lead = Math.max(ts[1].lead, diff);
+      ts[2].lead = Math.max(ts[2].lead, -diff);
+      if (runTeam === tn) runPts += pts;
+      else (runTeam = tn), (runPts = pts);
+      ts[tn].run = Math.max(ts[tn].run, runPts);
       if (isPlayer) {
         const b = pl(s);
         b.pts += pts;
@@ -534,15 +649,21 @@ function buildLive(d, gameId) {
         else if (type === 2) b.fgm++, b.fga++;
         else b.fgm++, b.fga++, b.tpm++, b.tpa++;
       }
-    } else if (tn && isPlayer) {
-      const b = pl(s);
-      if (type === 4) b.fta++;
-      else if (type === 5) b.fga++;
-      else if (type === 6) b.fga++, b.tpa++;
-      else if (type === 28) b.reb++;
-      else if (type === 26) b.stl++;
-      else if (type === 27) b.blk++;
-      else if (type >= 40 && type <= 46) b.pf++;
+    } else if (tn) {
+      const t = ts[tn];
+      const b = isPlayer ? pl(s) : null;
+      if (type === 4) t.fta++, b && b.fta++;
+      else if (type === 5) t.fg2a++, b && b.fga++;
+      else if (type === 6) t.fg3a++, b && (b.fga++, b.tpa++);
+      else if (type === 28) {
+        const off = parent && teamOf(parent.StartID) === tn;
+        off ? t.oreb++ : t.dreb++;
+        if (b) b.reb++;
+      } else if (type === 25 && parent && [1, 2, 3].includes(parent.PlayTypeID)) t.ast++, b && b.ast++;
+      else if (type === 26) t.stl++, b && b.stl++;
+      else if (type === 27) t.blk++, b && b.blk++;
+      else if ([11, 12, 13, 20, 47].includes(type) && isPlayer) t.tov++, b && b.tov++;
+      else if (type >= 40 && type <= 46) t.pf++, b && b.pf++;
     }
     if (tn && PLAY_TEXT[type] && (isPlayer || [1, 2, 3].includes(type))) {
       feed.push({
@@ -570,6 +691,7 @@ function buildLive(d, gameId) {
       ast: p.Assist || 0,
       stl: p.Steal || 0,
       blk: p.Blocks || 0,
+      tov: p.Turnover || 0,
       pf: p.Foul || 0,
       pm: p.PlusMinus ?? null,
       min: p.PlayedTime || null,
@@ -579,6 +701,7 @@ function buildLive(d, gameId) {
       start: !!p.IsStart,
     }));
 
+  const pct = (m, a) => (a ? Math.round((m / a) * 1000) / 10 : null);
   const teams = [1, 2].map((n) => {
     const m = teamsMeta[n] || {};
     const g = gt[n] || {};
@@ -586,37 +709,42 @@ function buildLive(d, gameId) {
     const useOfficial = official.some((p) => p.pts > 0 || p.min);
     const derived = [...box[n].values()].map((b) => ({
       ...b,
-      ast: null,
       fg2: `${b.fgm - b.tpm}/${b.fga - b.tpa}`,
       fg3: `${b.tpm}/${b.tpa}`,
       ft: `${b.ftm}/${b.fta}`,
     }));
     const players = (useOfficial ? official : derived).sort((a, b) => b.pts - a.pts);
-    const playsScore = score[n];
+    const t = ts[n];
+    // Official totals override the derived ones once they exist.
+    const off = useOfficial && g.Score;
+    const stats = {
+      fg2m: off ? g.Goal2 || 0 : t.fg2m, fg2a: off ? g.Shot2 || 0 : t.fg2a,
+      fg3m: off ? g.Goal3 || 0 : t.fg3m, fg3a: off ? g.Shot3 || 0 : t.fg3a,
+      ftm: off ? g.Goal1 || 0 : t.ftm, fta: off ? g.Shot1 || 0 : t.fta,
+      oreb: off ? g.OffRebound || 0 : t.oreb, dreb: off ? g.DefRebound || 0 : t.dreb,
+      ast: off ? g.Assist || 0 : t.ast, stl: off ? g.Steal || 0 : t.stl, blk: off ? g.Blocks || 0 : t.blk,
+      tov: off ? g.Turnover || 0 : t.tov, pf: off ? g.Foul || 0 : t.pf,
+      paint: t.paint, bench: t.bench, lead: t.lead, run: t.run,
+    };
+    stats.reb = stats.oreb + stats.dreb;
+    stats.fgm = stats.fg2m + stats.fg3m;
+    stats.fga = stats.fg2a + stats.fg3a;
+    stats.fgp = pct(stats.fgm, stats.fga);
+    stats.fg2p = pct(stats.fg2m, stats.fg2a);
+    stats.fg3p = pct(stats.fg3m, stats.fg3a);
+    stats.ftp = pct(stats.ftm, stats.fta);
     return {
       id: m.TeamID || g.TeamID,
       name: m.ShortName2 || g.TeamName?.CompTeamShortNameRu,
       city: m.RegionName2 || g.TeamName?.CompTeamRegionNameRu,
       logo: teamLogo(m.TeamID || g.TeamID),
       color: m.DominantColorARGB ? '#' + m.DominantColorARGB.slice(2) : null,
-      score: Math.max(playsScore, g.Score || 0),
+      score: Math.max(score[n], g.Score || 0),
       periods: periods[n],
       coach: g.Coach ? g.Coach.PersonNameRu : null,
       players,
       boxSource: useOfficial ? 'official' : 'derived',
-      totals: g.Score
-        ? {
-            fg2: g.Shots2,
-            fg3: g.Shots3,
-            ft: g.Shots1,
-            reb: g.Rebound,
-            ast: g.Assist,
-            stl: g.Steal,
-            tov: g.Turnover,
-            blk: g.Blocks,
-            pf: g.Foul,
-          }
-        : null,
+      stats,
     };
   });
 
@@ -644,6 +772,8 @@ function buildLive(d, gameId) {
     clockSec: Math.max(0, Math.round(remaining)),
     clockRunning: !!d.IsOnline && running,
     teams,
+    leadChanges,
+    ties,
     feed: feed.slice(-60).reverse(),
     progression,
     updated: Date.now(),
@@ -751,7 +881,7 @@ async function buildAiContext(env) {
           })
           .join('\n'),
     );
-    parts.push('Тренерский штаб:\n' + team.coaches.map((c) => `${c.post}: ${c.first} ${c.middle || ''} ${c.last}`.replace(/\s+/g, ' ')).join('\n'));
+    parts.push('Тренерский штаб:\n' + team.coaches.map((c) => `${c.post}: ${c.first} ${c.middle || ''} ${c.last}`.replace(/\s+/g, ' ') + (COACH_BIO[c.id] ? ` — ${COACH_BIO[c.id].bio} ${COACH_BIO[c.id].highlights.join('; ')}.` : '')).join('\n'));
     if (team.team) {
       const t = team.team;
       parts.push(`Командная статистика (ВТБ): ${t.games} игр, ${t.pts} очк/игру, ${t.reb} подб, ${t.ast} пер, 2-очк ${t.fg2p}%, 3-очк ${t.fg3p}%, штрафные ${t.ftp}%.`);
@@ -785,7 +915,7 @@ async function buildAiContext(env) {
 
 const AI_SYSTEM = `Ты — «Пармыч», ИИ-помощник болельщика баскетбольного клуба «БЕТСИТИ ПАРМА» из Перми в фанатском приложении.
 Отвечай по-русски, живо и по делу, как знающий болельщик, без канцелярита. Можно лёгкий юмор, без кринжа.
-Для фактов о клубе, составе, матчах, счёте, таблицах и билетах опирайся ТОЛЬКО на данные ниже — они актуальные и подтягиваются из официального протокола лиги. Если в данных ответа нет — честно скажи, что не знаешь, и подскажи, где проверить (parmabasket.ru, vtb-league.com). Ничего не выдумывай.
+Для фактов о клубе, людях (игроки, тренеры), матчах, счёте и таблицах опирайся ТОЛЬКО на данные ниже — не добавляй титулы, клубы, даты и цифры, которых там нет, и не путай людей (например, Евгения и Захара Пашутиных) — они актуальные и подтягиваются из официального протокола лиги. Если в данных ответа нет — честно скажи, что не знаешь, и подскажи, где проверить (parmabasket.ru, vtb-league.com). Ничего не выдумывай.
 На общие вопросы о баскетболе (правила, тактика, история, лиги, термины) отвечай из своих знаний.
 Форматирование: короткие абзацы, при необходимости списки через «- » и **жирный** для ключевого. Без таблиц и заголовков.
 
@@ -796,7 +926,7 @@ async function streamAi(env, messages) {
   let lastErr;
   for (const model of AI_MODELS) {
     try {
-      const stream = await env.AI.run(model, { messages, stream: true, max_tokens: 900, temperature: 0.4 });
+      const stream = await env.AI.run(model, { messages, stream: true, max_tokens: 900, temperature: 0.2 });
       return { stream, model };
     } catch (e) {
       lastErr = e;
@@ -920,6 +1050,7 @@ export default {
       if (p === '/api/ai' && request.method === 'POST') return await handleAi(request, env);
       if (p === '/api/schedule') return json(await getSchedule(env), 200, 30);
       if (p === '/api/team') return json(await getTeam(env), 200, 300);
+      if (p === '/api/coaches') return json(await getCoaches(env), 200, 3600);
       if (p === '/api/standings') return json(await getStandings(env), 200, 120);
       if (p === '/api/seasons') return json(await getSeasons(env), 200, 3600);
       if (p === '/api/season') return json(await getSeasonSummary(env, Number(url.searchParams.get('id'))), 200, 3600);
