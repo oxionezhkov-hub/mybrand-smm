@@ -3260,33 +3260,55 @@ async function getZoomAccessToken(env, account) {
   return data.access_token;
 }
 
-// Zoom recording file downloads work with either the account's S2S OAuth
-// bearer token or the short-lived `download_token` that comes in the same
-// webhook payload (as `payload.download_token`) — the latter is the
-// documented/recommended way and is what actually works for some accounts
-// where the OAuth bearer gets rejected for file downloads specifically, so
-// prefer it when the webhook included one.
+// Zoom recording file downloads accept several kinds of auth, and which one
+// actually works differs by account/app setup: the short-lived
+// `download_token` from the webhook payload (as ?access_token=), or the
+// account's S2S OAuth token (as a Bearer header, or as ?access_token=). Try
+// each in turn — one at a time, no sleeps, so a whole pass stays well inside
+// the 30s waitUntil budget the webhook path gets; retrying a failed pass is
+// the every-5-minute cron's job (see checkPendingZoomTranscripts), not this
+// function's. Previously this retried a single method with 5/10/15s sleeps,
+// which on a persistent failure blew through those 30s and got the Worker
+// killed before it could even report the error.
 //
-// Zoom's own devforum guidance for the resulting intermittent 401 (errorCode
-// 300 "Forbidden"): the file can lag behind the webhook by a few seconds on
-// their end, so retry with a short delay instead of treating it as fatal.
-const ZOOM_DOWNLOAD_RETRY_DELAYS_MS = [0, 5000, 10000, 15000];
+// A 200 isn't enough on its own: a rejected token can come back as a 200
+// HTML sign-in page, so the body has to actually look like WebVTT.
+const ZOOM_DOWNLOAD_TIMEOUT_MS = 8000;
 
-async function downloadZoomFile(downloadUrl, token, downloadToken) {
-  let lastError;
-  for (const delay of ZOOM_DOWNLOAD_RETRY_DELAYS_MS) {
-    if (delay) await new Promise(r => setTimeout(r, delay));
+function withAccessToken(url, token) {
+  const u = new URL(url);
+  u.searchParams.set('access_token', token);
+  return u.toString();
+}
+
+async function downloadZoomTranscript(env, account, downloadUrl, downloadToken) {
+  const methods = [];
+  if (downloadToken) methods.push(['download_token', () => fetch(withAccessToken(downloadUrl, downloadToken), { signal: AbortSignal.timeout(ZOOM_DOWNLOAD_TIMEOUT_MS) })]);
+  let oauthToken = null;
+  let oauthError = null;
+  try {
+    oauthToken = await getZoomAccessToken(env, account);
+  } catch (e) {
+    oauthError = e;
+  }
+  if (oauthToken) {
+    methods.push(['oauth-header', () => fetch(downloadUrl, { headers: { Authorization: `Bearer ${oauthToken}` }, signal: AbortSignal.timeout(ZOOM_DOWNLOAD_TIMEOUT_MS) })]);
+    methods.push(['oauth-query', () => fetch(withAccessToken(downloadUrl, oauthToken), { signal: AbortSignal.timeout(ZOOM_DOWNLOAD_TIMEOUT_MS) })]);
+  }
+
+  const errors = [];
+  if (oauthError) errors.push(`oauth: ${oauthError.message || oauthError}`);
+  for (const [name, run] of methods) {
     try {
-      const res = downloadToken
-        ? await fetch(`${downloadUrl}?access_token=${encodeURIComponent(downloadToken)}`)
-        : await fetch(downloadUrl, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) return res.text();
-      lastError = new Error(`Zoom file download ${res.status}: ${await res.text().catch(() => '')}`);
+      const res = await run();
+      const body = await res.text();
+      if (res.ok && /-->/.test(body) && /^﻿?\s*WEBVTT/.test(body)) return body;
+      errors.push(`${name}: ${res.status} ${res.headers.get('content-type') || ''} ${body.slice(0, 120).replace(/\s+/g, ' ')}`.trim());
     } catch (e) {
-      lastError = e;
+      errors.push(`${name}: ${e.message || e}`);
     }
   }
-  throw lastError;
+  throw new Error(errors.join(' | ') || 'no download method available');
 }
 
 // Strips VTT cue numbers/timestamps/tags, keeping just the spoken text (Zoom's
@@ -3443,82 +3465,134 @@ async function handleTranscriptCallback(request, env, key) {
   return new Response('OK');
 }
 
+// KV keys per meeting (all scoped by account label + meeting UUID):
+//   zoom:done:…     — the "🎥 topic / link / password" message has been sent
+//   zoom:txsent:…   — the transcript file has been delivered
+//   zoom:pending:…  — still owed a transcript; the */5 cron keeps working it
+//                     (see checkPendingZoomTranscripts) until it's delivered
+//                     or the entry gives up.
+// Keeping "link sent" and "transcript sent" apart is what lets a failed
+// download be retried later without re-sending the link.
+const ZOOM_KV_TTL = 60 * 60 * 72;
+
+function zoomMeetingKey(account, meetingUuid) {
+  return `${account.label}:${meetingUuid}`;
+}
+
+async function queueZoomPending(env, account, meetingUuid, fields) {
+  const key = `zoom:pending:${zoomMeetingKey(account, meetingUuid)}`;
+  const prev = await kget(env, key, null);
+  await kset(env, key, {
+    accountLabel: account.label,
+    meetingUuid,
+    firstSeenAt: Date.now(),
+    attempts: 0,
+    ...(prev || {}),
+    ...fields,
+  }, { expirationTtl: ZOOM_KV_TTL });
+}
+
+function findZoomTranscriptFile(recordingFiles) {
+  return (recordingFiles || []).find(f =>
+    f.file_type === 'TRANSCRIPT' || f.recording_type === 'audio_transcript' || f.file_extension === 'VTT'
+  );
+}
+
+// Sends the link message (once) and tries to deliver the transcript file
+// (once per call). Returns { sent: true } or { sent: false, error }. On any
+// failure the meeting stays queued in zoom:pending for the cron to retry —
+// it's queued *before* the download starts, so even the Worker being killed
+// mid-download can't lose it.
 async function handleZoomTranscriptCompleted(env, account, obj, downloadToken) {
   const meetingUuid = obj.uuid;
-  const dedupKey = `zoom:done:${account.label}:${meetingUuid}`;
-  if (await env.KV.get(dedupKey)) return;
-  await env.KV.put(dedupKey, '1', { expirationTtl: 172800 }); // 48h — covers Zoom's webhook retries
+  const mk = zoomMeetingKey(account, meetingUuid);
+  if (await env.KV.get(`zoom:txsent:${mk}`)) {
+    await env.KV.delete(`zoom:pending:${mk}`);
+    return { sent: true };
+  }
 
   const chatId = account.chat_id || env.OWNER_CHAT_ID;
   const topic = obj.topic || 'Zoom-встреча';
   const startTime = obj.start_time ? new Date(obj.start_time) : null;
-  const dateLabel = startTime ? startTime.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : '';
-  const recordingFiles = obj.recording_files || [];
-  const transcriptFile = recordingFiles.find(f =>
-    f.file_type === 'TRANSCRIPT' || f.recording_type === 'audio_transcript' || f.file_extension === 'VTT'
-  );
+  const transcriptFile = findZoomTranscriptFile(obj.recording_files);
 
-  const lines = [`🎥 <b>${escapeHtml(topic)}</b>`];
-  if (dateLabel) lines.push(dateLabel);
-  if (obj.share_url) lines.push(`Запись: ${obj.share_url}`);
-  if (obj.password) lines.push(`Пароль: <code>${escapeHtml(obj.password)}</code>`);
-  if (!transcriptFile) {
-    // Diagnostic detail instead of a bare "not available" — file_type naming
-    // for the transcript can differ by Zoom plan/API version, so showing
-    // what recording_files actually contained makes a mismatch obvious
-    // without needing Cloudflare log access.
-    const kinds = recordingFiles.length
-      ? recordingFiles.map(f => f.file_type || f.recording_type || f.file_extension || '?').join(', ')
-      : '(нет файлов в recording_files)';
-    lines.push(`⚠️ Транскрипт не найден среди файлов записи: ${escapeHtml(kinds)}`);
+  if (!(await env.KV.get(`zoom:done:${mk}`))) {
+    await env.KV.put(`zoom:done:${mk}`, '1', { expirationTtl: ZOOM_KV_TTL });
+    const dateLabel = startTime ? startTime.toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : '';
+    const lines = [`🎥 <b>${escapeHtml(topic)}</b>`];
+    if (dateLabel) lines.push(dateLabel);
+    if (obj.share_url) lines.push(`Запись: ${obj.share_url}`);
+    if (obj.password) lines.push(`Пароль: <code>${escapeHtml(obj.password)}</code>`);
+    if (transcriptFile) lines.push('📄 Транскрипт — следующим сообщением.');
+    await send(env, lines.join('\n'), { link_preview_options: { is_disabled: true }, disable_web_page_preview: true }, chatId);
   }
 
-  await send(env, lines.join('\n'), { link_preview_options: { is_disabled: true }, disable_web_page_preview: true }, chatId);
-  if (!transcriptFile) return;
+  if (!transcriptFile) {
+    // Diagnostic detail instead of a bare "not available" — kept in the queue
+    // entry and shown if the cron eventually gives up.
+    const kinds = (obj.recording_files || []).map(f => f.file_type || f.recording_type || f.file_extension || '?').join(', ') || '(нет файлов)';
+    await queueZoomPending(env, account, meetingUuid, { topic, lastError: `транскрипта нет среди файлов записи: ${kinds}` });
+    return { sent: false, error: 'no transcript file yet' };
+  }
+
+  await queueZoomPending(env, account, meetingUuid, {
+    topic,
+    ...(downloadToken ? { downloadToken } : {}),
+    lastAttemptAt: Date.now(),
+  });
 
   try {
-    const token = await getZoomAccessToken(env, account);
-    const vtt = await downloadZoomFile(transcriptFile.download_url, token, downloadToken);
+    const vtt = await downloadZoomTranscript(env, account, transcriptFile.download_url, downloadToken);
     const text = vttToText(vtt);
     const speakers = extractSpeakers(text);
     const safeTopic = topic.replace(/[^\p{L}\p{N} _-]/gu, '').trim().slice(0, 60) || 'meeting';
     const dateStamp = startTime ? startTime.toISOString().slice(0, 10) : todayMSK();
-    const caption = `📄 Транскрипт: ${topic}` + (speakers.length ? `\n👥 Участники: ${speakers.join(', ')}` : '');
-    await sendDocument(env, `${safeTopic}_${dateStamp}.txt`, text, { caption }, chatId);
+    const caption = (`📄 Транскрипт: ${topic}` + (speakers.length ? `\n👥 Участники: ${speakers.join(', ')}` : '')).slice(0, 1000);
+    const res = await sendDocument(env, `${safeTopic}_${dateStamp}.txt`, text || '(пустой транскрипт)', { caption }, chatId);
+    if (!res?.ok) throw new Error(`Telegram sendDocument: ${res?.description || 'unknown error'}`);
+    await env.KV.put(`zoom:txsent:${mk}`, '1', { expirationTtl: ZOOM_KV_TTL });
+    await env.KV.delete(`zoom:pending:${mk}`);
+    return { sent: true };
   } catch (e) {
-    console.error(`Zoom transcript download failed (${account.label}/${meetingUuid}):`, e);
-    await send(env, `⚠️ Не удалось скачать транскрипт (${e.message}). Ссылка на запись — выше.`, {}, chatId);
+    const error = (e.message || String(e)).slice(0, 1500);
+    console.error(`Zoom transcript delivery failed (${mk}):`, error);
+    const prev = await kget(env, `zoom:pending:${mk}`, null);
+    await queueZoomPending(env, account, meetingUuid, { lastError: error, attempts: (prev?.attempts || 0) + 1 });
+    return { sent: false, error };
   }
 }
 
-// Fallback for recording.transcript_completed simply not firing (a known Zoom
-// gap) — polls the Recordings API for meetings queued by recording.completed
-// (see handleZoomWebhook) until a transcript file shows up or ~20 minutes pass.
-const ZOOM_PENDING_GIVE_UP_MINUTES = 20;
+// The */5 cron works every queued meeting: re-reads its recording from the
+// Recordings API (fresh download_url, and the transcript may simply not have
+// existed yet — Zoom's transcription regularly takes 20-60+ minutes after the
+// meeting, and recording.transcript_completed itself doesn't always fire) and
+// retries delivery. Gives up — with the actual reason — after
+// ZOOM_PENDING_GIVE_UP_MINUTES of no transcript, or ZOOM_MAX_DOWNLOAD_ATTEMPTS
+// failed downloads of one that does exist.
+const ZOOM_PENDING_GIVE_UP_MINUTES = 240;
+const ZOOM_MAX_DOWNLOAD_ATTEMPTS = 8;
 
-async function checkPendingZoomTranscripts(env) {
+async function checkPendingZoomTranscripts(env, { force = false } = {}) {
   const list = await env.KV.list({ prefix: 'zoom:pending:' });
   const accounts = getZoomAccounts(env);
+  const report = [];
 
   for (const key of list.keys) {
     const pending = await kget(env, key.name, null);
-    if (!pending) {
+    const account = pending && accounts.find(a => a.label === pending.accountLabel);
+    if (!pending || !account) {
       await env.KV.delete(key.name);
       continue;
     }
-
-    const account = accounts.find(a => a.label === pending.accountLabel);
-    if (!account) {
+    const mk = zoomMeetingKey(account, pending.meetingUuid);
+    if (await env.KV.get(`zoom:txsent:${mk}`)) {
       await env.KV.delete(key.name);
       continue;
     }
+    // The webhook path is probably mid-download right now — don't race it.
+    if (!force && pending.lastAttemptAt && Date.now() - pending.lastAttemptAt < 120000) continue;
 
-    // The real webhook already handled this meeting — nothing left to poll for.
-    if (await env.KV.get(`zoom:done:${account.label}:${pending.meetingUuid}`)) {
-      await env.KV.delete(key.name);
-      continue;
-    }
-
+    let result = null;
     try {
       const token = await getZoomAccessToken(env, account);
       // Zoom's API wants a UUID that starts with / or contains // double-encoded.
@@ -3528,27 +3602,56 @@ async function checkPendingZoomTranscripts(env) {
       });
       if (res.ok) {
         const data = await res.json();
-        const hasTranscript = (data.recording_files || []).some(f =>
-          f.file_type === 'TRANSCRIPT' || f.recording_type === 'audio_transcript' || f.file_extension === 'VTT'
-        );
-        if (hasTranscript) {
-          await handleZoomTranscriptCompleted(env, account, data, null);
-          await env.KV.delete(key.name);
-          continue;
+        if (findZoomTranscriptFile(data.recording_files)) {
+          result = await handleZoomTranscriptCompleted(env, account, data, pending.downloadToken || null);
+        } else {
+          result = { sent: false, error: 'no transcript file yet' };
         }
-      } else if (res.status !== 404) {
-        console.error(`Zoom pending-transcript poll ${res.status} (${pending.accountLabel}/${pending.meetingUuid}):`, await res.text().catch(() => ''));
+      } else {
+        const error = `Zoom API GET /meetings/…/recordings ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`;
+        if (res.status !== 404) console.error(`${error} (${mk})`);
+        await queueZoomPending(env, account, pending.meetingUuid, { lastError: error });
+        result = { sent: false, error };
       }
     } catch (e) {
-      console.error(`Zoom pending-transcript poll failed (${pending.accountLabel}/${pending.meetingUuid}):`, e);
+      const error = (e.message || String(e)).slice(0, 1500);
+      console.error(`Zoom pending-transcript poll failed (${mk}):`, error);
+      await queueZoomPending(env, account, pending.meetingUuid, { lastError: error });
+      result = { sent: false, error };
     }
+    report.push({ meetingUuid: pending.meetingUuid, topic: pending.topic, ...result });
+    if (result.sent) continue;
 
-    if (Date.now() - pending.firstSeenAt >= ZOOM_PENDING_GIVE_UP_MINUTES * 60000) {
+    const latest = (await kget(env, key.name, null)) || pending;
+    const timedOut = Date.now() - latest.firstSeenAt >= ZOOM_PENDING_GIVE_UP_MINUTES * 60000;
+    const tooManyFailures = (latest.attempts || 0) >= ZOOM_MAX_DOWNLOAD_ATTEMPTS;
+    if (timedOut || tooManyFailures) {
       const chatId = account.chat_id || env.OWNER_CHAT_ID;
-      await send(env, `⚠️ Транскрипт для встречи «${escapeHtml(pending.topic)}» так и не появился за ${ZOOM_PENDING_GIVE_UP_MINUTES} минут. Ссылка на запись — в более раннем сообщении.`, {}, chatId);
+      const why = latest.lastError ? `\nПричина: <code>${escapeHtml(latest.lastError.slice(0, 700))}</code>` : '';
+      await send(env, `⚠️ Не получилось прислать транскрипт встречи «${escapeHtml(latest.topic || 'Zoom-встреча')}». Ссылка на запись — в более раннем сообщении.${why}`, {}, chatId);
       await env.KV.delete(key.name);
     }
   }
+  return report;
+}
+
+// Every cloud recording of the account since `from` (YYYY-MM-DD). S2S OAuth
+// tokens have no user of their own, so walk the account's users rather than
+// relying on /users/me.
+async function listZoomRecordings(env, account, from) {
+  const token = await getZoomAccessToken(env, account);
+  const get = async path => {
+    const res = await fetch(`https://api.zoom.us/v2${path}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error(`Zoom API GET ${path.split('?')[0]} ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`);
+    return res.json();
+  };
+  const usersData = await get('/users?status=active&page_size=300');
+  const meetings = [];
+  for (const user of usersData.users || []) {
+    const data = await get(`/users/${encodeURIComponent(user.id)}/recordings?from=${from}&page_size=300`);
+    meetings.push(...(data.meetings || []));
+  }
+  return meetings;
 }
 
 async function handleZoomWebhook(request, env, label, ctx) {
@@ -3578,25 +3681,18 @@ async function handleZoomWebhook(request, env, label, ctx) {
   const obj = body.payload?.object;
   if (body.event === 'recording.completed' && obj) {
     console.log(`Zoom recording.completed (${account.label}): ${obj.uuid}`);
-    // recording.transcript_completed is the one that actually sends to Telegram, but
+    // recording.transcript_completed is the one that normally sends to Telegram, but
     // it doesn't always fire (a known Zoom gap). Queue this meeting for the every-5-minute
-    // cron (checkPendingZoomTranscripts) to poll for a transcript as a fallback, in case
-    // the webhook never shows up. Harmless if it does show up — that path's own KV dedup
-    // (zoom:done:...) makes whichever one runs first win, and the poller drops the queue
-    // entry as soon as it sees that key set.
-    await kset(env, `zoom:pending:${account.label}:${obj.uuid}`, {
-      accountLabel: account.label,
-      meetingUuid: obj.uuid,
-      topic: obj.topic || 'Zoom-встреча',
-      firstSeenAt: Date.now(),
-    }, { expirationTtl: 3600 });
+    // cron (checkPendingZoomTranscripts) to poll for a transcript as a fallback. Harmless
+    // if the webhook does show up — the zoom:done / zoom:txsent keys keep both paths from
+    // sending the link or the file twice.
+    await queueZoomPending(env, account, obj.uuid, { topic: obj.topic || 'Zoom-встреча' });
   } else if (body.event === 'recording.transcript_completed' && obj) {
-    // Downloading can take up to ~30s (Zoom's own fix for a known file-lag
-    // race — see downloadZoomFile), well past what Zoom waits for a webhook
+    // Downloading can take several seconds, past what Zoom waits for a webhook
     // response before treating it as failed and retrying delivery. Ack Zoom
-    // immediately and let the retries run in the background via waitUntil,
-    // which — unlike code left running after an awaited call returns —
-    // Cloudflare guarantees to complete even after the response is sent.
+    // immediately and do the work in the background via waitUntil (bounded to
+    // ~30s by Cloudflare — see downloadZoomTranscript; anything that doesn't
+    // finish in time is still queued for the cron to retry).
     const work = handleZoomTranscriptCompleted(env, account, obj, body.payload?.download_token);
     if (ctx?.waitUntil) ctx.waitUntil(work);
     else await work; // no execution context (e.g. local test) — fall back to awaiting inline
@@ -3740,22 +3836,48 @@ export default {
     }
 
     // Manually run the every-5-minute Zoom transcript poll right now (instead of
-    // waiting for the cron) and report what's still queued afterward. No side
-    // effects beyond what the real cron already does, so no token needed.
+    // waiting for the cron) and report, per queued meeting, whether the
+    // transcript went out and if not, why. Same effects as the real cron.
     if (url.pathname === '/debug/zoom-poll') {
+      if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
       try {
-        await checkPendingZoomTranscripts(env);
+        const report = await checkPendingZoomTranscripts(env, { force: true });
         const list = await env.KV.list({ prefix: 'zoom:pending:' });
         const pending = [];
         for (const k of list.keys) {
           const p = await kget(env, k.name, null);
-          if (p) pending.push(p);
+          if (p) pending.push({ ...p, downloadToken: p.downloadToken ? '(set)' : undefined });
         }
-        return jsonResponse({ ok: true, pending });
+        return jsonResponse({ ok: true, report, pending });
       } catch (e) {
         console.error('Zoom poll debug check failed:', e);
         return jsonResponse({ ok: false, error: e.message || String(e) }, 500);
       }
+    }
+
+    // Re-send transcripts that never arrived: lists every account's cloud
+    // recordings since ?from=YYYY-MM-DD (default: today), queues each one
+    // whose transcript file hasn't been delivered yet, and runs the poll. The
+    // link message isn't repeated for meetings that already got one.
+    if (url.pathname === '/debug/zoom-resend') {
+      if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
+      const from = url.searchParams.get('from') || new Date().toISOString().slice(0, 10);
+      const queued = [];
+      const errors = [];
+      for (const account of getZoomAccounts(env)) {
+        try {
+          for (const m of await listZoomRecordings(env, account, from)) {
+            if (!findZoomTranscriptFile(m.recording_files)) continue;
+            if (await env.KV.get(`zoom:txsent:${zoomMeetingKey(account, m.uuid)}`)) continue;
+            await queueZoomPending(env, account, m.uuid, { topic: m.topic || 'Zoom-встреча' });
+            queued.push({ account: account.label, meetingUuid: m.uuid, topic: m.topic, start_time: m.start_time });
+          }
+        } catch (e) {
+          errors.push({ account: account.label, error: e.message || String(e) });
+        }
+      }
+      const report = await checkPendingZoomTranscripts(env, { force: true });
+      return jsonResponse({ ok: true, from, queued, errors, report });
     }
 
     // Manual trigger for debugging scheduled jobs (secured with bot token as secret)

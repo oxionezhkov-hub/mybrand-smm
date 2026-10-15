@@ -68,6 +68,9 @@ binding = "AI"
 #                          must be unique/URL-safe) and subscribe to "Recording Completed" and
 #                          "All Recordings have completed Transcription". Not set = feature is
 #                          simply inert (getZoomAccounts returns an empty list).
+#                          The S2S app needs cloud-recording read scopes (and user:read for
+#                          /debug/zoom-resend?token=<TG_TOKEN>&from=YYYY-MM-DD, which re-sends
+#                          transcripts that never arrived).
 
 [vars]
 # Set to "true" to disable the morning Telegram summary and all three daily
@@ -83,8 +86,9 @@ crons = [
   "0 10 * * *",  # 13:00 MSK daily — "update your tasks" push
   "0 18 * * *",  # 21:00 MSK daily — "plan tomorrow" push
   "0 6 * * *",   # 09:00 MSK daily — Entrepreneur content summary
-  "*/5 * * * *", # every 5 min — Zoom transcript-polling fallback (checkPendingZoomTranscripts),
-                 # for meetings whose recording.transcript_completed webhook never fires
+  "*/5 * * * *", # every 5 min — Zoom transcript retry/polling (checkPendingZoomTranscripts):
+                 # retries transcript downloads that failed and covers meetings whose
+                 # recording.transcript_completed webhook never fires
 ]
 
 # Static pages from ./public: the presentation deck (public/vebinar-slides/index.html) at
