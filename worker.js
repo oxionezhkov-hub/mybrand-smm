@@ -3635,9 +3635,10 @@ async function checkPendingZoomTranscripts(env, { force = false } = {}) {
   return report;
 }
 
-// Every cloud recording of the account since `from` (YYYY-MM-DD). S2S OAuth
-// tokens have no user of their own, so walk the account's users rather than
-// relying on /users/me.
+// Every cloud recording of the account since `from` (YYYY-MM-DD). Tries
+// /users/me first (resolves to the S2S app's owner and needs only the
+// recording-list scope), then walking all users (needs user:read:list_users:admin
+// too, which S2S apps often don't have).
 async function listZoomRecordings(env, account, from) {
   const token = await getZoomAccessToken(env, account);
   const get = async path => {
@@ -3645,13 +3646,21 @@ async function listZoomRecordings(env, account, from) {
     if (!res.ok) throw new Error(`Zoom API GET ${path.split('?')[0]} ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`);
     return res.json();
   };
-  const usersData = await get('/users?status=active&page_size=300');
-  const meetings = [];
-  for (const user of usersData.users || []) {
-    const data = await get(`/users/${encodeURIComponent(user.id)}/recordings?from=${from}&page_size=300`);
-    meetings.push(...(data.meetings || []));
+  try {
+    return (await get(`/users/me/recordings?from=${from}&page_size=300`)).meetings || [];
+  } catch (meError) {
+    try {
+      const usersData = await get('/users?status=active&page_size=300');
+      const meetings = [];
+      for (const user of usersData.users || []) {
+        const data = await get(`/users/${encodeURIComponent(user.id)}/recordings?from=${from}&page_size=300`);
+        meetings.push(...(data.meetings || []));
+      }
+      return meetings;
+    } catch (usersError) {
+      throw new Error(`${meError.message} | ${usersError.message}`);
+    }
   }
-  return meetings;
 }
 
 async function handleZoomWebhook(request, env, label, ctx) {
@@ -3864,7 +3873,22 @@ export default {
       const from = url.searchParams.get('from') || new Date().toISOString().slice(0, 10);
       const queued = [];
       const errors = [];
-      for (const account of getZoomAccounts(env)) {
+      // ?uuids=a,b,… (meeting UUIDs, e.g. from Zoom's web portal) queues those
+      // meetings directly — no recording-list API access needed, just the same
+      // per-meeting lookup the cron does. Goes to the first configured account
+      // unless ?label= names another.
+      const uuids = (url.searchParams.get('uuids') || '').split(',').map(u => u.trim()).filter(Boolean);
+      if (uuids.length) {
+        const accounts = getZoomAccounts(env);
+        const account = accounts.find(a => a.label === url.searchParams.get('label')) || accounts[0];
+        if (!account) return jsonResponse({ ok: false, error: 'no Zoom accounts configured' });
+        for (const uuid of uuids) {
+          if (await env.KV.get(`zoom:txsent:${zoomMeetingKey(account, uuid)}`)) continue;
+          await queueZoomPending(env, account, uuid, { topic: 'Zoom-встреча' });
+          queued.push({ account: account.label, meetingUuid: uuid });
+        }
+      }
+      for (const account of uuids.length ? [] : getZoomAccounts(env)) {
         try {
           for (const m of await listZoomRecordings(env, account, from)) {
             if (!findZoomTranscriptFile(m.recording_files)) continue;
