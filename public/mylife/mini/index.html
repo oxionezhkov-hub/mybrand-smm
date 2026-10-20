@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MyLife mini</title>
+<meta name="theme-color" content="#FAFAFA">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iOSIgZmlsbD0iIzExMTExMSIvPjxwYXRoIGQ9Ik05IDE3LjVsNSA1IDktMTEiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGZpbGw9Im5vbmUiLz48L3N2Zz4=">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FAFAFA;
+    --card:#FFFFFF;
+    --text:#111111;
+    --text-secondary:#8C8C8C;
+    --border:rgba(0,0,0,.06);
+    --border-strong:rgba(0,0,0,.12);
+    --accent:#111111;
+    --danger:#D64545;
+    --warn:#C98A2B;
+    --ease:cubic-bezier(.2,.8,.2,1);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#141414;
+      --card:#1E1E1E;
+      --text:#F2F2F2;
+      --text-secondary:#8A8A8A;
+      --border:rgba(255,255,255,.07);
+      --border-strong:rgba(255,255,255,.16);
+      --accent:#F2F2F2;
+      --danger:#F07575;
+      --warn:#E0A84E;
+    }
+  }
+
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;height:100%;
+    background:var(--bg);color:var(--text);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    user-select:none;
+    font-size:13px;
+  }
+  body{display:flex;flex-direction:column;overflow:hidden;}
+  button{font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;padding:0;}
+
+  header{
+    display:flex;align-items:center;gap:8px;
+    padding:12px 14px 8px;
+  }
+  .date{font-weight:600;font-size:14px;letter-spacing:-.01em;}
+  .weekday{color:var(--text-secondary);font-size:12px;}
+  .spacer{flex:1;}
+  .icon-btn{
+    width:26px;height:26px;border-radius:8px;display:grid;place-items:center;
+    color:var(--text-secondary);transition:background .15s,color .15s;
+  }
+  .icon-btn:hover{background:var(--border);color:var(--text);}
+  .icon-btn.spin svg{animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  main{flex:1;overflow-y:auto;padding:0 10px 10px;}
+  main::-webkit-scrollbar{width:4px;}
+  main::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:2px;}
+
+  .timer{
+    margin:0 4px 10px;padding:8px 12px;border-radius:12px;
+    background:var(--accent);color:var(--bg);
+    display:flex;align-items:center;justify-content:space-between;
+    font-weight:600;font-variant-numeric:tabular-nums;
+  }
+  .timer.done{background:var(--danger);color:#fff;}
+
+  .section{margin-bottom:12px;}
+  .section-head{
+    display:flex;align-items:center;gap:8px;
+    padding:4px 6px 6px;
+    font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--text-secondary);
+  }
+  .progress{flex:1;height:3px;border-radius:2px;background:var(--border);overflow:hidden;}
+  .progress > i{display:block;height:100%;background:var(--accent);transition:width .3s var(--ease);}
+
+  .row{
+    display:flex;align-items:flex-start;gap:10px;
+    padding:9px 10px;margin-bottom:4px;
+    background:var(--card);border:1px solid var(--border);border-radius:12px;
+    transition:opacity .25s,transform .25s var(--ease);
+  }
+  .row.leaving{opacity:0;transform:translateX(12px);}
+  .row.muted .title{color:var(--text-secondary);text-decoration:line-through;}
+  .check{
+    width:16px;height:16px;flex-shrink:0;margin-top:1px;border-radius:50%;
+    border:1.6px solid var(--border-strong);display:grid;place-items:center;
+    transition:border-color .15s,background .15s;
+  }
+  button.check:hover{border-color:var(--text);}
+  .check.on{background:var(--accent);border-color:var(--accent);color:var(--bg);}
+  .check.active{border-color:var(--accent);}
+  .check.active::after{content:'';width:6px;height:6px;border-radius:50%;background:var(--accent);}
+  .body{flex:1;min-width:0;}
+  .title{line-height:1.4;font-weight:500;word-break:break-word;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .meta{display:flex;align-items:center;gap:6px;margin-top:2px;color:var(--text-secondary);font-size:11.5px;}
+  .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+  .due-today{color:var(--danger);font-weight:500;}
+  .due-over{color:var(--danger);font-weight:600;}
+  .due-tomorrow{color:var(--warn);font-weight:500;}
+
+  .empty{padding:10px 8px;color:var(--text-secondary);font-size:12px;}
+  .error{margin:0 4px 8px;padding:8px 10px;border-radius:10px;background:rgba(214,69,69,.1);color:var(--danger);font-size:12px;}
+
+  footer{
+    padding:6px 14px 10px;color:var(--text-secondary);font-size:11px;
+    display:flex;justify-content:space-between;
+  }
+  footer a{color:inherit;text-decoration:none;}
+  footer a:hover{color:var(--text);}
+</style>
+</head>
+<body>
+<header>
+  <span class="date" id="date"></span>
+  <span class="weekday" id="weekday"></span>
+  <span class="spacer"></span>
+  <button class="icon-btn" id="refresh" title="Обновить">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+  </button>
+  <button class="icon-btn" id="open-full" title="Открыть MyLife">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+  </button>
+</header>
+<main id="main"></main>
+<footer><span id="updated"></span><a href="/mylife/" target="_blank">MyLife →</a></footer>
+
+<script>
+(function(){
+'use strict';
+
+// Compact always-on-top widget for MyLife: today's focus + top priority tasks.
+// Reads the same /mylife/api as the full app; the timer is shared through
+// localStorage (same origin, same key as the full app).
+
+const TIMER_KEY = 'mylife:timer:v1';
+const REFRESH_MS = 60000;
+const PICKS_LIMIT = 6;
+const MONTHS_GEN = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const WEEKDAYS = ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
+
+let data = null;
+let error = null;
+
+function $(sel){ return document.querySelector(sel); }
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function toDateKey(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function addDays(d, n){ const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+
+async function load(){
+  const btn = $('#refresh');
+  btn.classList.add('spin');
+  try {
+    const r = await fetch('/mylife/api/data', { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    data = await r.json();
+    error = null;
+    $('#updated').textContent = 'обновлено ' + new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  } catch (e) {
+    error = 'Не удалось загрузить данные';
+  }
+  btn.classList.remove('spin');
+  render();
+}
+
+function priorityById(id){ return data.priorities.find(p => p.id === id); }
+function projectById(id){ return data.projects.find(p => p.id === id); }
+
+// Same ordering as the full app's "Что сделать сейчас": due today, overdue, then undated, by priority.
+function computePicks(){
+  const todayKey = toDateKey(new Date());
+  const tomorrowKey = toDateKey(addDays(new Date(), 1));
+  const active = data.tasks.filter(t => t.status === 'active');
+  const rank = t => { const p = priorityById(t.priorityId); return p ? p.order : 999; };
+  const sortFn = (a, b) => rank(a) - rank(b) || a.createdAt - b.createdAt;
+  const dueToday = active.filter(t => t.dueDate === todayKey).sort(sortFn);
+  const overdue = active.filter(t => t.dueDate && t.dueDate < todayKey).sort(sortFn);
+  const tomorrow = active.filter(t => t.dueDate === tomorrowKey).sort(sortFn);
+  const rest = active.filter(t => !t.dueDate).sort(sortFn);
+  return [...dueToday, ...overdue, ...tomorrow, ...rest].slice(0, PICKS_LIMIT);
+}
+
+function dueLabel(dueDate){
+  if (!dueDate) return '';
+  const todayKey = toDateKey(new Date());
+  if (dueDate === todayKey) return '<span class="due-today">сегодня</span>';
+  if (dueDate < todayKey) return '<span class="due-over">просрочено</span>';
+  if (dueDate === toDateKey(addDays(new Date(), 1))) return '<span class="due-tomorrow">завтра</span>';
+  const [, m, d] = dueDate.split('-').map(Number);
+  return `${d} ${MONTHS_GEN[m-1]}`;
+}
+
+function focusMinutes(t){
+  if (t.status === 'done') return t.actualMinutes ? `${t.actualMinutes} мин` : 'готово';
+  if (t.status === 'skipped') return 'пропущено';
+  if ((t.status === 'active' || t.status === 'paused') && t.startedAt){
+    const end = t.status === 'paused' && t.pausedAt ? t.pausedAt : Date.now();
+    const mins = Math.max(0, Math.round((end - t.startedAt - (t.pausedMs || 0)) / 60000));
+    const est = t.estimatedMinutes ? ` / ${t.estimatedMinutes}` : '';
+    return (t.status === 'paused' ? 'пауза · ' : 'в работе · ') + mins + est + ' мин';
+  }
+  return t.estimatedMinutes ? `~${t.estimatedMinutes} мин` : '';
+}
+
+function renderFocus(){
+  const day = data.focus && data.focus[toDateKey(new Date())];
+  if (!day || !day.tasks || !day.tasks.length) return '';
+  const done = day.tasks.filter(t => t.status === 'done' || t.status === 'skipped').length;
+  const pct = Math.round(done / day.tasks.length * 100);
+  const rows = day.tasks.map(t => {
+    const finished = t.status === 'done' || t.status === 'skipped';
+    const checkCls = t.status === 'done' ? 'check on' : (t.status === 'active' || t.status === 'paused') ? 'check active' : 'check';
+    const tick = t.status === 'done' ? '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>' : '';
+    const meta = focusMinutes(t);
+    return `<div class="row${finished ? ' muted' : ''}">
+      <span class="${checkCls}">${tick}</span>
+      <div class="body"><div class="title">${escapeHtml(t.name)}</div>${meta ? `<div class="meta">${meta}</div>` : ''}</div>
+    </div>`;
+  }).join('');
+  return `<div class="section">
+    <div class="section-head">Фокус дня <span class="progress"><i style="width:${pct}%"></i></span> ${done}/${day.tasks.length}</div>
+    ${rows}
+  </div>`;
+}
+
+function renderPicks(){
+  const picks = computePicks();
+  const rows = picks.map(t => {
+    const p = priorityById(t.priorityId);
+    const proj = projectById(t.projectId);
+    const dot = p ? `<span class="dot" style="background:${escapeHtml(p.color)}"></span>` : '';
+    const parts = [dueLabel(t.dueDate), proj ? escapeHtml(proj.name) : ''].filter(Boolean).join(' · ');
+    return `<div class="row" data-id="${escapeHtml(t.id)}">
+      <button class="check" data-done="${escapeHtml(t.id)}" title="Готово"></button>
+      <div class="body"><div class="title">${escapeHtml(t.title)}</div>${dot || parts ? `<div class="meta">${dot}${parts}</div>` : ''}</div>
+    </div>`;
+  }).join('');
+  return `<div class="section">
+    <div class="section-head">Сейчас важно</div>
+    ${rows || '<div class="empty">Активных задач нет</div>'}
+  </div>`;
+}
+
+function render(){
+  const now = new Date();
+  $('#date').textContent = `${now.getDate()} ${MONTHS_GEN[now.getMonth()]}`;
+  $('#weekday').textContent = WEEKDAYS[now.getDay()];
+  let html = '<div id="timer-slot"></div>';
+  if (error) html += `<div class="error">${error}</div>`;
+  if (data) html += renderFocus() + renderPicks();
+  $('#main').innerHTML = html;
+  renderTimer();
+}
+
+function renderTimer(){
+  const slot = $('#timer-slot');
+  if (!slot) return;
+  let t = null;
+  try { t = JSON.parse(localStorage.getItem(TIMER_KEY)); } catch {}
+  if (!t || !t.endAt){ slot.innerHTML = ''; return; }
+  const left = t.endAt - Date.now();
+  if (left <= 0){
+    slot.innerHTML = '<div class="timer done"><span>Таймер</span><span>Время вышло</span></div>';
+    return;
+  }
+  const s = Math.ceil(left / 1000);
+  const mm = String(Math.floor(s / 60)).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  slot.innerHTML = `<div class="timer"><span>Таймер · ${t.minutes} мин</span><span>${mm}:${ss}</span></div>`;
+}
+
+async function completeTask(id, rowEl){
+  const task = data.tasks.find(t => t.id === id);
+  if (!task) return;
+  const check = rowEl.querySelector('.check');
+  check.classList.add('on');
+  rowEl.classList.add('leaving');
+  task.status = 'done';
+  try {
+    const r = await fetch('/mylife/api/tasks/' + encodeURIComponent(id), {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'done' }),
+    });
+    if (!r.ok) throw new Error();
+  } catch {
+    task.status = 'active';
+    error = 'Не удалось отметить задачу';
+  }
+  setTimeout(render, 250);
+}
+
+$('#main').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-done]');
+  if (btn) completeTask(btn.dataset.done, btn.closest('.row'));
+});
+$('#refresh').addEventListener('click', load);
+$('#open-full').addEventListener('click', () => window.open('/mylife/', '_blank'));
+window.addEventListener('focus', load);
+window.addEventListener('storage', (e) => { if (e.key === TIMER_KEY) renderTimer(); });
+
+load();
+setInterval(load, REFRESH_MS);
+setInterval(renderTimer, 1000);
+})();
+</script>
+</body>
+</html>
