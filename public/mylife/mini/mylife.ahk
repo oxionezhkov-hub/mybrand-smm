@@ -16,6 +16,7 @@ MINI_W      := 340
 MINI_H      := 520
 MINI_MARGIN := 16                        ; gap from the screen's bottom-right corner
 
+; Full path to the .exe file itself, not to its folder.
 CHROME   := "C:\Program Files\Google\Chrome\Application\chrome.exe"
 TELEGRAM := EnvGet("APPDATA") "\Telegram Desktop\Telegram.exe"
 ; Path to your VPN client. Leave "" to skip. Examples:
@@ -66,10 +67,11 @@ OpenMini() {
 ; ── Ctrl+Alt+W: start the workday ────────────────────────────────────────────
 
 ^!w:: {
-    if (VPN != "" && FileExist(VPN))
-        StartOnce(VPN)
-    if FileExist(TELEGRAM)
-        StartOnce(TELEGRAM)
+    if (VPN != "")
+        Launch(VPN)
+    ; Telegram keeps a single instance: launching it again just brings the
+    ; window back from the tray, so it is always run.
+    Launch(TELEGRAM)
 
     args := ""
     for url in TABS
@@ -81,9 +83,12 @@ OpenMini() {
         OpenMini()
 }
 
-; Runs a program unless it's already running (so Telegram/VPN don't double up)
-StartOnce(path) {
-    SplitPath(path, &exe)
-    if !ProcessExist(exe)
-        Run('"' path '"')
+; Runs a program; says so instead of failing silently when the path is wrong
+Launch(path) {
+    if !FileExist(path) || InStr(FileExist(path), "D") {
+        MsgBox("Не найден файл:`n" path "`n`nУкажи полный путь к .exe в настройках скрипта.", "MyLife", "Icon!")
+        return
+    }
+    SplitPath(path, , &dir)
+    Run('"' path '"', dir)
 }
