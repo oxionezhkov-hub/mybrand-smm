@@ -1,6 +1,6 @@
 ; MyLife — AutoHotkey v2 script (https://www.autohotkey.com, install v2).
-; Save this file anywhere, double-click to run. To start it with Windows:
-; Win+R → shell:startup → put a shortcut to this file there.
+; Save this file anywhere and double-click it once: it adds itself to Windows
+; startup, so after a reboot the hotkeys work and the workday opens by itself.
 ;
 ;   Ctrl+Alt+M     — show / hide the small MyLife window (always on top)
 ;   Ctrl+Space     — pin / unpin whatever window is active (always on top)
@@ -24,12 +24,27 @@ TELEGRAM := EnvGet("APPDATA") "\Telegram Desktop\Telegram.exe"
 ;   "C:\Program Files\Outline\Outline.exe"
 VPN      := ""
 
+; Open Telegram, VPN, Chrome and MyLife automatically when Windows starts
+AUTO_START_WORKDAY := true
+; How long to wait after boot before opening them (network, VPN, etc.), seconds
+BOOT_DELAY := 20
+
 ; Tabs Chrome opens on Ctrl+Alt+W
 TABS := [
     "https://tasktracker.oxion-ezhkov.workers.dev/mylife/",
     "https://mail.google.com/",
     "https://calendar.google.com/",
 ]
+
+; ── Startup ──────────────────────────────────────────────────────────────────
+
+; Keep a shortcut to this script in the Startup folder. Re-created on every run,
+; so it stays correct even if the script file is moved.
+; The shortcut passes /autostart, which tells a boot launch from a double-click.
+FileCreateShortcut(A_ScriptFullPath, A_Startup "\MyLife.lnk", A_ScriptDir, "/autostart")
+
+if (AUTO_START_WORKDAY && A_Args.Length && A_Args[1] = "/autostart")
+    SetTimer(StartWorkday, -BOOT_DELAY * 1000)
 
 ; ── Ctrl+Alt+M: MyLife mini window ───────────────────────────────────────────
 
@@ -66,7 +81,9 @@ OpenMini() {
 
 ; ── Ctrl+Alt+W: start the workday ────────────────────────────────────────────
 
-^!w:: {
+^!w:: StartWorkday()
+
+StartWorkday(*) {
     if (VPN != "")
         Launch(VPN)
     ; Telegram keeps a single instance: launching it again just brings the
