@@ -13,10 +13,12 @@ binding = "AI"
 # Secrets required (set via `wrangler secret put <name>`), not stored here:
 #   TG_TOKEN            — Telegram bot token
 #   OWNER_CHAT_ID        — Telegram chat id allowed to use the bot
-#   CLAUDE_API           — Anthropic API key (currently unused — the worker is
-#                          temporarily routed entirely through the free Llama
-#                          model on Workers AI; see callClaude/callClaudeStreaming/
-#                          callClaudeCoach in worker.js)
+#   CLAUDE_API           — Anthropic API key. The Telegram bot/MyLife paths are
+#                          temporarily routed through the free Llama model on
+#                          Workers AI (see callClaude/callClaudeStreaming/
+#                          callClaudeCoach in worker.js); only the German trainer's
+#                          AI tutor (/deutsch/api/ai) uses it, falling back to
+#                          Workers AI when it is unset or Claude fails.
 #   CCR_TRIGGER_URL      — "Call via API" endpoint URL for the Claude Code
 #                          Remote Routine "Zoom transcript → decisions summary"
 #                          (see handleTranscriptDocument in worker.js). Find it
@@ -92,8 +94,9 @@ crons = [
 ]
 
 # Static pages from ./public: the presentation deck (public/vebinar-slides/index.html) at
-# /vebinar-slides and the ARA exam trainer (public/ara/index.html) at /ara/, whose progress
-# is stored in KV via /ara/api/progress.
+# /vebinar-slides, the ARA exam trainer (public/ara/index.html) at /ara/, whose progress
+# is stored in KV via /ara/api/progress, and the German A1 trainer (public/deutsch/) at
+# /deutsch/ (progress via /deutsch/api/progress, AI tutor via /deutsch/api/ai).
 # Matched assets are served directly by Cloudflare; everything else (webhook, /debug/morning, /)
 # falls through to the Worker script below.
 [assets]

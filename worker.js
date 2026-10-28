@@ -89,9 +89,14 @@ async function readJson(request) {
 const ARA_PROGRESS_KEY = 'ara:progress';
 const ARA_PROGRESS_MAX_BYTES = 512 * 1024;
 
-async function handleAraProgress(request, env) {
+function handleAraProgress(request, env) {
+  return handleSyncedProgress(request, env, ARA_PROGRESS_KEY);
+}
+
+// Shared by the ARA trainer and the German trainer (/deutsch, below).
+async function handleSyncedProgress(request, env, key) {
   if (request.method === 'GET') {
-    return jsonResponse(await kget(env, ARA_PROGRESS_KEY, { state: null, updatedAt: 0 }));
+    return jsonResponse(await kget(env, key, { state: null, updatedAt: 0 }));
   }
   if (request.method === 'PUT' || request.method === 'POST') {
     const text = await request.text();
@@ -105,14 +110,167 @@ async function handleAraProgress(request, env) {
     if (!body || !body.state || typeof body.state !== 'object' || Array.isArray(body.state) || !Number.isFinite(body.updatedAt)) {
       return jsonResponse({ error: 'expected {state, updatedAt}' }, 400);
     }
-    const current = await kget(env, ARA_PROGRESS_KEY, { updatedAt: 0 });
+    const current = await kget(env, key, { updatedAt: 0 });
     if (body.updatedAt < (current.updatedAt || 0)) {
       return jsonResponse({ ok: false, stale: true, updatedAt: current.updatedAt }, 409);
     }
-    await kset(env, ARA_PROGRESS_KEY, { state: body.state, updatedAt: body.updatedAt });
+    await kset(env, key, { state: body.state, updatedAt: body.updatedAt });
     return jsonResponse({ ok: true, updatedAt: body.updatedAt });
   }
   return jsonResponse({ error: 'method not allowed' }, 405);
+}
+
+// ── German exam trainer (/deutsch) ──────────────────────────────────────────
+// Static page in public/deutsch/; progress syncs through handleSyncedProgress
+// under its own key. The "AI" button streams answers from /deutsch/api/ai as
+// plain text: Claude (CLAUDE_API) first, Workers AI if Claude is unavailable.
+
+const DEUTSCH_PROGRESS_KEY = 'deutsch:progress';
+const DEUTSCH_CLAUDE_MODEL = 'claude-opus-5-5';
+const DEUTSCH_FALLBACK_MODELS = ['@cf/meta/llama-3.3-70b-instruct-fp8-fast', '@cf/mistralai/mistral-small-3.1-24b-instruct'];
+
+const DEUTSCH_SYSTEM = `You are the built-in tutor of a German exam trainer. The learner speaks English, is a near-complete beginner (target: pass an A1-level German exam in a few days) and needs fast, clear, encouraging help.
+
+How to answer:
+- Answer in English. Write German words and sentences in **bold**, and give the English translation right after, e.g. **Ich habe Hunger.** — I am hungry.
+- Be short and concrete: a direct answer first, then at most 2–4 bullet points or a tiny table. No long essays unless asked.
+- For a German word: article + plural for nouns (e.g. **der Tisch, die Tische**), a simple pronunciation hint for English speakers (e.g. "ts-VIE-bel"), 1–2 example sentences.
+- For a sentence: translate it, then explain the grammar that matters (word order, case, verb ending) in beginner language.
+- For grammar: one rule, one memory trick, 2–3 examples.
+- When the learner selected something on the page ("Selected"), explain exactly that, using the page context. If it is an emoji picture, say what it shows and the German word for it.
+- If the learner made a mistake in an exercise, say kindly why the right answer is right.
+- When asked to quiz or practise, give 3–5 short questions and wait for answers; then correct them.
+- Never invent rules. If something has exceptions, say so briefly. Use simple Markdown only (bold, lists, small tables).`;
+
+async function handleDeutschAi(request, env, ctx) {
+  if (request.method !== 'POST') return jsonResponse({ error: 'method not allowed' }, 405);
+  const body = await readJson(request);
+  const raw = Array.isArray(body.messages) ? body.messages.slice(-16) : [];
+  const messages = raw
+    .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
+    .map((m) => ({ role: m.role, content: m.content.slice(0, 6000) }));
+  while (messages.length && messages[0].role !== 'user') messages.shift();
+  if (!messages.length || messages[messages.length - 1].role !== 'user') return jsonResponse({ error: 'expected a user message' }, 400);
+  const context = typeof body.context === 'string' ? body.context.slice(0, 3000) : '';
+  const system = context ? `${DEUTSCH_SYSTEM}\n\nWhat the learner currently sees in the app:\n${context}` : DEUTSCH_SYSTEM;
+
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+  const enc = new TextEncoder();
+  const write = (t) => writer.write(enc.encode(t));
+
+  const run = async () => {
+    let sent = false;
+    try {
+      if (env.CLAUDE_API) {
+        try {
+          sent = await deutschStreamClaude(env, system, messages, (t) => { sent = true; return write(t); });
+        } catch (e) {
+          console.error('Deutsch AI: Claude failed, falling back to Workers AI:', e.message || e);
+        }
+      }
+      if (!sent) {
+        for (const model of DEUTSCH_FALLBACK_MODELS) {
+          try {
+            sent = await deutschStreamWorkersAi(env, model, system, messages, (t) => { sent = true; return write(t); });
+            if (sent) break;
+          } catch (e) {
+            console.error(`Deutsch AI: ${model} failed:`, e.message || e);
+            if (sent) break;
+          }
+        }
+      }
+      if (!sent) await write('Sorry — the AI is not reachable right now. Please try again in a minute.');
+    } finally {
+      await writer.close();
+    }
+  };
+  ctx.waitUntil(run());
+  return new Response(readable, {
+    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' },
+  });
+}
+
+// Reads an SSE response body and calls onEvent(data) for each `data:` line.
+async function deutschReadSse(res, onEvent) {
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, i).trim();
+      buf = buf.slice(i + 1);
+      if (!line.startsWith('data:')) continue;
+      const data = line.slice(5).trim();
+      if (!data || data === '[DONE]') continue;
+      let obj;
+      try {
+        obj = JSON.parse(data);
+      } catch {
+        continue;
+      }
+      await onEvent(obj);
+    }
+  }
+}
+
+// Returns true once any text was streamed. Throws before the first token on
+// HTTP errors (bad key, no credit) so the caller can fall back.
+async function deutschStreamClaude(env, system, messages, emit) {
+  const request = (withFallbacks) => fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': env.CLAUDE_API,
+      'anthropic-version': '2026-10-21',
+      ...(withFallbacks ? { 'anthropic-beta': 'server-side-fallback-2026-07-01' } : {}),
+    },
+    body: JSON.stringify({
+      model: DEUTSCH_CLAUDE_MODEL,
+      max_tokens: 4000,
+      stream: true,
+      output_config: { effort: 'low' },
+      ...(withFallbacks ? { fallbacks: 'default' } : {}),
+      system,
+      messages,
+    }),
+  });
+  let res = await request(true);
+  // The refusal-fallback beta is optional — if the account rejects it, retry plain.
+  if (res.status === 400) res = await request(false);
+  if (!res.ok) throw new Error(`Claude HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  let any = false;
+  await deutschReadSse(res, async (ev) => {
+    if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta' && ev.delta.text) {
+      any = true;
+      await emit(ev.delta.text);
+    } else if (ev.type === 'error') {
+      throw new Error(`Claude stream error: ${ev.error?.message || 'unknown'}`);
+    }
+  });
+  return any;
+}
+
+async function deutschStreamWorkersAi(env, model, system, messages, emit) {
+  const stream = await env.AI.run(model, {
+    messages: [{ role: 'system', content: system }, ...messages],
+    stream: true,
+    max_tokens: 1200,
+    temperature: 0.3,
+  });
+  let any = false;
+  await deutschReadSse(new Response(stream), async (ev) => {
+    const t = ev.response ?? ev.choices?.[0]?.delta?.content;
+    if (typeof t === 'string' && t) {
+      any = true;
+      await emit(t);
+    }
+  });
+  return any;
 }
 
 async function handleMylifeApi(request, env, url) {
@@ -3797,6 +3955,24 @@ export default {
         return await handleMylifeApi(request, env, url);
       } catch (e) {
         console.error('MyLife API error:', e);
+        return jsonResponse({ error: e.message }, 500);
+      }
+    }
+
+    if (url.pathname === '/deutsch/api/progress') {
+      try {
+        return await handleSyncedProgress(request, env, DEUTSCH_PROGRESS_KEY);
+      } catch (e) {
+        console.error('Deutsch progress error:', e);
+        return jsonResponse({ error: e.message }, 500);
+      }
+    }
+
+    if (url.pathname === '/deutsch/api/ai') {
+      try {
+        return await handleDeutschAi(request, env, ctx);
+      } catch (e) {
+        console.error('Deutsch AI error:', e);
         return jsonResponse({ error: e.message }, 500);
       }
     }
