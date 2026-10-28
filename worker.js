@@ -128,6 +128,7 @@ async function handleSyncedProgress(request, env, key) {
 const DEUTSCH_PROGRESS_KEY = 'deutsch:progress';
 const DEUTSCH_CLAUDE_MODEL = 'claude-opus-5-5';
 const DEUTSCH_FALLBACK_MODELS = ['@cf/meta/llama-3.3-70b-instruct-fp8-fast', '@cf/mistralai/mistral-small-3.1-24b-instruct'];
+const DEUTSCH_PROBE_MODELS = [...DEUTSCH_FALLBACK_MODELS, '@cf/openai/gpt-oss-120b', '@cf/meta/llama-4-scout-17b-16e-instruct', '@cf/qwen/qwen3-30b-a3b-fp8', '@cf/google/gemma-3-12b-it'];
 
 const DEUTSCH_SYSTEM = `You are the built-in tutor of a German exam trainer. The learner speaks English, is a near-complete beginner (target: pass an A1-level German exam in a few days) and needs fast, clear, encouraging help.
 
@@ -140,7 +141,9 @@ How to answer:
 - When the learner selected something on the page ("Selected"), explain exactly that, using the page context. If it is an emoji picture, say what it shows and the German word for it.
 - If the learner made a mistake in an exercise, say kindly why the right answer is right.
 - When asked to quiz or practise, give 3–5 short questions and wait for answers; then correct them.
-- Never invent rules. If something has exceptions, say so briefly. Use simple Markdown only (bold, lists, small tables).`;
+- Never invent rules. If something has exceptions, say so briefly. Use simple Markdown only (bold, lists, small tables).
+- The app's answer key is always right. If the page context shows an exercise with "Correct answer: …", explain why exactly THAT answer is correct for the blank (look at the hints in the sentence, e.g. "früher", "gestern", the person, the case) and why the learner's answer is wrong. Never propose a different answer than the key, and never fill a blank with a word that is not among the options.
+- Gaps written as "___" are blanks in an exercise, not missing text.`;
 
 async function handleDeutschAi(request, env, ctx) {
   if (request.method !== 'POST') return jsonResponse({ error: 'method not allowed' }, 405);
@@ -152,6 +155,8 @@ async function handleDeutschAi(request, env, ctx) {
   while (messages.length && messages[0].role !== 'user') messages.shift();
   if (!messages.length || messages[messages.length - 1].role !== 'user') return jsonResponse({ error: 'expected a user message' }, 400);
   const context = typeof body.context === 'string' ? body.context.slice(0, 3000) : '';
+  // Diagnostics: force one Workers AI model (skips Claude) — only models from this list.
+  const forced = DEUTSCH_PROBE_MODELS.includes(body.model) ? body.model : null;
   const system = context ? `${DEUTSCH_SYSTEM}\n\nWhat the learner currently sees in the app:\n${context}` : DEUTSCH_SYSTEM;
 
   const { readable, writable } = new TransformStream();
@@ -162,7 +167,7 @@ async function handleDeutschAi(request, env, ctx) {
   const run = async () => {
     let sent = false;
     try {
-      if (env.CLAUDE_API) {
+      if (env.CLAUDE_API && !forced) {
         try {
           sent = await deutschStreamClaude(env, system, messages, (t) => { sent = true; return write(t); });
         } catch (e) {
@@ -170,7 +175,7 @@ async function handleDeutschAi(request, env, ctx) {
         }
       }
       if (!sent) {
-        for (const model of DEUTSCH_FALLBACK_MODELS) {
+        for (const model of forced ? [forced] : DEUTSCH_FALLBACK_MODELS) {
           try {
             sent = await deutschStreamWorkersAi(env, model, system, messages, (t) => { sent = true; return write(t); });
             if (sent) break;
@@ -264,7 +269,7 @@ async function deutschStreamWorkersAi(env, model, system, messages, emit) {
   });
   let any = false;
   await deutschReadSse(new Response(stream), async (ev) => {
-    const t = ev.response ?? ev.choices?.[0]?.delta?.content;
+    const t = ev.response ?? ev.choices?.[0]?.delta?.content ?? (ev.type === 'response.output_text.delta' ? ev.delta : undefined);
     if (typeof t === 'string' && t) {
       any = true;
       await emit(t);

@@ -659,7 +659,7 @@ window.TOPICS = [
       { q: 'vor ___ Woche', o: ['ein', 'eine', 'einem', 'einer'], a: 3, e: 'die Woche → dative: einer Woche.' },
       { q: 'Ich suche für ___ Monat einen Job.', o: ['ein', 'einen', 'einem', 'einer'], a: 1, e: 'für + accusative: einen Monat.' },
       { q: 'Früher ___ ich viel Arbeit.', o: ['habe', 'hatte', 'war', 'hat'], a: 1, e: 'Past of haben: hatte.' },
-      { q: 'Wie ___ dein Chef? — Sehr nett.', o: ['war', 'warst', 'hatte', 'ist gewesen'], a: 0, e: 'er war.' },
+      { q: 'Früher hatte ich einen Job im Café. Mein Chef ___ sehr nett. (sein, Präteritum)', o: ['war', 'warst', 'hatte', 'waren'], a: 0, e: 'Past of sein: ich war, du warst, er/sie war. „hatte“ is the past of haben.' },
       { q: 'Wir ___ gestern im Kino.', o: ['war', 'waren', 'wart', 'hatten'], a: 1, e: 'wir waren.' },
       { q: '"Ich bin zurzeit arbeitslos" means …', o: ['I am on holiday.', 'I am currently unemployed.', 'I work part-time.', 'I am a student.'], a: 1, e: 'arbeitslos = without work.' },
       { q: '1998 is said …', o: ['eintausendneunhundertachtundneunzig', 'neunzehnhundertachtundneunzig', 'neunzehnachtundneunzig', 'neunundneunzighundert'], a: 1, e: 'Years before 2000: neunzehnhundert…' },
