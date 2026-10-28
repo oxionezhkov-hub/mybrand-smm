@@ -221,24 +221,27 @@ async function deutschReadSse(res, onEvent) {
 // Returns true once any text was streamed. Throws before the first token on
 // HTTP errors (bad key, no credit) so the caller can fall back.
 async function deutschStreamClaude(env, system, messages, emit) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const request = (withFallbacks) => fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       'x-api-key': env.CLAUDE_API,
       'anthropic-version': '2026-10-21',
-      'anthropic-beta': 'server-side-fallback-2026-07-01',
+      ...(withFallbacks ? { 'anthropic-beta': 'server-side-fallback-2026-07-01' } : {}),
     },
     body: JSON.stringify({
       model: DEUTSCH_CLAUDE_MODEL,
       max_tokens: 4000,
       stream: true,
       output_config: { effort: 'low' },
-      fallbacks: 'default',
+      ...(withFallbacks ? { fallbacks: 'default' } : {}),
       system,
       messages,
     }),
   });
+  let res = await request(true);
+  // The refusal-fallback beta is optional — if the account rejects it, retry plain.
+  if (res.status === 400) res = await request(false);
   if (!res.ok) throw new Error(`Claude HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
   let any = false;
   await deutschReadSse(res, async (ev) => {
