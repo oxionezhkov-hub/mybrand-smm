@@ -279,9 +279,18 @@
     else if (a === 'exam') view = viewExam(b, c);
     else if (a === 'words') view = viewWords();
     else view = viewHome();
+    const prevY = window.scrollY;
+    // Same page, different tab (e.g. #/l/l3 → #/l/l3/cards): don't jump to the top.
+    const samePage = !!b && lastHash.split('/').slice(0, 2).join('/') === `${a}/${b}`;
+    $app.style.minHeight = samePage || keepScroll ? `${$app.offsetHeight}px` : '';
     $app.replaceChildren(view);
     for (const n of document.querySelectorAll('[data-r]')) n.classList.toggle('on', n.dataset.r === (a === 'l' ? 'lessons' : a || 'home'));
-    if (!keepScroll && hash !== lastHash) window.scrollTo(0, 0);
+    if (samePage || keepScroll) {
+      const tabs = $app.querySelector('.tabs');
+      const tabsY = tabs ? tabs.getBoundingClientRect().top + window.scrollY - 70 : prevY;
+      window.scrollTo(0, Math.min(prevY, Math.max(0, tabsY)));
+      requestAnimationFrame(() => { $app.style.minHeight = ''; });
+    } else if (hash !== lastHash) window.scrollTo(0, 0);
     lastHash = hash;
     paintChrome();
   }
@@ -423,11 +432,16 @@
   }
 
   // ── Question builders ─────────────────────────────────────────────────────
+  // Core meaning words of an English gloss: "to live (reside)" → {live}.
+  const STOP = new Set(['to', 'a', 'an', 'the', 'of', 'm', 'f', 'be', 'is', 'in', 'on', 'at', 'for', 'and', 'or', 'with', 'you', 'i', 'it', 's']);
+  const core = (en) => new Set(String(en).toLowerCase().replace(/\([^)]*\)/g, ' ').split(/[^a-z']+/).filter((t) => t && !STOP.has(t)));
+  const overlaps = (a, b) => { const A = core(a); for (const t of core(b)) if (A.has(t)) return true; return false; };
+  const sameMeaning = (a, b) => norm(String(a).replace(/\([^)]*\)/g, '')) === norm(String(b).replace(/\([^)]*\)/g, ''));
   function distractors(w, field, pool, n = 3) {
     const seen = new Set([w[field]]);
-    const sameKind = pool.filter((x) => x.de !== w.de && isNoun(x) === isNoun(w));
+    const sameKind = pool.filter((x) => x.de !== w.de && isNoun(x) === isNoun(w) && !overlaps(x.en, w.en));
     const out = [];
-    for (const x of shuffle(sameKind.length >= n ? sameKind : pool.filter((x2) => x2.de !== w.de))) {
+    for (const x of shuffle(sameKind.length >= n ? sameKind : pool.filter((x2) => x2.de !== w.de && !overlaps(x2.en, w.en)))) {
       if (seen.has(x[field])) continue;
       seen.add(x[field]); out.push(x[field]);
       if (out.length >= n) break;
@@ -440,7 +454,7 @@
       case 'de_en': return mcQ({ kind: 'What does it mean?', prompt: w.de, promptHtml: wordHtml(w.de), say: w.de, correct: w.en, wrong: distractors(w, 'en', pool), wid: w.de, explain: `${w.de} = ${w.en}` });
       case 'en_de': return mcQ({ kind: 'Choose the German word', prompt: w.en, pic: w.pic, correct: w.de, wrong: distractors(w, 'de', pool), wid: w.de, explain: `${w.en} = ${w.de}` });
       case 'listen': return mcQ({ kind: 'Listen and choose', prompt: '', listen: true, say: w.de, correct: w.de, wrong: distractors(w, 'de', pool), wid: w.de, explain: `You heard: ${w.de} (${w.en})` });
-      case 'type': return { type: 'type', kind: 'Write it in German', prompt: w.en, pic: w.pic, accept: [w.de], show: w.de, say: w.de, wid: w.de, noun: isNoun(w) };
+      case 'type': return { type: 'type', kind: 'Write it in German', prompt: w.en, pic: w.pic, accept: [w.de, ...[...WORDS.values()].filter((x) => x.de !== w.de && sameMeaning(x.en, w.en)).map((x) => x.de)], show: w.de, say: w.de, wid: w.de, noun: isNoun(w) };
       case 'gender': {
         const g = genderOf(w.de), bare = w.de.slice(g.length + 1);
         return { type: 'mc', gender: true, kind: 'der, das or die?', prompt: bare, pic: w.pic, sub: w.en, options: ['der', 'das', 'die'], answer: ['der', 'das', 'die'].indexOf(g), say: w.de, wid: w.de, explain: `${w.de}${w.pl ? ` — plural: ${w.pl}` : ''}` };
@@ -502,7 +516,8 @@
     function reshuffle(q) { const opts = shuffle(q.options); return { options: opts, answer: opts.indexOf(q.options[q.answer]) }; }
 
     function show() {
-      if (i >= qs.length) return finish();
+      if (root.isConnected) root.style.minHeight = `${Math.max(parseFloat(root.style.minHeight) || 0, root.offsetHeight)}px`;
+      if (i >= qs.length) { root.style.minHeight = ''; return finish(); }
       const q = qs[i];
       const card = h('div', { class: 'qcard' });
       let answered = false;
@@ -556,7 +571,7 @@
         const inp = h('input', { class: 'input', placeholder: 'Type in German… (ä = ae, ß = ss is fine)', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false' });
         const check = () => {
           const v = inp.value.trim();
-          if (!v) return inp.focus();
+          if (!v) return inp.focus({ preventScroll: true });
           const nv = norm(v);
           const acc = q.accept.map(norm);
           let ok = acc.includes(nv);
@@ -571,7 +586,8 @@
         card.append(inp);
         actions.append(h('button', { class: 'btn', onclick: () => { if (!answered) { inp.value = ''; done(false, '(skipped)', q.show); } } }, "I don't know"), h('button', { class: 'btn primary', onclick: check }, 'Check ⏎'));
         setKeys(null);
-        setTimeout(() => inp.focus({ preventScroll: true }), 30);
+        // Auto-focus only with a mouse: on phones it pops the keyboard and shifts the page.
+        if (window.matchMedia('(pointer: fine)').matches) setTimeout(() => inp.focus({ preventScroll: true }), 30);
       } else if (q.type === 'order') {
         const ans = h('div', { class: 'tokens' }), pool = h('div', { class: 'tokens pool' });
         const mk = (t) => { const b = h('button', { class: 'tok', onclick: () => { if (answered) return; (b.parentNode === pool ? ans : pool).append(b); } }, t); return b; };
@@ -627,6 +643,7 @@
       show();
     }
     function show() {
+      if (root.isConnected) root.style.minHeight = `${Math.max(parseFloat(root.style.minHeight) || 0, root.offsetHeight)}px`;
       if (idx >= deck.length) {
         root.replaceChildren(h('div', { class: 'qcard', style: 'text-align:center;max-width:520px;margin:0 auto' },
           h('div', { class: 'confetti' }, '🎉'), h('h2', null, 'Deck finished!'), h('p', { class: 'muted' }, `${seen} cards reviewed. Now test yourself with the quiz.`),
