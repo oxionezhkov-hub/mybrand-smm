@@ -4,7 +4,7 @@ Oct 30, 2026 · @Oleg
 
 Research proposal. Master in Management, Graduate School of Management, St. Petersburg University. Student: Oleg Ezhkov. Supervisor: Prof. Marina O. Latukha.
 
-## 1. Introduction
+## Introduction
 
 A founder who hires a first employee gives away part of the work that, until then, only the founder did. In a venture of two to ten people that decision is hard to reverse cheaply: each early hire sets a working standard for the people who come next, takes a share of a thin budget, and either frees the founder's time or consumes it in training and correction. Rocha and Grilli (2024) note that most start-ups have no formal HR function until they employ 40 to 50 people, so these decisions are made by the founder alone, usually without HR training.
 
@@ -21,11 +21,11 @@ The study addresses one main question and three sub-questions:
 
 The aim is to build an empirically grounded model of the first-hire decision process and to translate it into a practical framework that founders can use before their first hires. The study covers ventures up to two years old, at the pre-seed stage, in marketing services (agencies, SMM and content studios, production projects). "First hires" include staff employees, freelancers and self-employed contractors, as well as partners who join with a share of the business.
 
-## 2. Literature review
+## Literature review
 
-The review is organised around the decision itself. Section 2.1 asks what makes first hires different from later ones. Sections 2.2 to 2.5 follow the decision from where candidates come from, through why they agree to join and how the founder chooses, to what happens in the first weeks. Section 2.6 places the problem in marketing services and the Russian labour market, and Section 2.7 draws the gap and the research questions out of the tensions found along the way.
+The review is organised around the decision itself. It starts with what makes first hires different from later ones, then follows the decision from where candidates come from, through why they agree to join and how the founder chooses, to what happens in the first weeks. It then places the problem in marketing services and the Russian labour market and closes by drawing the gap and the research questions out of the tensions found along the way.
 
-### 2.1 Hiring before HR exists
+### Hiring before HR exists
 
 The starting point of most work on young firms is Stinchcombe's (1965) liability of newness: a new organisation has no track record, no routines and no reputation, so outsiders, including job seekers, cannot judge whether it will survive. Cardon and Stevens (2004), in the review that still frames HRM research on small organisations, add the internal side of the same problem. There is no HR department, recruitment is irregular, and the person who hires is usually the owner, who has many other tasks and little training in selection.
 
@@ -37,7 +37,7 @@ This condition matters for the present study. A marketing agency or an SMM studi
 
 A broader limitation is visible in the quarter-century review of HRM in small and medium-sized enterprises by Harney and Alkhalaf (2021). Across 137 peer-reviewed articles they find three recurring weaknesses: studies rarely distinguish between types of small firms, they pay little attention to the conditions in which these firms operate, and they mostly report the views of managers rather than the processes behind decisions. Research on micro-ventures in their first two years, where "HRM" means a founder making a handful of decisions, is a small and under-theorised part of this field. The same review argues that small firms are a productive setting for HRM theory precisely because practices there are informal and visible, which supports a process-oriented, qualitative approach to first hiring.
 
-### 2.2 Where first hires come from
+### Where first hires come from
 
 A founder with no employer brand and no recruiter starts from people already within reach. Research agrees that personal and professional ties dominate early hiring. It disagrees on whether this helps the venture.
 
@@ -49,7 +49,7 @@ These results were obtained for co-founders, but two features make them relevant
 
 The network view is not uncontested. Coad et al. (2017) show that family is the most common source of the first employee, which fits a network account but also suggests that many first hires are made for availability and trust rather than skill. Frid, Wyman and Shaver (2025), studying early firm success, find that neither the founder's human capital (education, industry, managerial or start-up experience) nor the strength of the founder's ties predicts the number of hires in the first year. One way to reconcile these findings is to separate two decisions that the literature tends to merge. Networks may shape *whom* a founder hires much more than *whether* or *when* the founder hires. A second distinction is one the literature has not drawn at all: a founder may hire from personal circles strategically, because the person's work is known, or defensively, because hiring a stranger feels risky. In conversations with less experienced founders, especially students, the second motive seems frequent. The difference matters for a methodology, because the same channel produces different outcomes depending on why it is used.
 
-### 2.3 Why people join an unknown venture
+### Why people join an unknown venture
 
 The second half of the matching problem is the candidate's choice. A founder can only select among people who are willing to come, and the literature gives two quite different accounts of who these people are.
 
@@ -61,9 +61,9 @@ The two accounts are not necessarily contradictory. They were obtained on differ
 
 This problem is sharp in the setting of the present study. My own observation, and the experience of founders I know, is that in Russia in recent years many people are ready to work for modest pay in small marketing ventures, and that among them there are unusually initiative-driven students and early-career people who later become strong specialists. They work remotely, so the region does not matter. Neither strand of research says how a founder can tell these future talents from candidates who simply had no better offer, and how much the answer depends on what happens after hiring rather than before it. The literature on signals (Spence, 1973; Moser et al., 2017) treats the venture as the party that sends signals and the candidate as the one who reads them. In first hiring the founder faces the reverse problem as well, and must read weak signals from candidates with little track record.
 
-### 2.4 How founders decide
+### How founders decide
 
-Sections 2.2 and 2.3 describe the pool of candidates and the forces that sort people into young ventures. They say little about how the founder chooses within that pool. Four bodies of work offer partial answers, each from a different angle.
+The studies above describe the pool of candidates and the forces that sort people into young ventures. They say little about how the founder chooses within that pool. Four bodies of work offer partial answers, each from a different angle.
 
 **Effectuation.** Sarasvathy (2001) contrasts causation, in which a decision maker starts from a goal and selects the means to reach it, with effectuation, in which an entrepreneur starts from available means (who I am, what I know, whom I know) and lets goals emerge from what these means allow. Seen this way, hiring from personal networks is not a lack of method. It is the method an effectual founder would use, because known people are the means at hand and their commitment reduces uncertainty. Hubner and Baum (2018) bring this distinction into HR research. Interviews with entrepreneurs and new-venture consultants show that founders develop their employees through a mix of the two logics: planned, causal steps when requirements are clear, and effectual steps (using networks, improvising, letting employees shape their own roles) when they are not. The study concerns human resource development rather than selection, but it is one of very few that look inside founders' people decisions, and its main result, that the two logics coexist and switch with circumstances, is directly testable for hiring.
 
@@ -75,19 +75,19 @@ Sections 2.2 and 2.3 describe the pool of candidates and the forces that sort pe
 
 The four strands disagree on one point that is central to a methodology: whether the founder's approach to people is fixed at founding (blueprints, imprinting) or keeps being rebuilt through experience (simple rules, the mix of causal and effectual logics). Each strand also stops short of the decision this study is about. Effectuation explains where candidates come from but not how they are judged. The heuristics study concerns another domain. Blueprints and imprinting describe a general employment model, not the sequence of choices in a particular hire. None of these studies models the steps a founder goes through from noticing that help is needed to deciding that a new person stays.
 
-### 2.5 Selection, onboarding and early exit
+### Selection, onboarding and early exit
 
 HR research usually treats recruitment, selection, onboarding and dismissal as separate practices, each with its own literature. In a venture of a few people they behave more like stages of one decision. The founder who hires an assistant is also the person who trains that assistant, sees the first week of work and decides whether the trial period ends with a contract or a goodbye.
 
 Several features of early ventures make the boundary between selection and onboarding thin. First, the most important qualities of an early hire are hard to observe before work starts. In my own failed hires the problem was rarely a missing skill that a test task could reveal. It was a person who took on responsibility in conversation and then did not honour it, or who could not learn the role at the speed the venture needed. Both became visible only in the paid trial month. Second, the founder has no separate trainer, so every week of onboarding is a week of the founder's time. A wrong hire costs the salary and also the hours that were supposed to be freed. Third, the first people set the standard that later hires copy. Baron and Hannan (2002) and Ahn and Greve (2025) both imply that what founders do with their first employees imprints the culture, but neither study observes the first weeks of an individual hire.
 
-The literature that does follow learning in hiring decisions comes from online labour markets. Leung (2018) studied employers hiring contract workers on an online platform and found that employers learn from the outcomes of earlier hires and adjust whom they hire next, so hiring itself is an experiential learning process. This setting is close to the reality of small marketing ventures, which often engage freelancers and remote contractors before, or instead of, staff employees. It also supports the view from Section 2.4 that founders' hiring rules are built from experience.
+The literature that does follow learning in hiring decisions comes from online labour markets. Leung (2018) studied employers hiring contract workers on an online platform and found that employers learn from the outcomes of earlier hires and adjust whom they hire next, so hiring itself is an experiential learning process. This setting is close to the reality of small marketing ventures, which often engage freelancers and remote contractors before, or instead of, staff employees. It also supports the view that founders' hiring rules are built from experience.
 
 A last element of the decision is new. Digital tools now perform parts of sourcing and screening that a founder once did by hand, from automated filtering of responses to generating test tasks and checking them with language models. Hunkenschroer and Luetge (2022) review the ethics of AI-enabled recruiting and selection and set its promised efficiency and fairness against risks of bias, opacity and loss of human judgement. Their review concerns organisations with HR departments. For a founder without HR staff, the same tools may replace a missing recruiter rather than support an existing one, which changes both the gain and the risk. No study I found examines how founders of micro-ventures use such tools in first hiring.
 
 Taken together, these points suggest that a methodology of first hiring cannot stop at the moment of the offer. A model that includes the trial period, onboarding and the decision to keep or release the person describes the founder's real problem more faithfully, and it is where founders' own lessons tend to concentrate.
 
-### 2.6 Context: marketing services and the Russian labour market
+### Context: marketing services and the Russian labour market
 
 Most of the evidence reviewed so far comes from technology ventures in Denmark, Italy and the United States. Two features of the present setting may change how it applies: the kind of work done in marketing ventures, and the state of the Russian labour market in 2024 to 2026.
 
@@ -101,7 +101,7 @@ Two further features are specific to Russia. First, the self-employment tax regi
 
 Russian-language academic research on how founders hire their first people is almost absent. Searches of Russian management journals produced mainly conference abstracts and practitioner articles. The present study can therefore add an empirical account from a setting that the international literature does not cover and that local research has not yet addressed.
 
-### 2.7 Synthesis: tensions, gap and research questions
+### Synthesis: tensions, gap and research questions
 
 The review does not add up to one consistent picture of early hiring, and the places where studies disagree are the most useful for this thesis. Table 1 lists the main tensions and what each implies for the decision a founder faces.
 
@@ -124,17 +124,17 @@ The research questions stated in the Introduction follow from this. RQ1 addresse
 
 **Theoretical lens.** The study will use effectuation (Sarasvathy, 2001) and the simple-rules view of heuristics (Bingham and Eisenhardt, 2011) as its main lens, with imprinting (Baron and Hannan, 2002; Ahn and Greve, 2025) as a second layer. Effectuation explains why founders start from the people within reach. The simple-rules view explains how they turn failed and successful hires into rules. Imprinting explains why founders with corporate experience and first-time founders start from different rules. The combination also matches the intended output: a decision model whose stages are governed by a small set of rules that a founder can apply.
 
-## 3. Preliminary plan of empirical study
+## Preliminary plan of empirical study
 
-### 3.1 Methodology
+### Methodology
 
 The study will use a qualitative, inductive design based on semi-structured interviews with founders. Three reasons support this choice. First, the research questions ask *how* founders decide, and the literature offers no tested model of that process. Inductive qualitative research is the usual route for building theory where constructs are not yet defined (Eisenhardt, 1989; Gioia, Corley and Hamilton, 2013). Second, the object is a sequence of choices over time, from noticing the need for help to keeping or releasing a person. Process questions call for data that preserve order and context (Langley, 1999), which a survey of practices would flatten. Third, Harney and Alkhalaf (2021) criticise small-firm HRM research for reporting managers' general views; interviews built around specific hiring episodes reduce that risk.
 
-The data will be analysed with the Gioia methodology (Gioia et al., 2013): first-order codes close to founders' own words, second-order themes, and aggregate dimensions that form the stages of the decision model. Process mapping (Langley, 1999) will be used to order the stages and to show where founders loop back, for example from the trial period to a new search. Comparison between experienced and first-time founders will test the imprinting and learning accounts from Section 2.4.
+The data will be analysed with the Gioia methodology (Gioia et al., 2013): first-order codes close to founders' own words, second-order themes, and aggregate dimensions that form the stages of the decision model. Process mapping (Langley, 1999) will be used to order the stages and to show where founders loop back, for example from the trial period to a new search. Comparison between experienced and first-time founders will test the imprinting and learning accounts of founders' people practices.
 
 The author's own experience as a founder is both a resource and a risk. It helps in building the interview guide and in gaining access, but it may lead to reading founders' accounts through the author's own rules. The author's experience will therefore be used only to design the guide and as an explicit reference point in analytic memos, his own agency will be excluded from the sample, and the coding will be checked by a second reader where possible.
 
-### 3.2 Data collection
+### Data collection
 
 **Sample.** Purposive sampling of 10 to 14 founders of marketing-service ventures in Russia: agencies, SMM and content studios, and production projects. Inclusion criteria: the venture was at most two years old at the time of the hires discussed, and the founder made at least two hiring decisions, counting staff, freelancers, self-employed contractors and partners. The sample will be split roughly evenly between founders with prior corporate or entrepreneurial experience and first-time founders, including students, so that the two groups can be compared. Guest, Bunce and Johnson (2006) found that most themes in fairly homogeneous samples emerge within the first twelve interviews; recruitment will continue until new interviews add no new codes. Access is available through the author's professional network, and snowball referrals will be used to reach founders outside it.
 
@@ -144,7 +144,7 @@ The author's own experience as a founder is both a resource and a risk. It helps
 
 **Ethics.** Founders and ventures will be anonymised, and details that could identify former employees will be removed from transcripts.
 
-### 3.3 Expected findings
+### Expected findings
 
 **Result.** The study is expected to produce a process model of the first-hire decision in early-stage marketing ventures. A tentative sequence, to be revised by the data, is: trigger (workload or a quality risk the founder can no longer cover), choice of role type (assistant, specialist or partner), choice of channel, assessment, paid trial and onboarding, decision to keep or release, and the update of the founder's rules. For each stage the study will identify the rules founders use and how they differ between experienced and first-time founders.
 
