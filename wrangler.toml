@@ -76,7 +76,7 @@ binding = "AI"
 
 [vars]
 # Set to "true" to disable the morning Telegram summary and all three daily
-# browser push nudges.
+# "как ты?" check-ins (push + Telegram).
 MAILINGS_PAUSED = "false"
 
 # All cron schedules the Worker's scheduled() handler dispatches on (see
@@ -84,9 +84,9 @@ MAILINGS_PAUSED = "false"
 # doesn't drop schedules that existed only in the dashboard before.
 [triggers]
 crons = [
-  "0 4 * * *",   # 07:00 MSK daily — Telegram task summary + "open your tasks" push
-  "0 10 * * *",  # 13:00 MSK daily — "update your tasks" push
-  "0 18 * * *",  # 21:00 MSK daily — "plan tomorrow" push
+  "0 4 * * *",   # 07:00 MSK daily — MyLife morning brief + "как ты?" check-in (push + Telegram)
+  "0 10 * * *",  # 13:00 MSK daily — "как ты?" check-in (push + Telegram)
+  "0 18 * * *",  # 21:00 MSK daily — "как ты?" check-in (push + Telegram)
   "0 6 * * *",   # 09:00 MSK daily — Entrepreneur content summary
   "*/5 * * * *", # every 5 min — Zoom transcript retry/polling (checkPendingZoomTranscripts):
                  # retries transcript downloads that failed and covers meetings whose

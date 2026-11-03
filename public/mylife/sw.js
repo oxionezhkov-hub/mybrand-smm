@@ -30,7 +30,11 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
       for (const c of list) {
-        if (c.url.includes('/mylife') && 'focus' in c) return c.focus();
+        if (c.url.includes('/mylife') && 'focus' in c) {
+          // Open the check-in the notification is about, not just the old tab.
+          if ('navigate' in c && !c.url.endsWith(url)) c.navigate(url).catch(() => {});
+          return c.focus();
+        }
       }
       if (self.clients.openWindow) return self.clients.openWindow(url);
     })

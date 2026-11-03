@@ -1,0 +1,3368 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>MyLife</title>
+<meta name="theme-color" content="#FAFAFA">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iOSIgZmlsbD0iIzExMTExMSIvPjxwYXRoIGQ9Ik05IDE3LjVsNSA1IDktMTEiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGZpbGw9Im5vbmUiLz48L3N2Zz4=">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FAFAFA;
+    --card:#FFFFFF;
+    --project-bg:#FCFCFC;
+    --text:#111111;
+    --text-secondary:#8C8C8C;
+    --border:rgba(0,0,0,.05);
+    --border-strong:rgba(0,0,0,.09);
+    --shadow:rgba(0,0,0,.05);
+    --ease:cubic-bezier(.2,.8,.2,1);
+    --radius-project:28px;
+    --radius-card:20px;
+    --radius-bar:26px;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{
+    height:100%;
+    margin:0;
+    overflow:hidden;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    -webkit-tap-highlight-color:transparent;
+    overscroll-behavior:none;
+    user-select:none;
+  }
+  input,textarea,[contenteditable]{user-select:text;}
+  ::selection{background:rgba(17,17,17,.12);}
+
+  ::-webkit-scrollbar{width:6px;height:6px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:transparent;border-radius:3px;}
+  .thin-scroll.scrolling::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);}
+
+  button{font-family:inherit;border:none;background:none;color:inherit;cursor:pointer;padding:0;}
+  svg{display:block;}
+
+  #app{position:fixed;inset:0;overflow:hidden;}
+
+  #canvas-viewport{
+    position:absolute;inset:0;overflow:hidden;cursor:grab;
+  }
+  #canvas-viewport.panning{cursor:grabbing;}
+  #canvas-world{
+    position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;
+  }
+  #canvas-world.animated{transition:transform .32s var(--ease);}
+
+  .project{
+    position:absolute;
+    background:var(--project-bg);
+    border:1px solid var(--border);
+    border-radius:var(--radius-project);
+    padding:32px;
+  }
+  .project-title{
+    font-size:22px;
+    font-weight:600;
+    margin:0 0 24px 4px;
+    letter-spacing:-.01em;
+  }
+  .project-grid{
+    display:grid;
+    grid-template-columns:repeat(var(--cols),300px);
+    grid-auto-rows:minmax(120px,auto);
+    gap:22px;
+  }
+  .project-empty-hint{
+    width:300px;height:120px;
+    border:1px dashed var(--border-strong);
+    border-radius:var(--radius-card);
+  }
+
+  .task-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:var(--radius-card);
+    padding:18px 20px;
+    min-height:120px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    cursor:pointer;
+    transition:transform .18s var(--ease),box-shadow .18s var(--ease),opacity .15s;
+    position:relative;
+  }
+  .task-card:hover{transform:translateY(-2px);box-shadow:0 10px 30px var(--shadow);}
+  .task-card.hidden-dragging{opacity:0;pointer-events:none;}
+  .task-card.drop-target{box-shadow:0 0 0 2px rgba(17,17,17,.12) inset;}
+  .task-card.editing{cursor:default;}
+  .task-card.editing:hover{transform:none;box-shadow:none;}
+
+  .task-title{
+    font-size:16px;font-weight:500;line-height:1.5;
+    word-break:break-word;white-space:pre-wrap;
+  }
+  .task-title-input{
+    font-size:16px;font-weight:500;line-height:1.5;
+    outline:none;word-break:break-word;
+  }
+  .task-meta{display:flex;align-items:center;gap:8px;margin-top:auto;}
+  .priority-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .task-date{font-size:13px;color:var(--text-secondary);}
+  .task-date.due-today{color:#D64545;font-weight:500;}
+  .task-date.due-tomorrow{color:#C98A2B;font-weight:500;}
+
+  .task-desc-preview{font-size:13px;color:var(--text-secondary);line-height:1.5;
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+  .task-desc-image{width:100%;max-height:130px;object-fit:cover;border-radius:12px;display:block;}
+  .task-link-chip{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border-radius:12px;font-size:12px;color:var(--text-secondary);overflow:hidden;text-decoration:none;}
+  a.task-link-chip{cursor:pointer;}
+  a.task-link-chip:hover{background:var(--border);}
+  .task-link-chip img{width:28px;height:28px;object-fit:cover;border-radius:6px;flex-shrink:0;}
+  .task-link-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  .task-editor-desc{
+    font-size:13px;line-height:1.6;color:var(--text);outline:none;min-height:20px;
+    max-width:100%;overflow-wrap:anywhere;
+  }
+  .task-editor-desc:empty:before{content:'Описание, ссылка, изображение…';color:var(--text-secondary);}
+  .task-editor-desc img{max-width:100%;border-radius:12px;display:block;margin:4px 0;}
+  .task-editor-desc a{color:var(--text);text-decoration:underline;text-decoration-color:var(--border-strong);}
+  .link-preview{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border-radius:12px;margin:6px 0;}
+  .link-preview img{width:32px;height:32px;object-fit:cover;border-radius:7px;flex-shrink:0;}
+  .link-preview span{font-size:12px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  /* Bottom composer bar */
+  #bottom-bar{
+    position:fixed;left:50%;bottom:28px;transform:translateX(-50%);
+    width:min(620px,88vw);
+    background:rgba(255,255,255,.68);
+    backdrop-filter:blur(22px) saturate(160%);
+    -webkit-backdrop-filter:blur(22px) saturate(160%);
+    border:1px solid rgba(255,255,255,.6);
+    box-shadow:0 24px 60px rgba(0,0,0,.09);
+    border-radius:var(--radius-bar);
+    display:flex;align-items:flex-end;gap:6px;
+    padding:14px 12px 14px 22px;
+    z-index:50;
+  }
+  .composer-input{
+    flex:1;min-height:24px;max-height:120px;overflow-y:auto;outline:none;
+    font-size:15px;line-height:1.5;padding:6px 4px;
+  }
+  .composer-input:empty:before{content:'Новая задача…';color:var(--text-secondary);}
+
+  .bar-btn{
+    width:38px;height:38px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;flex-shrink:0;color:var(--text-secondary);
+    transition:background .15s;position:relative;
+  }
+  .bar-btn:hover{background:rgba(0,0,0,.05);}
+  .bar-btn.filled{color:var(--text);}
+  .bar-btn .day-badge{
+    position:absolute;bottom:-3px;right:-3px;background:var(--text);color:#fff;
+    font-size:10px;font-weight:700;line-height:1;padding:2.5px 4px;border-radius:6px;
+    min-width:10px;text-align:center;box-shadow:0 0 0 2px var(--card);
+  }
+  .bar-btn.submit{background:var(--text);color:#fff;}
+  .bar-btn.submit:hover{background:#000;}
+  .bar-btn.submit svg{transform:translateY(-1px);}
+
+  /* Right rail + panel */
+  #right-rail{
+    position:fixed;right:24px;bottom:24px;
+    display:flex;flex-direction:column;gap:10px;z-index:46;
+  }
+  .rail-btn{
+    width:44px;height:44px;display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,.8);
+    backdrop-filter:blur(14px);border:1px solid var(--border);border-radius:50%;
+    color:var(--text-secondary);cursor:pointer;
+    transition:background .15s,color .15s;box-shadow:0 8px 24px rgba(0,0,0,.06);
+  }
+  .rail-btn:hover{color:var(--text);}
+  .rail-btn.active{color:#fff;background:var(--text);border-color:var(--text);}
+
+  #right-panel{
+    position:fixed;right:0;top:0;bottom:0;width:370px;
+    background:#fff;border-left:1px solid var(--border);
+    transform:translateX(100%);transition:transform .3s var(--ease);
+    z-index:45;display:flex;flex-direction:column;padding:36px 28px 28px;
+  }
+  #right-panel.open{transform:translateX(0);}
+  .panel-week-nav{display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-shrink:0;}
+  .panel-week-nav button{width:26px;height:26px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);border-radius:8px;}
+  .panel-week-nav button:hover{background:var(--bg);color:var(--text);}
+  .panel-week-label{font-size:13px;color:var(--text-secondary);flex:1;text-align:center;}
+  .panel-list{flex:1;overflow-y:auto;min-height:0;}
+  .panel-day-group{margin-bottom:26px;}
+  .panel-day-header{display:flex;align-items:center;gap:6px;margin-bottom:12px;}
+  .panel-day-title{font-size:13px;color:var(--text-secondary);margin-bottom:0;flex:1;}
+  .panel-day-edit{
+    opacity:.45;width:20px;height:20px;flex-shrink:0;color:var(--text-secondary);
+    border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;
+  }
+  .panel-day-edit:hover{opacity:1;background:var(--bg);color:var(--text);}
+  .panel-extra-list{margin-bottom:8px;}
+  .panel-extra-add{margin:2px 0 14px;}
+  .panel-extra-add input{
+    width:100%;border:none;outline:none;font-size:13px;font-family:inherit;
+    background:var(--bg);border-radius:10px;padding:9px 11px;color:var(--text);
+  }
+  .panel-extra-add input::placeholder{color:var(--text-secondary);}
+  .panel-project-group{margin-bottom:14px;}
+  .panel-project-title{font-size:13px;font-weight:600;margin-bottom:6px;}
+  .panel-task-line{font-size:14px;line-height:1.9;color:var(--text);}
+  .panel-empty{font-size:13px;color:var(--text-secondary);margin-top:8px;}
+
+  /* Habits */
+  .habits-project{width:390px;}
+  .habits-body{display:flex;flex-direction:column;}
+  .habit-row{margin-bottom:22px;}
+  .habit-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;row-gap:4px;}
+  .habit-name{font-size:14px;font-weight:500;flex:1;min-width:60px;}
+  .habit-del{opacity:0;width:20px;height:20px;flex-shrink:0;color:var(--text-secondary);border-radius:50%;display:flex;align-items:center;justify-content:center;}
+  .habit-row:hover .habit-del{opacity:1;}
+  .habit-del:hover{background:var(--bg);color:var(--text);}
+  .habit-cells{display:flex;gap:6px;}
+  .habit-cell-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;}
+  .habit-cell-label{font-size:9px;color:var(--text-secondary);white-space:nowrap;}
+  .habit-cell{
+    width:100%;height:26px;border-radius:8px;background:var(--bg);
+    border:1px solid var(--border);cursor:pointer;transition:background .15s;
+  }
+  .habit-cell:hover{background:var(--border);}
+  .habit-cell.done{background:var(--text);border-color:var(--text);}
+  .habit-weekday-choice{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap;}
+  .habit-weekday-chip{padding:6px 8px;border-radius:8px;font-size:11px;color:var(--text-secondary);background:var(--bg);cursor:pointer;}
+  .habit-weekday-chip.active{background:var(--text);color:#fff;}
+  .habit-add{border-top:1px solid var(--border);padding-top:16px;margin-top:6px;}
+  .habit-add input[type=text]{
+    width:100%;border:none;outline:none;font-size:14px;font-family:inherit;
+    background:none;color:var(--text);margin-bottom:10px;
+  }
+  .habit-add input[type=text]::placeholder{color:var(--text-secondary);}
+  .habit-period-choice{display:flex;gap:6px;}
+  .habit-period-btn{
+    flex:1;text-align:center;padding:8px 0;border-radius:10px;font-size:12px;
+    color:var(--text-secondary);background:var(--bg);cursor:pointer;
+  }
+  .habit-period-btn.active{background:var(--text);color:#fff;}
+
+  /* Popovers */
+  .popover{
+    position:fixed;background:#fff;border:1px solid var(--border-strong);
+    border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.14);
+    padding:8px;z-index:60;min-width:200px;max-width:260px;
+  }
+  .popover-list{max-height:260px;overflow-y:auto;}
+  .popover-item{
+    display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;
+    font-size:14px;cursor:pointer;position:relative;
+  }
+  .popover-item:hover{background:var(--bg);}
+  .popover-item.selected{background:var(--bg);font-weight:500;}
+  .popover-item .p-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .popover-item .p-name{flex:1;outline:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .popover-item .p-color-input{width:16px;height:16px;padding:0;border:none;border-radius:50%;overflow:hidden;flex-shrink:0;background:none;}
+  .popover-item .p-color-input::-webkit-color-swatch-wrapper{padding:0;}
+  .popover-item .p-color-input::-webkit-color-swatch{border:none;border-radius:50%;}
+  .popover-item .p-del{opacity:0;width:18px;height:18px;flex-shrink:0;color:var(--text-secondary);border-radius:50%;display:flex;align-items:center;justify-content:center;}
+  .popover-item:hover .p-del{opacity:1;}
+  .popover-item .p-del:hover{background:rgba(0,0,0,.08);color:var(--text);}
+  .smart-pick-popover{width:300px;max-width:320px;}
+  .smart-pick-item{align-items:flex-start;}
+  .smart-pick-item .p-dot{margin-top:6px;}
+  .smart-pick-text{flex:1;min-width:0;}
+  .smart-pick-title{font-size:14px;line-height:1.45;color:var(--text);white-space:normal;word-break:break-word;}
+  .smart-pick-project{font-size:12px;color:var(--text-secondary);margin-top:3px;font-weight:400;}
+  .popover-add{display:flex;align-items:center;gap:8px;padding:9px 10px;border-top:1px solid var(--border);margin-top:4px;}
+  .popover-add input[type=text]{flex:1;border:none;outline:none;font-size:14px;font-family:inherit;background:none;color:var(--text);}
+  .popover-add input[type=text]::placeholder{color:var(--text-secondary);}
+  .popover-add .p-color-input{width:16px;height:16px;border:none;border-radius:50%;background:none;flex-shrink:0;}
+
+  #ctx-menu{
+    position:fixed;background:#fff;border:1px solid var(--border-strong);
+    border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.16);
+    padding:6px;z-index:70;min-width:150px;
+  }
+  #ctx-menu .ctx-item{padding:9px 12px;border-radius:9px;font-size:14px;cursor:pointer;}
+  #ctx-menu .ctx-item:hover{background:var(--bg);}
+  #ctx-menu .ctx-item.danger:hover{color:#c0392b;}
+
+  @keyframes task-complete-pop{
+    0%{ transform:scale(1); opacity:1; }
+    45%{ transform:scale(.97); opacity:.85; }
+    100%{ transform:scale(.9); opacity:0; }
+  }
+  @keyframes check-burst{
+    0%{ transform:scale(.35) rotate(-8deg); opacity:0; }
+    55%{ transform:scale(1.15) rotate(0deg); opacity:1; }
+    100%{ transform:scale(1) rotate(0deg); opacity:0; }
+  }
+  .task-card.completing{ animation:task-complete-pop .42s var(--ease) forwards; pointer-events:none; }
+  .check-burst{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    animation:check-burst .42s var(--ease) forwards; pointer-events:none;
+  }
+
+  #drag-ghost{
+    position:fixed;pointer-events:none;z-index:80;opacity:.92;
+    box-shadow:0 20px 50px rgba(0,0,0,.18);border-radius:var(--radius-card);
+  }
+
+  .veil{position:fixed;inset:0;z-index:55;}
+  .focus-veil{z-index:85;background:rgba(0,0,0,.05);}
+
+  /* Morning Focus Lock */
+  body.focus-locked #bottom-bar,
+  body.focus-locked #right-rail,
+  body.focus-locked #right-panel,
+  body.focus-locked #mobile-tabs,
+  body.focus-locked #timer-widget{
+    display:none !important;
+  }
+  #focus-lock-root{
+    position:fixed;inset:0;z-index:200;background:var(--bg);
+    display:flex;align-items:center;justify-content:center;padding:24px;
+  }
+  .focus-card,.focus-entry,.focus-done{
+    width:100%;max-width:420px;background:var(--card);border:1px solid var(--border);
+    border-radius:24px;padding:32px 28px;box-shadow:0 24px 60px rgba(0,0,0,.08);
+  }
+  .focus-modal{
+    position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:90;
+    width:min(420px,90vw);background:var(--card);border-radius:24px;padding:32px 28px;
+    box-shadow:0 24px 60px rgba(0,0,0,.16);
+  }
+  .focus-progress{font-size:13px;color:var(--text-secondary);margin-bottom:16px;}
+  .focus-history{margin-bottom:20px;display:flex;flex-direction:column;gap:6px;}
+  .focus-history-item{font-size:13px;color:var(--text-secondary);}
+  .focus-task-name{font-size:22px;font-weight:600;margin-bottom:6px;letter-spacing:-.01em;}
+  .focus-task-estimate{font-size:14px;color:var(--text-secondary);margin-bottom:8px;}
+  .focus-timer{
+    font-size:44px;font-weight:700;font-variant-numeric:tabular-nums;
+    text-align:center;margin:20px 0;color:var(--text);
+  }
+  .focus-timer.overtime{color:#D64545;}
+  .focus-timer.paused{opacity:.5;}
+  .focus-paused-info{font-size:12px;color:var(--text-secondary);text-align:center;margin:-14px 0 14px;min-height:16px;}
+  .focus-actions-row{display:flex;gap:10px;}
+  .focus-action-btn{
+    flex:1;padding:16px;border-radius:16px;background:var(--text);color:#fff;border:none;
+    font-size:16px;font-weight:600;text-align:center;cursor:pointer;font-family:inherit;
+  }
+  .focus-action-btn:hover{background:#000;}
+  .focus-pause-btn{
+    flex:0 0 auto;padding:16px 18px;border-radius:16px;background:var(--bg);color:var(--text);
+    border:1px solid var(--border);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;
+  }
+  .focus-pause-btn:hover{background:var(--border);}
+  .focus-side-capture{margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;}
+  .focus-side-row{display:flex;gap:8px;}
+  .focus-side-input{
+    flex:1;border:1px solid var(--border);border-radius:12px;padding:10px 12px;
+    font-size:13px;font-family:inherit;outline:none;color:var(--text);min-width:0;background:var(--bg);
+  }
+  .focus-side-input:focus{border-color:var(--border-strong);}
+  .focus-side-btn{
+    flex:0 0 auto;width:36px;border-radius:12px;background:var(--text);color:#fff;border:none;
+    font-size:16px;font-weight:600;cursor:pointer;font-family:inherit;
+  }
+  .focus-side-btn:hover{background:#000;}
+  .focus-entry-title{font-size:18px;font-weight:600;margin-bottom:20px;letter-spacing:-.01em;}
+  .focus-entry-row{display:flex;gap:10px;margin-bottom:12px;}
+  .focus-entry-name{
+    flex:1;border:1px solid var(--border);border-radius:12px;padding:12px 14px;
+    font-size:14px;font-family:inherit;outline:none;color:var(--text);min-width:0;
+  }
+  .focus-entry-name:focus{border-color:var(--border-strong);}
+  .focus-entry-estimate{
+    width:64px;border:1px solid var(--border);border-radius:12px;padding:12px 8px;
+    font-size:14px;font-family:inherit;outline:none;text-align:center;color:var(--text);
+  }
+  .focus-entry-actions{display:flex;gap:10px;margin-top:8px;}
+  .focus-entry-skip{
+    flex:0 0 auto;padding:14px 16px;border-radius:14px;color:var(--text-secondary);
+    font-size:14px;cursor:pointer;background:none;border:none;font-family:inherit;
+  }
+  .focus-entry-skip:hover{background:var(--bg);}
+  .focus-entry-submit{
+    flex:1;padding:14px;border-radius:14px;background:var(--text);color:#fff;border:none;
+    font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;
+  }
+  .focus-entry-submit:hover{background:#000;}
+  .focus-done-title{font-size:18px;font-weight:600;margin-bottom:16px;letter-spacing:-.01em;}
+
+  /* Timer widget */
+  #timer-widget{
+    position:fixed;top:18px;right:18px;z-index:47;
+    display:flex;align-items:center;gap:10px;
+    background:rgba(255,255,255,.85);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid var(--border);border-radius:20px;
+    padding:8px 8px 8px 16px;box-shadow:0 8px 24px rgba(0,0,0,.08);
+  }
+  #timer-widget .timer-time{font-variant-numeric:tabular-nums;font-size:15px;font-weight:600;color:var(--text);}
+  #timer-widget.overtime .timer-time{color:#D64545;}
+  #timer-widget .timer-stop{
+    width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    color:var(--text-secondary);font-size:16px;line-height:1;
+  }
+  #timer-widget .timer-stop:hover{background:var(--bg);color:var(--text);}
+
+  .task-age{font-size:13px;color:var(--text-secondary);}
+
+  /* Calendar popover */
+  .cal-popover{width:264px;}
+  .cal-header{display:flex;align-items:center;justify-content:space-between;padding:4px 6px 8px;}
+  .cal-header button{width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);border-radius:8px;}
+  .cal-header button:hover{background:var(--bg);color:var(--text);}
+  .cal-month-label{font-size:13px;font-weight:500;}
+  .cal-weekdays,.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);}
+  .cal-weekdays span{font-size:11px;color:var(--text-secondary);text-align:center;padding:4px 0;}
+  .cal-day{
+    aspect-ratio:1;display:flex;align-items:center;justify-content:center;
+    font-size:13px;border-radius:50%;cursor:pointer;color:var(--text);
+  }
+  .cal-day:hover{background:var(--bg);}
+  .cal-day.outside{color:var(--text-secondary);opacity:.5;}
+  .cal-day.today{box-shadow:0 0 0 1px var(--border-strong) inset;}
+  .cal-day.selected{background:var(--text);color:#fff;}
+  .cal-footer{border-top:1px solid var(--border);margin-top:6px;padding-top:6px;text-align:center;}
+  .cal-clear{font-size:13px;color:var(--text-secondary);padding:8px;cursor:pointer;border-radius:10px;}
+  .cal-clear:hover{background:var(--bg);color:var(--text);}
+
+  /* Duration popover */
+  .duration-stepper{display:flex;align-items:center;justify-content:center;gap:14px;padding:8px 4px 14px;}
+  .duration-step{width:30px;height:30px;border-radius:50%;background:var(--bg);font-size:18px;display:flex;align-items:center;justify-content:center;color:var(--text);}
+  .duration-step:hover{background:var(--border);}
+  .duration-value{font-size:15px;font-weight:600;min-width:64px;text-align:center;}
+  .duration-presets{display:flex;flex-wrap:wrap;gap:6px;padding:0 4px 4px;}
+  .duration-chip{padding:6px 10px;border-radius:10px;font-size:12px;color:var(--text-secondary);background:var(--bg);cursor:pointer;}
+  .duration-chip:hover{background:var(--border);color:var(--text);}
+
+  .status-chip-row{display:flex;flex-direction:column;gap:6px;padding:2px;}
+  .status-chip{padding:10px 12px;border-radius:12px;font-size:14px;color:var(--text);background:var(--bg);cursor:pointer;text-align:left;}
+  .status-chip:hover{background:var(--border);}
+  .status-confirm{padding:18px 8px;text-align:center;font-size:13px;color:var(--text-secondary);}
+
+  /* Editor meta controls (priority + date pickers on an existing task) */
+  .meta-control{
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    color:var(--text-secondary);border-radius:8px;padding:2px 6px;margin:-2px -6px;
+  }
+  .meta-control:hover{background:var(--bg);}
+  .meta-priority-swatch{width:11px;height:11px;border-radius:50%;border:1.4px solid var(--border-strong);flex-shrink:0;}
+
+  /* Archive restore action */
+  .panel-task-line{display:flex;align-items:center;gap:8px;}
+  .panel-task-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .panel-task-age{color:var(--text-secondary);font-size:12px;flex-shrink:0;}
+  .panel-restore{
+    opacity:0;width:20px;height:20px;flex-shrink:0;color:var(--text-secondary);
+    border-radius:50%;display:flex;align-items:center;justify-content:center;
+  }
+  .panel-task-line:hover .panel-restore{opacity:1;}
+  .panel-restore:hover{background:var(--bg);color:var(--text);}
+
+  /* Mobile list */
+  #mobile-list{
+    display:none;position:fixed;inset:0;overflow-y:auto;
+    padding:28px 16px 150px;
+  }
+  #mobile-list .project{position:static;width:auto;margin-bottom:0;padding:0;background:none;border:none;}
+  #mobile-list .project-title{display:none;}
+  #mobile-list .project-grid{display:flex;flex-direction:column;grid-template-columns:none;gap:12px;}
+  #mobile-list .task-card{width:auto;max-width:none;min-width:0;}
+  #mobile-list .project-empty-hint{width:auto;height:80px;}
+
+  #mobile-tabs{
+    display:none;position:fixed;top:0;left:0;right:156px;z-index:44;
+    background:rgba(250,250,250,.9);backdrop-filter:blur(14px);
+    padding:14px 16px 10px;
+    border-bottom:1px solid var(--border);
+  }
+  .mobile-project-select{
+    display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:14px;
+    font-size:14px;font-weight:500;color:var(--text);background:#fff;
+    border:1px solid var(--border);cursor:pointer;max-width:100%;
+  }
+  .mobile-project-select-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .mobile-project-select svg{flex-shrink:0;transition:transform .15s;color:var(--text-secondary);}
+  .mobile-project-select.open svg{transform:rotate(180deg);}
+  .mobile-project-dropdown{
+    position:fixed;top:64px;left:16px;z-index:47;
+    background:#fff;border:1px solid var(--border-strong);border-radius:16px;
+    box-shadow:0 24px 60px rgba(0,0,0,.14);padding:8px;min-width:200px;max-width:80vw;
+    max-height:60vh;overflow-y:auto;
+  }
+  .mobile-project-item{padding:10px 12px;border-radius:10px;font-size:14px;cursor:pointer;color:var(--text);}
+  .mobile-project-item:hover{background:var(--bg);}
+  .mobile-project-item.active{background:var(--bg);font-weight:600;}
+
+  .pull-refresh-indicator{
+    display:none;position:fixed;top:80px;left:0;right:0;z-index:44;
+    text-align:center;font-size:12px;color:var(--text-secondary);
+    pointer-events:none;
+  }
+  .pull-refresh-indicator.visible{display:block;}
+
+  #push-banner{
+    position:fixed;left:0;right:0;bottom:0;z-index:200;
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    background:#111111;color:#fff;padding:12px 16px;
+    box-shadow:0 -8px 24px rgba(0,0,0,.18);
+  }
+  .push-banner-text{flex:1 1 240px;font-size:13px;line-height:1.4;}
+  .push-banner-actions{display:flex;gap:8px;flex:0 0 auto;}
+  .push-banner-btn{
+    background:#fff;color:#111;border:none;border-radius:10px;
+    padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;
+  }
+  .push-banner-btn:hover{background:#eee;}
+
+  @media (max-width:860px){
+    #canvas-viewport{display:none;}
+    #mobile-list{display:block;padding-top:78px;}
+    #mobile-tabs{display:block;right:190px;}
+    #right-rail{top:14px;bottom:auto;right:10px;flex-direction:row;gap:6px;}
+    .rail-btn{width:36px;height:36px;}
+    #bottom-bar{left:12px;right:12px;width:auto;transform:none;}
+    #right-panel{width:100%;}
+    #timer-widget{top:66px;right:12px;}
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="canvas-viewport">
+    <div id="canvas-world"></div>
+  </div>
+
+  <div id="mobile-tabs"></div>
+  <div id="mobile-list"></div>
+
+  <div id="right-rail">
+    <button class="rail-btn" data-panel="progress" title="Прогресс">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5l3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="rail-btn" data-panel="archive" title="Архив">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="4" rx="1" stroke="currentColor" stroke-width="1.6"/><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" stroke="currentColor" stroke-width="1.6"/><path d="M10 12h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+    <button class="rail-btn" id="btn-timer" title="Таймер">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="1.6"/><path d="M12 9v4l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.5 2.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+    <button class="rail-btn" id="btn-smart-pick" title="Что сделать сейчас">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>
+    </button>
+    <button class="rail-btn" id="btn-status" title="Статус дня">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5l4 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+
+  <div id="right-panel">
+    <div class="panel-week-nav" id="progress-nav">
+      <button id="week-prev" aria-label="prev">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="panel-week-label" id="week-label"></div>
+      <button id="week-next" aria-label="next">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <div class="panel-list thin-scroll" id="panel-list"></div>
+  </div>
+
+  <div id="bottom-bar">
+    <div class="composer-input" id="composer-input" contenteditable="true" data-placeholder="Новая задача…"></div>
+
+    <button class="bar-btn" id="btn-project" title="Проект" style="position:relative;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      <span class="day-badge" id="project-badge" style="display:none;"></span>
+    </button>
+
+    <button class="bar-btn" id="btn-priority" title="Приоритет">
+      <span id="priority-dot-preview" style="width:12px;height:12px;border-radius:50%;background:transparent;border:1.6px solid currentColor;display:block;"></span>
+    </button>
+
+    <button class="bar-btn" id="btn-date" title="Дата" style="position:relative;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.6"/><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span class="day-badge" id="date-badge" style="display:none;"></span>
+    </button>
+
+    <button class="bar-btn submit" id="btn-submit" title="Добавить">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+// ───────────────────────────── State ─────────────────────────────
+
+const state = {
+  projects: [],
+  priorities: [],
+  tasks: [],
+  habits: [],
+  extraLogs: [],
+  focus: {},
+  eveningPromptDismissed: false,
+  view: { x: 0, y: 0, zoom: 1 },
+  composer: { projectId: null, priorityId: null, date: null },
+  editingTaskId: null,
+  panelOpen: null, // 'progress' | 'archive' | 'habits' | null
+  progressWeekStart: weekStartMonday(new Date()),
+  projectLayout: {},
+  fittedOnce: false,
+  pendingRender: false,
+  mobileActiveProjectId: null,
+};
+
+const GENERAL_ID = 'general';
+const HABITS_PROJECT_ID = '__habits__';
+const MONTHS_GEN = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const MONTHS_NOM = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const WEEKDAYS = ['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'];
+const WEEKDAYS_SHORT = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+
+// ───────────────────────────── API ─────────────────────────────
+
+const api = {
+  async getData(){
+    const r = await fetch('/mylife/api/data');
+    return r.json();
+  },
+  async createTask(payload){
+    const r = await fetch('/mylife/api/tasks', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    return r.json();
+  },
+  async updateTask(id, patch){
+    const r = await fetch('/mylife/api/tasks/' + id, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch) });
+    return r.json();
+  },
+  async deleteTask(id){
+    return fetch('/mylife/api/tasks/' + id, { method:'DELETE' });
+  },
+  async reorderTasks(updates){
+    const r = await fetch('/mylife/api/tasks/reorder', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ updates }) });
+    return r.json();
+  },
+  async createPriority(payload){
+    const r = await fetch('/mylife/api/priorities', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    return r.json();
+  },
+  async updatePriority(id, patch){
+    const r = await fetch('/mylife/api/priorities/' + id, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch) });
+    return r.json();
+  },
+  async deletePriority(id){
+    const r = await fetch('/mylife/api/priorities/' + id, { method:'DELETE' });
+    return r.json();
+  },
+  async deleteProject(id){
+    const r = await fetch('/mylife/api/projects/' + id, { method:'DELETE' });
+    return r.json();
+  },
+  async createHabit(payload){
+    const r = await fetch('/mylife/api/habits', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    return r.json();
+  },
+  async updateHabit(id, patch){
+    const r = await fetch('/mylife/api/habits/' + id, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch) });
+    return r.json();
+  },
+  async deleteHabit(id){
+    const r = await fetch('/mylife/api/habits/' + id, { method:'DELETE' });
+    return r.json();
+  },
+  async createExtraLog(payload){
+    const r = await fetch('/mylife/api/extra-logs', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    return r.json();
+  },
+  async deleteExtraLog(id){
+    const r = await fetch('/mylife/api/extra-logs/' + id, { method:'DELETE' });
+    return r.json();
+  },
+  async setFocusDay(dateKey, tasks){
+    const r = await fetch('/mylife/api/focus', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ dateKey, tasks }) });
+    return r.json();
+  },
+  async updateFocusTask(dateKey, taskId, patch){
+    const r = await fetch('/mylife/api/focus/' + dateKey, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ taskId, patch }) });
+    return r.json();
+  },
+  async linkPreview(url){
+    const r = await fetch('/mylife/api/link-preview', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url }) });
+    return r.json();
+  },
+  async logStatus(statusType){
+    const r = await fetch('/mylife/api/status-log', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ statusType }) });
+    return r.json();
+  },
+};
+
+// ───────────────────────────── Push notifications ─────────────────────────────
+// Nags the user on every visit until browser notifications are enabled, then
+// subscribes to Web Push so the worker's morning/day/evening crons can reach them.
+
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
+async function subscribeToPush(){
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const keyRes = await fetch('/mylife/api/push/vapid-key');
+    if (!keyRes.ok) return false;
+    const { key } = await keyRes.json();
+    if (!key) return false;
+
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub){
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(key),
+      });
+    }
+    await fetch('/mylife/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription: sub.toJSON() }),
+    });
+    return true;
+  } catch (e){
+    console.warn('Push subscribe failed:', e);
+    return false;
+  }
+}
+
+function showPushBanner(){
+  if ($('#push-banner')) return;
+  const denied = Notification.permission === 'denied';
+
+  const banner = el('div', '');
+  banner.id = 'push-banner';
+  banner.appendChild(el('div', 'push-banner-text', denied
+    ? 'Уведомления заблокированы браузером. Разреши их в настройках сайта (значок замка в адресной строке), чтобы получать напоминания о задачах.'
+    : 'Включи уведомления, чтобы получать напоминания о задачах утром, днём и вечером.'));
+
+  const actions = el('div', 'push-banner-actions');
+  if (!denied){
+    const btn = el('button', 'push-banner-btn', 'Разрешить уведомления');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted'){
+        await subscribeToPush();
+        banner.remove();
+      } else {
+        btn.disabled = false;
+        banner.remove();
+        showPushBanner();
+      }
+    });
+    actions.appendChild(btn);
+  }
+  banner.appendChild(actions);
+  document.body.appendChild(banner);
+}
+
+async function initPushNotifications(){
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return;
+
+  try {
+    await navigator.serviceWorker.register('/mylife/sw.js');
+  } catch (e){
+    console.warn('Service worker registration failed:', e);
+    return;
+  }
+
+  if (Notification.permission === 'granted'){
+    await subscribeToPush();
+    return;
+  }
+
+  // Not granted yet (default, or blocked) — nag on every visit until resolved.
+  showPushBanner();
+}
+
+// ───────────────────────────── Utils ─────────────────────────────
+
+function $(sel, root){ return (root||document).querySelector(sel); }
+function $all(sel, root){ return Array.from((root||document).querySelectorAll(sel)); }
+function el(tag, cls, html){
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (html !== undefined) e.innerHTML = html;
+  return e;
+}
+
+function weekStartMonday(d){
+  const day = (d.getDay() + 6) % 7;
+  const r = new Date(d);
+  r.setHours(0,0,0,0);
+  r.setDate(r.getDate() - day);
+  return r;
+}
+function sameDay(a,b){
+  return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+}
+function fmtDate(ts){
+  const d = new Date(ts);
+  const now = new Date();
+  let s = `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
+  if (d.getFullYear() !== now.getFullYear()) s += `, ${d.getFullYear()}`;
+  return s;
+}
+function fmtShort(d){
+  return `${d.getDate()} ${MONTHS_GEN[d.getMonth()].slice(0,3)}`;
+}
+function dayLabel(ts){
+  const d = new Date(ts);
+  const today = new Date();
+  const yesterday = new Date(); yesterday.setDate(today.getDate()-1);
+  if (sameDay(d, today)) return 'Сегодня';
+  if (sameDay(d, yesterday)) return 'Вчера';
+  return `${WEEKDAYS[(d.getDay()+6)%7]}, ${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
+}
+function toDateKey(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function pluralDays(n){
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${n} день`;
+  if ([2,3,4].includes(mod10) && ![12,13,14].includes(mod100)) return `${n} дня`;
+  return `${n} дней`;
+}
+function daysActiveLabel(fromTs, toTs){
+  const n = Math.floor(((toTs ?? Date.now()) - fromTs) / 86400000);
+  return n <= 0 ? 'сегодня' : pluralDays(n);
+}
+function fmtTime(ts){
+  if (!ts) return '';
+  const d = new Date(ts);
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function isMobile(){
+  return window.matchMedia('(max-width: 860px)').matches;
+}
+function dueDateStatusClass(dueDateStr){
+  if (!dueDateStr) return '';
+  const todayKey = toDateKey(new Date());
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  if (dueDateStr === todayKey) return ' due-today';
+  if (dueDateStr === toDateKey(tomorrow)) return ' due-tomorrow';
+  return '';
+}
+
+function attachThinScroll(container){
+  let t;
+  container.addEventListener('scroll', () => {
+    container.classList.add('scrolling');
+    clearTimeout(t);
+    t = setTimeout(() => container.classList.remove('scrolling'), 500);
+  }, { passive:true });
+}
+
+function activeTasksByProject(projectId){
+  return state.tasks
+    .filter(t => t.projectId === projectId && t.status === 'active')
+    .sort((a,b) => a.order - b.order);
+}
+
+function projectById(id){ return state.projects.find(p => p.id === id); }
+function priorityById(id){ return state.priorities.find(p => p.id === id); }
+
+// ───────────────────────────── Sanitizer ─────────────────────────────
+
+const ALLOWED_TAGS = new Set(['B','I','U','BR','DIV','P','SPAN','A','IMG','STRONG','EM']);
+
+function sanitizeFragment(html){
+  const template = document.createElement('template');
+  template.innerHTML = html;
+  cleanNode(template.content);
+  return template.innerHTML;
+}
+function cleanNode(root){
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
+  const toUnwrap = [];
+  let node = walker.currentNode;
+  while (node){
+    const children = Array.from(node.childNodes);
+    for (const child of children){
+      if (child.nodeType === 1){
+        if (!ALLOWED_TAGS.has(child.tagName)){
+          toUnwrap.push(child);
+        } else {
+          for (const attr of Array.from(child.attributes)){
+            const name = attr.name.toLowerCase();
+            if (child.tagName === 'A' && name === 'href'){
+              if (!/^https?:\/\//i.test(attr.value)) child.removeAttribute('href');
+              else { child.setAttribute('target','_blank'); child.setAttribute('rel','noopener noreferrer'); }
+            } else if (child.tagName === 'IMG' && name === 'src'){
+              if (!/^(https?:|data:image\/)/i.test(attr.value)) child.removeAttribute('src');
+            } else if (name !== 'class' || child.tagName !== 'DIV') {
+              child.removeAttribute(attr.name);
+            }
+          }
+        }
+      }
+    }
+    node = walker.nextNode();
+  }
+  for (const n of toUnwrap){
+    while (n.firstChild) n.parentNode.insertBefore(n.firstChild, n);
+    n.parentNode.removeChild(n);
+  }
+}
+
+function descHasImage(html){ return /<img[^>]+src=/i.test(html); }
+function descFirstImage(html){
+  const m = html.match(/<img[^>]+src="([^"]+)"/i);
+  return m ? m[1] : null;
+}
+function descLinkPreview(html){
+  const block = html.match(/<div class="link-preview"[^>]*>([\s\S]*?)<\/div>/i);
+  if (!block) return null;
+  const imgMatch = block[1].match(/<img[^>]*src="([^"]*)"/i);
+  const titleMatch = block[1].match(/<span[^>]*>([^<]*)<\/span>/i);
+  const hrefMatch = html.match(/<a[^>]+href="([^"]+)"/i);
+  return { image: imgMatch ? imgMatch[1] : null, title: titleMatch ? titleMatch[1] : '', href: hrefMatch ? hrefMatch[1] : null };
+}
+function descPlainText(html){
+  const t = document.createElement('div');
+  t.innerHTML = html;
+  t.querySelectorAll('.link-preview, a').forEach(n => n.remove());
+  return t.textContent.trim();
+}
+
+// ───────────────────────────── Rendering: canvas ─────────────────────────────
+
+const viewport = $('#canvas-viewport');
+const world = $('#canvas-world');
+
+function applyTransform(animated){
+  world.classList.toggle('animated', !!animated);
+  world.style.transform = `translate(${state.view.x}px, ${state.view.y}px) scale(${state.view.zoom})`;
+}
+
+function renderCanvas(){
+  if (state.editingTaskId){ state.pendingRender = true; return; }
+
+  world.innerHTML = '';
+  const sortedProjects = [...state.projects].sort((a,b) => a.order - b.order);
+  const nodes = {};
+
+  const habitsEl = el('div', 'project habits-project');
+  habitsEl.dataset.projectId = HABITS_PROJECT_ID;
+  habitsEl.appendChild(buildHabitsBody());
+  world.appendChild(habitsEl);
+  nodes[HABITS_PROJECT_ID] = habitsEl;
+
+  for (const project of sortedProjects){
+    const tasks = activeTasksByProject(project.id);
+    const cols = tasks.length > 0 ? Math.max(1, Math.min(4, tasks.length)) : 2;
+
+    const pEl = el('div', 'project');
+    pEl.dataset.projectId = project.id;
+    pEl.style.setProperty('--cols', cols);
+
+    const title = el('div', 'project-title', escapeHtml(project.name));
+    pEl.appendChild(title);
+
+    const grid = el('div', 'project-grid');
+    if (tasks.length === 0){
+      grid.appendChild(el('div', 'project-empty-hint'));
+    } else {
+      for (const task of tasks){
+        grid.appendChild(renderCard(task));
+      }
+    }
+    pEl.appendChild(grid);
+    world.appendChild(pEl);
+    nodes[project.id] = pEl;
+  }
+
+  layoutProjects(nodes, [{ id: HABITS_PROJECT_ID }, ...sortedProjects]);
+
+  if (!state.fittedOnce && !isMobile()){
+    state.fittedOnce = true;
+    fitAll(false);
+  }
+
+  renderMobileList();
+}
+
+function renderMobileList(){
+  const container = $('#mobile-list');
+  const tabsEl = $('#mobile-tabs');
+  container.innerHTML = '';
+  tabsEl.innerHTML = '';
+  $('#mobile-project-dropdown')?.remove();
+
+  const sortedProjects = [...state.projects].sort((a,b) => a.order - b.order);
+
+  if (!state.mobileActiveProjectId || (state.mobileActiveProjectId !== HABITS_PROJECT_ID && !sortedProjects.find(p => p.id === state.mobileActiveProjectId))){
+    state.mobileActiveProjectId = sortedProjects.length ? sortedProjects[0].id : HABITS_PROJECT_ID;
+  }
+
+  const currentName = state.mobileActiveProjectId === HABITS_PROJECT_ID
+    ? 'Привычки'
+    : (sortedProjects.find(p => p.id === state.mobileActiveProjectId)?.name || 'Проект');
+
+  const selectBtn = el('button', 'mobile-project-select');
+  selectBtn.appendChild(el('span', 'mobile-project-select-name', escapeHtml(currentName)));
+  selectBtn.appendChild(el('span', null, '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'));
+  selectBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleMobileProjectDropdown(selectBtn);
+  });
+  tabsEl.appendChild(selectBtn);
+
+  if (state.mobileActiveProjectId === HABITS_PROJECT_ID){
+    container.appendChild(buildHabitsBody());
+    return;
+  }
+
+  if (!sortedProjects.length) return;
+  const project = sortedProjects.find(p => p.id === state.mobileActiveProjectId);
+  const tasks = activeTasksByProject(project.id);
+
+  const pEl = el('div', 'project');
+  pEl.dataset.projectId = project.id;
+  const grid = el('div', 'project-grid');
+  if (tasks.length === 0){
+    grid.appendChild(el('div', 'project-empty-hint'));
+  } else {
+    for (const task of tasks) grid.appendChild(renderCard(task));
+  }
+  pEl.appendChild(grid);
+  container.appendChild(pEl);
+}
+
+function toggleMobileProjectDropdown(anchorEl){
+  const existing = $('#mobile-project-dropdown');
+  if (existing){
+    existing.remove();
+    anchorEl.classList.remove('open');
+    return;
+  }
+
+  const sortedProjects = [...state.projects].sort((a,b) => a.order - b.order);
+  const dd = el('div', 'mobile-project-dropdown');
+  dd.id = 'mobile-project-dropdown';
+
+  const habitsItem = el('div', 'mobile-project-item' + (state.mobileActiveProjectId === HABITS_PROJECT_ID ? ' active' : ''), 'Привычки');
+  habitsItem.addEventListener('click', () => {
+    state.mobileActiveProjectId = HABITS_PROJECT_ID;
+    renderMobileList();
+  });
+  dd.appendChild(habitsItem);
+
+  for (const project of sortedProjects){
+    const item = el('div', 'mobile-project-item' + (project.id === state.mobileActiveProjectId ? ' active' : ''), escapeHtml(project.name));
+    item.addEventListener('click', () => {
+      state.mobileActiveProjectId = project.id;
+      renderMobileList();
+    });
+    dd.appendChild(item);
+  }
+
+  document.body.appendChild(dd);
+  anchorEl.classList.add('open');
+}
+
+document.addEventListener('pointerdown', (e) => {
+  const dd = $('#mobile-project-dropdown');
+  if (!dd) return;
+  if (e.target.closest('#mobile-project-dropdown') || e.target.closest('.mobile-project-select')) return;
+  dd.remove();
+  $('.mobile-project-select')?.classList.remove('open');
+});
+
+function renderCard(task){
+  const card = el('div', 'task-card');
+  card.dataset.taskId = task.id;
+
+  const titleEl = el('div', 'task-title', escapeHtml(task.title));
+  card.appendChild(titleEl);
+
+  if (task.description && task.description.trim()){
+    const img = descFirstImage(task.description);
+    if (img){
+      const imgEl = el('img', 'task-desc-image');
+      imgEl.src = img;
+      imgEl.draggable = false;
+      card.appendChild(imgEl);
+    }
+    const lp = descLinkPreview(task.description);
+    if (lp){
+      const chip = el(lp.href ? 'a' : 'div', 'task-link-chip');
+      if (lp.href){ chip.href = lp.href; chip.target = '_blank'; chip.rel = 'noopener noreferrer'; }
+      if (lp.image) chip.appendChild(Object.assign(el('img'), { src: lp.image }));
+      chip.appendChild(el('span', null, escapeHtml(lp.title || '')));
+      card.appendChild(chip);
+    }
+    const text = descPlainText(task.description);
+    if (text) card.appendChild(el('div', 'task-desc-preview', escapeHtml(text)));
+  }
+
+  const meta = el('div', 'task-meta');
+  const priority = priorityById(task.priorityId);
+  if (priority){
+    const dot = el('span', 'priority-dot');
+    dot.style.background = priority.color;
+    meta.appendChild(dot);
+    card.style.borderColor = priority.color;
+  }
+  meta.appendChild(el('span', 'task-age', task.plannedMinutes ? `⏱ ${task.plannedMinutes} мин` : daysActiveLabel(task.createdAt)));
+  if (task.dueDate){
+    meta.appendChild(el('span', 'task-date' + dueDateStatusClass(task.dueDate), fmtDate(new Date(task.dueDate).getTime())));
+  }
+  card.appendChild(meta);
+
+  return card;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function layoutProjects(nodes, sortedProjects){
+  const GAP = 24;
+  const vw = viewport.clientWidth;
+  const usableH = Math.max(300, viewport.clientHeight - BOTTOM_BAR_CLEARANCE);
+
+  // Pick a row-wrap width that makes the packed bounding box's aspect ratio roughly match
+  // the viewport's, so the later fit-to-view scale isn't bottlenecked by height (leaving
+  // wide empty margins left/right) just because projects happened to stack into a tall column.
+  let naturalWidth = 0, maxHeight = 0;
+  for (const project of sortedProjects){
+    const node = nodes[project.id];
+    naturalWidth += node.offsetWidth + GAP;
+    maxHeight = Math.max(maxHeight, node.offsetHeight);
+  }
+  const idealRowWidth = Math.sqrt(naturalWidth * maxHeight * vw / usableH);
+  const MAX_ROW_WIDTH = Math.max(vw * 0.92, idealRowWidth);
+
+  let x = 0, y = 0, rowHeight = 0;
+  const layout = {};
+
+  for (const project of sortedProjects){
+    const node = nodes[project.id];
+    const w = node.offsetWidth;
+    const h = node.offsetHeight;
+
+    if (x > 0 && x + w > MAX_ROW_WIDTH){
+      x = 0;
+      y += rowHeight + GAP;
+      rowHeight = 0;
+    }
+
+    node.style.left = x + 'px';
+    node.style.top = y + 'px';
+    layout[project.id] = { x, y, w, h };
+
+    x += w + GAP;
+    rowHeight = Math.max(rowHeight, h);
+  }
+
+  state.projectLayout = layout;
+}
+
+// ───────────────────────────── Pan & zoom ─────────────────────────────
+
+const BOTTOM_BAR_CLEARANCE = 140;
+
+function fitBoundsToView(bounds, opts){
+  opts = opts || {};
+  const vw = viewport.clientWidth, vh = viewport.clientHeight;
+  const padding = opts.padding ?? Math.max(28, vw * 0.03);
+  const bottomClearance = opts.bottomClearance ?? 0;
+  const usableH = vh - bottomClearance;
+
+  const scaleX = (vw - padding*2) / bounds.w;
+  const scaleY = (usableH - padding*2) / bounds.h;
+  let scale = Math.min(scaleX, scaleY, opts.maxZoom ?? 1.4);
+  scale = Math.max(scale, 0.12);
+
+  state.view.zoom = scale;
+  state.view.x = vw/2 - (bounds.x + bounds.w/2) * scale;
+  state.view.y = usableH/2 - (bounds.y + bounds.h/2) * scale;
+  applyTransform(opts.animate !== false);
+  syncFocusedProject();
+}
+
+function fitAll(animate){
+  const keys = Object.keys(state.projectLayout);
+  if (!keys.length) return;
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for (const k of keys){
+    const l = state.projectLayout[k];
+    minX = Math.min(minX, l.x); minY = Math.min(minY, l.y);
+    maxX = Math.max(maxX, l.x + l.w); maxY = Math.max(maxY, l.y + l.h);
+  }
+  fitBoundsToView({ x:minX, y:minY, w:maxX-minX, h:maxY-minY }, { animate, maxZoom: 3, bottomClearance: BOTTOM_BAR_CLEARANCE });
+}
+
+function zoomToProject(id){
+  const l = state.projectLayout[id];
+  if (!l) return;
+  fitBoundsToView(l, { animate: true, maxZoom: 1.8, bottomClearance: BOTTOM_BAR_CLEARANCE });
+  // Explicit intent to focus this project — select it directly rather than relying on the
+  // ambient center-point+zoom-threshold heuristic, which can miss for large projects where
+  // the fit-to-view scale ends up below the threshold.
+  if (id !== HABITS_PROJECT_ID && id !== state.composer.projectId){
+    state.composer.projectId = id;
+    updateProjectBadge();
+  }
+}
+
+let panState = null;
+
+viewport.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const rect = viewport.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+
+  const worldX = (mouseX - state.view.x) / state.view.zoom;
+  const worldY = (mouseY - state.view.y) / state.view.zoom;
+
+  const factor = Math.exp(-e.deltaY * 0.0015);
+  let newZoom = state.view.zoom * factor;
+  newZoom = Math.max(0.12, Math.min(2.5, newZoom));
+
+  state.view.x = mouseX - worldX * newZoom;
+  state.view.y = mouseY - worldY * newZoom;
+  state.view.zoom = newZoom;
+  applyTransform(false);
+  scheduleFocusSync();
+}, { passive:false });
+
+let focusSyncTimer = null;
+function scheduleFocusSync(){
+  clearTimeout(focusSyncTimer);
+  focusSyncTimer = setTimeout(syncFocusedProject, 160);
+}
+
+viewport.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  if (e.target.closest('.task-card') || e.target.closest('.habits-project')) return;
+  panState = { startX: e.clientX, startY: e.clientY, viewX: state.view.x, viewY: state.view.y };
+  viewport.classList.add('panning');
+  viewport.setPointerCapture(e.pointerId);
+});
+viewport.addEventListener('pointermove', (e) => {
+  if (!panState) return;
+  state.view.x = panState.viewX + (e.clientX - panState.startX);
+  state.view.y = panState.viewY + (e.clientY - panState.startY);
+  applyTransform(false);
+});
+function endPan(e){
+  if (!panState) return;
+  panState = null;
+  viewport.classList.remove('panning');
+  syncFocusedProject();
+}
+viewport.addEventListener('pointerup', endPan);
+viewport.addEventListener('pointercancel', endPan);
+
+viewport.addEventListener('dblclick', (e) => {
+  const atPoint = document.elementFromPoint(e.clientX, e.clientY);
+  const projectEl = atPoint && atPoint.closest('.project');
+  if (projectEl && !atPoint.closest('.task-card')){
+    zoomToProject(projectEl.dataset.projectId);
+  } else if (!projectEl){
+    fitAll(true);
+  }
+});
+
+window.addEventListener('resize', () => { if (state.fittedOnce) layoutOnly(); });
+function layoutOnly(){
+  const nodes = {};
+  $all('.project', world).forEach(n => nodes[n.dataset.projectId] = n);
+  const sortedProjects = [...state.projects].sort((a,b) => a.order - b.order);
+  layoutProjects(nodes, [{ id: HABITS_PROJECT_ID }, ...sortedProjects]);
+}
+
+// ───────────────────────────── Card drag & drop (reorder) ─────────────────────────────
+
+let dragCtx = null;
+
+document.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  if (e.target.closest('a')) return; // let links navigate untouched
+  const card = e.target.closest('.task-card');
+  if (!card || card.classList.contains('editing')) return;
+
+  const taskId = card.dataset.taskId;
+
+  if (isMobile()){
+    // Tap-to-edit only on mobile — no drag/pointer capture, so native scrolling stays intact.
+    const startX = e.clientX, startY = e.clientY;
+    const cleanup = () => {
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', cleanup);
+    };
+    const onUp = (ue) => {
+      cleanup();
+      if (Math.hypot(ue.clientX - startX, ue.clientY - startY) < 8){
+        openEditor(card, taskId);
+      }
+    };
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', cleanup);
+    return;
+  }
+
+  const rect = card.getBoundingClientRect();
+  dragCtx = {
+    card, taskId,
+    startX: e.clientX, startY: e.clientY,
+    offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top,
+    rectW: rect.width, rectH: rect.height,
+    moved: false, ghost: null, dropTarget: null,
+  };
+  card.setPointerCapture(e.pointerId);
+});
+
+document.addEventListener('pointermove', (e) => {
+  if (!dragCtx) return;
+  const dx = e.clientX - dragCtx.startX;
+  const dy = e.clientY - dragCtx.startY;
+
+  if (!dragCtx.moved){
+    if (Math.hypot(dx, dy) < 6) return;
+    dragCtx.moved = true;
+    dragCtx.card.classList.add('hidden-dragging');
+    const ghost = el('div');
+    ghost.id = 'drag-ghost';
+    ghost.innerHTML = dragCtx.card.innerHTML;
+    ghost.className = dragCtx.card.className.replace('hidden-dragging','') + '';
+    // offsetWidth/Height are unaffected by the canvas' CSS scale transform, unlike getBoundingClientRect;
+    // scaling the ghost to match keeps its text proportioned correctly at any zoom level.
+    ghost.style.width = dragCtx.card.offsetWidth + 'px';
+    ghost.style.transform = `scale(${state.view.zoom})`;
+    ghost.style.transformOrigin = '0 0';
+    ghost.style.background = 'var(--card)';
+    ghost.style.border = '1px solid var(--border)';
+    ghost.style.padding = '18px 20px';
+    document.body.appendChild(ghost);
+    dragCtx.ghost = ghost;
+  }
+
+  dragCtx.ghost.style.left = (e.clientX - dragCtx.offsetX) + 'px';
+  dragCtx.ghost.style.top = (e.clientY - dragCtx.offsetY) + 'px';
+
+  dragCtx.ghost.style.display = 'none';
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  dragCtx.ghost.style.display = '';
+
+  if (dragCtx.dropTarget) dragCtx.dropTarget.classList.remove('drop-target');
+  const targetCard = under ? under.closest('.task-card') : null;
+  if (targetCard && targetCard !== dragCtx.card){
+    targetCard.classList.add('drop-target');
+    dragCtx.dropTarget = targetCard;
+  } else {
+    dragCtx.dropTarget = null;
+    dragCtx.dropProject = under ? under.closest('.project') : null;
+  }
+});
+
+document.addEventListener('pointerup', async (e) => {
+  if (!dragCtx) return;
+  const ctx = dragCtx;
+  dragCtx = null;
+
+  if (ctx.dropTarget) ctx.dropTarget.classList.remove('drop-target');
+
+  if (!ctx.moved){
+    openEditor(ctx.card, ctx.taskId);
+    return;
+  }
+
+  if (ctx.ghost) ctx.ghost.remove();
+  ctx.card.classList.remove('hidden-dragging');
+
+  const task = state.tasks.find(t => t.id === ctx.taskId);
+  if (!task) return;
+
+  let targetProjectId = null;
+  let insertBeforeTaskId = null;
+
+  if (ctx.dropTarget){
+    targetProjectId = ctx.dropTarget.closest('.project').dataset.projectId;
+    insertBeforeTaskId = ctx.dropTarget.dataset.taskId;
+  } else if (ctx.dropProject){
+    targetProjectId = ctx.dropProject.dataset.projectId;
+  } else {
+    return; // dropped nowhere valid
+  }
+
+  await moveTask(task, targetProjectId, insertBeforeTaskId);
+});
+
+async function moveTask(task, targetProjectId, insertBeforeTaskId){
+  const oldProjectId = task.projectId;
+
+  let list = activeTasksByProject(targetProjectId).filter(t => t.id !== task.id);
+  let insertIdx = list.length;
+  if (insertBeforeTaskId){
+    const idx = list.findIndex(t => t.id === insertBeforeTaskId);
+    if (idx !== -1) insertIdx = idx;
+  }
+  list.splice(insertIdx, 0, task);
+
+  task.projectId = targetProjectId;
+  list.forEach((t, i) => { t.order = i; });
+
+  const updates = [{ id: task.id, patch: { projectId: targetProjectId, order: task.order } }];
+  list.forEach(t => { if (t.id !== task.id) updates.push({ id: t.id, patch: { order: t.order } }); });
+
+  if (oldProjectId !== targetProjectId){
+    const oldList = activeTasksByProject(oldProjectId);
+    oldList.forEach((t, i) => { t.order = i; updates.push({ id: t.id, patch: { order: i } }); });
+  }
+
+  renderCanvas();
+  await api.reorderTasks(updates);
+}
+
+// ───────────────────────────── Card editor ─────────────────────────────
+
+function activeContainer(){
+  return isMobile() ? $('#mobile-list') : world;
+}
+
+function openEditor(cardEl, taskId){
+  if (state.editingTaskId) closeEditor(true);
+
+  const task = state.tasks.find(t => t.id === taskId);
+  if (!task) return;
+
+  state.editingTaskId = taskId;
+  cardEl.classList.add('editing');
+  if (task.priorityId) cardEl.style.borderColor = priorityById(task.priorityId)?.color || '';
+  cardEl.innerHTML = '';
+
+  const titleInput = el('div', 'task-title-input');
+  titleInput.contentEditable = 'true';
+  titleInput.textContent = task.title;
+  cardEl.appendChild(titleInput);
+
+  const descInput = el('div', 'task-editor-desc');
+  descInput.contentEditable = 'true';
+  descInput.innerHTML = sanitizeFragment(task.description || '');
+  cardEl.appendChild(descInput);
+
+  const meta = el('div', 'task-meta');
+  cardEl.appendChild(meta);
+  buildEditorMeta(cardEl, task);
+
+  setupPasteHandler(descInput);
+
+  requestAnimationFrame(() => {
+    titleInput.focus();
+    placeCaretAtEnd(titleInput);
+  });
+
+  cardEl.oncontextmenu = null;
+}
+
+function buildEditorMeta(cardEl, task){
+  const meta = cardEl.querySelector('.task-meta');
+  meta.innerHTML = '';
+
+  const priority = priorityById(task.priorityId);
+  const prioBtn = el('div', 'meta-control');
+  const swatch = el('span', 'meta-priority-swatch');
+  if (priority){ swatch.style.background = priority.color; swatch.style.border = 'none'; }
+  prioBtn.appendChild(swatch);
+  prioBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeAllPopovers();
+    openPriorityPopover(prioBtn, task.priorityId, async (id) => {
+      task.priorityId = id;
+      cardEl.style.borderColor = id ? (priorityById(id)?.color || '') : '';
+      buildEditorMeta(cardEl, task);
+      await api.updateTask(task.id, { priorityId: id });
+    });
+  });
+  meta.appendChild(prioBtn);
+
+  const dateBtn = el('div', 'meta-control');
+  dateBtn.appendChild(el('span', 'task-date' + dueDateStatusClass(task.dueDate), task.dueDate ? fmtDate(new Date(task.dueDate).getTime()) : 'Дата'));
+  dateBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeAllPopovers();
+    openCalendarPopover(dateBtn, task.dueDate, {
+      onSelect: async (d) => {
+        task.dueDate = d;
+        buildEditorMeta(cardEl, task);
+        await api.updateTask(task.id, { dueDate: d });
+      },
+      onClear: async () => {
+        task.dueDate = null;
+        buildEditorMeta(cardEl, task);
+        await api.updateTask(task.id, { dueDate: null });
+      },
+    });
+  });
+  meta.appendChild(dateBtn);
+
+  const durationBtn = el('div', 'meta-control');
+  durationBtn.appendChild(el('span', 'task-date', task.plannedMinutes ? `⏱ ${task.plannedMinutes} мин` : '⏱ время'));
+  durationBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeAllPopovers();
+    openDurationPopover(durationBtn, task.plannedMinutes, {
+      onSelect: async (mins) => {
+        task.plannedMinutes = mins;
+        buildEditorMeta(cardEl, task);
+        await api.updateTask(task.id, { plannedMinutes: mins });
+      },
+      onClear: async () => {
+        task.plannedMinutes = null;
+        buildEditorMeta(cardEl, task);
+        await api.updateTask(task.id, { plannedMinutes: null });
+      },
+    });
+  });
+  meta.appendChild(durationBtn);
+
+  meta.appendChild(el('span', 'task-age', daysActiveLabel(task.createdAt)));
+}
+
+function openDurationPopover(anchorEl, currentValue, { onSelect, onClear }){
+  const veil = el('div', 'veil');
+  veil.addEventListener('pointerdown', closeAllPopovers);
+  document.body.appendChild(veil);
+
+  const pop = el('div', 'popover');
+  pop.dataset.kind = 'duration';
+  pop.style.minWidth = '210px';
+  pop.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+  let value = currentValue || 0;
+
+  const stepper = el('div', 'duration-stepper');
+  const minus = el('button', 'duration-step', '−');
+  const display = el('div', 'duration-value');
+  const plus = el('button', 'duration-step', '+');
+  stepper.appendChild(minus); stepper.appendChild(display); stepper.appendChild(plus);
+  pop.appendChild(stepper);
+
+  function render(){
+    display.textContent = value > 0 ? `${value} мин` : '—';
+  }
+  render();
+
+  minus.addEventListener('click', () => { value = Math.max(0, value - 5); render(); onSelect(value || null); });
+  plus.addEventListener('click', () => { value = Math.min(480, value + 5); render(); onSelect(value); });
+
+  const presets = el('div', 'duration-presets');
+  [15, 25, 30, 45, 60, 90].forEach(mins => {
+    const chip = el('div', 'duration-chip', String(mins));
+    chip.addEventListener('click', () => { value = mins; render(); onSelect(value); });
+    presets.appendChild(chip);
+  });
+  pop.appendChild(presets);
+
+  if (currentValue){
+    const footer = el('div', 'cal-footer');
+    const clearBtn = el('div', 'cal-clear', 'Очистить время');
+    clearBtn.addEventListener('click', () => { onClear(); closeAllPopovers(); });
+    footer.appendChild(clearBtn);
+    pop.appendChild(footer);
+  }
+
+  document.body.appendChild(pop);
+  positionPopover(pop, anchorEl);
+}
+
+function placeCaretAtEnd(node){
+  const range = document.createRange();
+  range.selectNodeContents(node);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+async function closeEditor(save){
+  const taskId = state.editingTaskId;
+  if (!taskId) return;
+  const cardEl = activeContainer().querySelector(`.task-card[data-task-id="${taskId}"]`);
+  state.editingTaskId = null;
+
+  if (save && cardEl){
+    const task = state.tasks.find(t => t.id === taskId);
+    const titleInput = cardEl.querySelector('.task-title-input');
+    const descInput = cardEl.querySelector('.task-editor-desc');
+    const newTitle = (titleInput ? titleInput.textContent.trim() : task.title) || 'Без названия';
+    const newDesc = descInput ? sanitizeFragment(descInput.innerHTML) : task.description;
+
+    if (newTitle !== task.title || newDesc !== task.description){
+      task.title = newTitle;
+      task.description = newDesc;
+      await api.updateTask(taskId, { title: newTitle, description: newDesc });
+    }
+  }
+
+  if (state.pendingRender){
+    state.pendingRender = false;
+    renderCanvas();
+  } else if (cardEl){
+    const task = state.tasks.find(t => t.id === taskId);
+    cardEl.classList.remove('editing');
+    if (task) cardEl.replaceWith(renderCard(task));
+  }
+}
+
+document.addEventListener('pointerdown', (e) => {
+  if (!state.editingTaskId) return;
+  if (e.target.closest('.popover') || e.target.closest('.veil')) return;
+  const cardEl = activeContainer().querySelector(`.task-card[data-task-id="${state.editingTaskId}"]`);
+  if (cardEl && !cardEl.contains(e.target)){
+    closeEditor(true);
+  }
+}, true);
+
+// ───────────────────────────── Context menu ─────────────────────────────
+
+const ctxMenu = el('div');
+ctxMenu.id = 'ctx-menu';
+ctxMenu.style.display = 'none';
+document.body.appendChild(ctxMenu);
+
+document.addEventListener('contextmenu', (e) => {
+  if (!e.target.closest('#canvas-world, #mobile-list')) return;
+  e.preventDefault();
+
+  const card = e.target.closest('.task-card');
+  if (card){
+    if (card.classList.contains('editing')) return;
+    showContextMenu(e.clientX, e.clientY, taskContextItems(card.dataset.taskId));
+    return;
+  }
+
+  const titleEl = e.target.closest('.project-title');
+  if (titleEl){
+    const projectId = titleEl.closest('.project').dataset.projectId;
+    if (projectId === GENERAL_ID || projectId === HABITS_PROJECT_ID) return;
+    showContextMenu(e.clientX, e.clientY, projectContextItems(projectId));
+  }
+});
+
+function taskContextItems(taskId){
+  return [
+    { label: 'Готово', action: () => setTaskStatus(taskId, 'done') },
+    { label: 'Архив', action: () => setTaskStatus(taskId, 'archived') },
+    { label: 'Удалить', action: () => deleteTaskNow(taskId), danger: true },
+  ];
+}
+function projectContextItems(projectId){
+  return [
+    { label: 'Удалить проект', action: () => deleteProjectNow(projectId), danger: true },
+  ];
+}
+
+function showContextMenu(x, y, items){
+  ctxMenu.innerHTML = '';
+  for (const item of items){
+    const row = el('div', 'ctx-item' + (item.danger ? ' danger' : ''), item.label);
+    row.addEventListener('click', () => { hideContextMenu(); item.action(); });
+    ctxMenu.appendChild(row);
+  }
+  ctxMenu.style.display = 'block';
+  const menuW = 160, menuH = items.length * 38 + 12;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  ctxMenu.style.left = Math.min(x, vw - menuW - 10) + 'px';
+  ctxMenu.style.top = Math.min(y, vh - menuH - 10) + 'px';
+}
+function hideContextMenu(){ ctxMenu.style.display = 'none'; }
+document.addEventListener('pointerdown', (e) => {
+  if (ctxMenu.style.display !== 'none' && !ctxMenu.contains(e.target)) hideContextMenu();
+});
+document.addEventListener('contextmenu', (e) => {
+  if (!e.target.closest('.task-card, .project-title')) hideContextMenu();
+});
+
+function playCompletionAnimation(taskId){
+  return new Promise((resolve) => {
+    const cardEl = activeContainer().querySelector(`.task-card[data-task-id="${taskId}"]`);
+    if (!cardEl || cardEl.classList.contains('editing')){ resolve(); return; }
+    const burst = el('div', 'check-burst', '<svg width="36" height="36" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" fill="#3FA65B"/><path d="M7 12.4l3.2 3.2L17 8.8" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+    cardEl.appendChild(burst);
+    cardEl.classList.add('completing');
+    setTimeout(resolve, 380);
+  });
+}
+
+async function setTaskStatus(taskId, status){
+  const task = state.tasks.find(t => t.id === taskId);
+  if (!task) return;
+  if (status === 'done') await playCompletionAnimation(taskId);
+  task.status = status;
+  if (status === 'done') task.completedAt = Date.now();
+  if (status === 'archived') task.archivedAt = Date.now();
+  renderCanvas();
+  await api.updateTask(taskId, { status });
+  if (state.panelOpen) renderPanel();
+}
+async function deleteTaskNow(taskId){
+  state.tasks = state.tasks.filter(t => t.id !== taskId);
+  renderCanvas();
+  await api.deleteTask(taskId);
+}
+async function deleteProjectNow(projectId){
+  state.projects = state.projects.filter(p => p.id !== projectId);
+  for (const t of state.tasks) if (t.projectId === projectId) t.projectId = GENERAL_ID;
+  if (state.mobileActiveProjectId === projectId) state.mobileActiveProjectId = null;
+  renderCanvas();
+  const { projects } = await api.deleteProject(projectId);
+  if (projects) state.projects = projects;
+}
+
+// ───────────────────────────── Paste handling ─────────────────────────────
+
+function downscaleImage(file, maxDim, quality){
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim){
+          if (width > height){ height = Math.round(height * maxDim / width); width = maxDim; }
+          else { width = Math.round(width * maxDim / height); height = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function insertHtmlAtCaret(target, html){
+  target.focus();
+  document.execCommand('insertHTML', false, html);
+}
+function insertTextAtCaret(target, text){
+  target.focus();
+  document.execCommand('insertText', false, text);
+}
+
+function setupPasteHandler(target){
+  target.addEventListener('paste', async (e) => {
+    e.preventDefault();
+    const cd = e.clipboardData;
+    if (!cd) return;
+
+    for (const item of cd.items){
+      if (item.kind === 'file' && item.type.startsWith('image/')){
+        const file = item.getAsFile();
+        const dataUrl = await downscaleImage(file, 900, 0.82);
+        insertHtmlAtCaret(target, `<img src="${dataUrl}">`);
+        return;
+      }
+    }
+
+    const html = cd.getData('text/html');
+    const text = cd.getData('text/plain');
+
+    if (html){
+      insertHtmlAtCaret(target, sanitizeFragment(html));
+      return;
+    }
+
+    const trimmed = (text || '').trim();
+    if (/^https?:\/\/\S+$/i.test(trimmed)){
+      const id = 'lp-' + Math.random().toString(36).slice(2);
+      insertHtmlAtCaret(target, `<a href="${trimmed}">${trimmed}</a><div class="link-preview" id="${id}" contenteditable="false"></div><br>`);
+      try {
+        const preview = await api.linkPreview(trimmed);
+        const node = document.getElementById(id);
+        if (node){
+          node.innerHTML = (preview.image ? `<img src="${preview.image}">` : '') + `<span>${escapeHtml(preview.title || trimmed)}</span>`;
+        }
+      } catch {}
+      return;
+    }
+
+    if (text) insertTextAtCaret(target, text);
+  });
+}
+
+// ───────────────────────────── Bottom composer ─────────────────────────────
+
+const composerInput = $('#composer-input');
+const btnProject = $('#btn-project');
+const btnPriority = $('#btn-priority');
+const btnDate = $('#btn-date');
+const dateBadge = $('#date-badge');
+const projectBadge = $('#project-badge');
+const btnSubmit = $('#btn-submit');
+const priorityDotPreview = $('#priority-dot-preview');
+
+setupPasteHandler(composerInput);
+
+composerInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey){
+    e.preventDefault();
+    submitComposer();
+  }
+});
+
+btnDate.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if ($('.popover[data-kind="calendar"]')) { closeAllPopovers(); return; }
+  closeAllPopovers();
+  openCalendarPopover(btnDate, state.composer.date, {
+    onSelect: (d) => { state.composer.date = d; updateDateBadge(); },
+    onClear: () => { state.composer.date = null; updateDateBadge(); },
+  });
+});
+
+function updateDateBadge(){
+  if (state.composer.date){
+    const d = new Date(state.composer.date + 'T00:00:00');
+    dateBadge.textContent = d.getDate();
+    dateBadge.style.display = 'block';
+    btnDate.classList.add('filled');
+  } else {
+    dateBadge.style.display = 'none';
+    btnDate.classList.remove('filled');
+  }
+}
+
+function updateProjectBadge(){
+  const p = projectById(state.composer.projectId);
+  if (p){
+    projectBadge.textContent = p.name.trim().slice(0, 2).toUpperCase();
+    projectBadge.style.display = 'block';
+    btnProject.classList.add('filled');
+  } else {
+    projectBadge.style.display = 'none';
+    btnProject.classList.remove('filled');
+  }
+}
+
+// ── Auto-select project when zooming into it (desktop) ──
+
+const FOCUS_ZOOM_THRESHOLD = 1.05;
+
+function centerProjectId(){
+  const vw = viewport.clientWidth, vh = viewport.clientHeight;
+  const cx = (vw/2 - state.view.x) / state.view.zoom;
+  const cy = (vh/2 - state.view.y) / state.view.zoom;
+  for (const pid in state.projectLayout){
+    if (pid === HABITS_PROJECT_ID) continue;
+    const l = state.projectLayout[pid];
+    if (cx >= l.x && cx <= l.x + l.w && cy >= l.y && cy <= l.y + l.h) return pid;
+  }
+  return null;
+}
+
+function syncFocusedProject(){
+  if (isMobile()) return;
+  if (state.view.zoom < FOCUS_ZOOM_THRESHOLD){
+    if (state.composer.projectId){
+      state.composer.projectId = null;
+      updateProjectBadge();
+    }
+    return;
+  }
+  const pid = centerProjectId();
+  if (pid && pid !== state.composer.projectId){
+    state.composer.projectId = pid;
+    updateProjectBadge();
+  }
+}
+
+function updatePriorityPreview(){
+  const p = priorityById(state.composer.priorityId);
+  if (p){
+    priorityDotPreview.style.background = p.color;
+    priorityDotPreview.style.border = 'none';
+    btnPriority.classList.add('filled');
+  } else {
+    priorityDotPreview.style.background = 'transparent';
+    priorityDotPreview.style.border = '1.6px solid currentColor';
+    btnPriority.classList.remove('filled');
+  }
+}
+
+async function submitComposer(){
+  const html = composerInput.innerHTML;
+  const plain = composerInput.innerText.trim();
+  if (!plain && !descHasImage(html)) return;
+
+  const firstBreak = plain.indexOf('\n');
+  const firstLine = (firstBreak === -1 ? plain : plain.slice(0, firstBreak)).trim();
+  const hasMore = firstBreak !== -1 || /<img|link-preview/.test(html);
+
+  const title = firstLine || 'Без названия';
+  const description = hasMore ? sanitizeFragment(html) : '';
+
+  const payload = { title, description, priorityId: state.composer.priorityId || null, dueDate: state.composer.date || null };
+  const selectedProject = projectById(state.composer.projectId);
+  if (selectedProject && selectedProject.pending){
+    payload.newProjectName = selectedProject.name;
+  } else {
+    payload.projectId = state.composer.projectId || GENERAL_ID;
+  }
+
+  composerInput.innerHTML = '';
+
+  const { task, projects } = await api.createTask(payload);
+  if (projects) state.projects = projects;
+  state.tasks.push(task);
+
+  state.composer = { projectId: null, priorityId: null, date: null };
+  updatePriorityPreview();
+  updateDateBadge();
+  updateProjectBadge();
+  renderCanvas();
+  syncFocusedProject();
+}
+
+btnSubmit.addEventListener('click', submitComposer);
+
+// ── Project popover ──
+
+function closeAllPopovers(){
+  $all('.popover').forEach(p => p.remove());
+  $all('.veil').forEach(v => v.remove());
+}
+
+btnProject.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if ($('.popover[data-kind="project"]')) { closeAllPopovers(); return; }
+  closeAllPopovers();
+  openProjectPopover();
+});
+
+function openProjectPopover(){
+  const veil = el('div', 'veil');
+  veil.addEventListener('pointerdown', closeAllPopovers);
+  document.body.appendChild(veil);
+
+  const pop = el('div', 'popover');
+  pop.dataset.kind = 'project';
+  pop.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+  const list = el('div', 'popover-list');
+  const sorted = [...state.projects].sort((a,b) => a.order - b.order);
+  for (const project of sorted){
+    const row = el('div', 'popover-item' + (state.composer.projectId === project.id || (!state.composer.projectId && project.id === GENERAL_ID) ? ' selected' : ''));
+    row.appendChild(el('span', 'p-name', escapeHtml(project.name)));
+    row.addEventListener('click', () => {
+      state.composer.projectId = project.id;
+      updateProjectBadge();
+      closeAllPopovers();
+    });
+    list.appendChild(row);
+  }
+  pop.appendChild(list);
+
+  const addRow = el('div', 'popover-add');
+  const input = el('input');
+  input.type = 'text';
+  input.placeholder = 'Новый проект…';
+  input.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter' && input.value.trim()){
+      e.preventDefault();
+      const name = input.value.trim();
+      const existing = state.projects.find(p => p.name.toLowerCase() === name.toLowerCase());
+      if (existing){
+        state.composer.projectId = existing.id;
+      } else {
+        const tempId = 'pending-' + Math.random().toString(36).slice(2);
+        state.projects.push({ id: tempId, name, order: state.projects.length, createdAt: Date.now(), pending: true });
+        state.composer.projectId = tempId;
+      }
+      updateProjectBadge();
+      closeAllPopovers();
+    }
+  });
+  addRow.appendChild(input);
+  pop.appendChild(addRow);
+
+  document.body.appendChild(pop);
+  positionPopover(pop, btnProject);
+  input.focus();
+}
+
+function positionPopover(pop, anchor){
+  const rect = anchor.getBoundingClientRect();
+  const popRect = pop.getBoundingClientRect();
+  let left = rect.left + rect.width/2 - popRect.width/2;
+  left = Math.max(10, Math.min(left, window.innerWidth - popRect.width - 10));
+  let top = rect.top - popRect.height - 10;
+  if (top < 10) top = rect.bottom + 10;
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
+}
+
+// ── Calendar popover ──
+
+function openCalendarPopover(anchorEl, currentValue, { onSelect, onClear }){
+  const selectedDate = currentValue ? new Date(currentValue + 'T00:00:00') : null;
+  let viewYear, viewMonth;
+  if (selectedDate){ viewYear = selectedDate.getFullYear(); viewMonth = selectedDate.getMonth(); }
+  else { const now = new Date(); viewYear = now.getFullYear(); viewMonth = now.getMonth(); }
+
+  const veil = el('div', 'veil');
+  veil.addEventListener('pointerdown', closeAllPopovers);
+  document.body.appendChild(veil);
+
+  const pop = el('div', 'popover cal-popover');
+  pop.dataset.kind = 'calendar';
+  pop.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+  const header = el('div', 'cal-header');
+  const prevBtn = el('button', null, '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+  const label = el('div', 'cal-month-label');
+  const nextBtn = el('button', null, '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+  header.appendChild(prevBtn); header.appendChild(label); header.appendChild(nextBtn);
+  pop.appendChild(header);
+
+  const weekdaysRow = el('div', 'cal-weekdays');
+  for (const w of WEEKDAYS_SHORT) weekdaysRow.appendChild(el('span', null, w));
+  pop.appendChild(weekdaysRow);
+
+  const grid = el('div', 'cal-grid');
+  pop.appendChild(grid);
+
+  const footer = el('div', 'cal-footer');
+  const clearBtn = el('div', 'cal-clear', 'Очистить дату');
+  clearBtn.addEventListener('click', () => { onClear(); closeAllPopovers(); });
+  footer.appendChild(clearBtn);
+  if (currentValue) pop.appendChild(footer);
+
+  function renderGrid(){
+    grid.innerHTML = '';
+    label.textContent = `${MONTHS_NOM[viewMonth]} ${viewYear}`;
+    const firstDow = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7;
+    const totalDays = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const totalCells = Math.ceil((firstDow + totalDays) / 7) * 7;
+    const todayKey = toDateKey(new Date());
+
+    for (let i = 0; i < totalCells; i++){
+      const dayNum = i - firstDow + 1;
+      const dateObj = new Date(viewYear, viewMonth, dayNum);
+      const key = toDateKey(dateObj);
+      const outside = dayNum < 1 || dayNum > totalDays;
+
+      const cell = el('div', 'cal-day' + (outside ? ' outside' : '') + (key === todayKey ? ' today' : '') + (key === currentValue ? ' selected' : ''), String(dateObj.getDate()));
+      cell.addEventListener('click', () => {
+        onSelect(key);
+        closeAllPopovers();
+      });
+      grid.appendChild(cell);
+    }
+  }
+
+  prevBtn.addEventListener('click', () => {
+    viewMonth--; if (viewMonth < 0){ viewMonth = 11; viewYear--; }
+    renderGrid();
+  });
+  nextBtn.addEventListener('click', () => {
+    viewMonth++; if (viewMonth > 11){ viewMonth = 0; viewYear++; }
+    renderGrid();
+  });
+
+  renderGrid();
+  document.body.appendChild(pop);
+  positionPopover(pop, anchorEl);
+}
+
+// ── Priority popover ──
+
+btnPriority.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if ($('.popover[data-kind="priority"]')) { closeAllPopovers(); return; }
+  closeAllPopovers();
+  openPriorityPopover(btnPriority, state.composer.priorityId, (id) => {
+    state.composer.priorityId = id;
+    updatePriorityPreview();
+  });
+});
+
+function randomPastel(){
+  const h = Math.floor(Math.random()*360);
+  return `hsl(${h}, 55%, 78%)`;
+}
+function hslToHex(hsl){
+  // fallback: keep as-is, <input type=color> requires hex; convert basic hsl() string via canvas
+  const div = document.createElement('div');
+  div.style.color = hsl;
+  document.body.appendChild(div);
+  const rgb = getComputedStyle(div).color.match(/\d+/g).map(Number);
+  document.body.removeChild(div);
+  return '#' + rgb.slice(0,3).map(v => v.toString(16).padStart(2,'0')).join('');
+}
+
+function openPriorityPopover(anchorEl, currentId, onSelect){
+  const veil = el('div', 'veil');
+  veil.addEventListener('pointerdown', closeAllPopovers);
+  document.body.appendChild(veil);
+
+  const pop = el('div', 'popover');
+  pop.dataset.kind = 'priority';
+  pop.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+  const list = el('div', 'popover-list');
+
+  const noneRow = el('div', 'popover-item' + (!currentId ? ' selected' : ''));
+  noneRow.appendChild(el('span', 'p-dot', ''));
+  noneRow.querySelector('.p-dot').style.border = '1.4px solid var(--border-strong)';
+  noneRow.appendChild(el('span', 'p-name', 'Без приоритета'));
+  noneRow.addEventListener('click', () => { onSelect(null); closeAllPopovers(); });
+  list.appendChild(noneRow);
+
+  const sorted = [...state.priorities].sort((a,b) => a.order - b.order);
+  for (const p of sorted){
+    const row = el('div', 'popover-item' + (currentId === p.id ? ' selected' : ''));
+
+    const colorInput = el('input');
+    colorInput.type = 'color';
+    colorInput.className = 'p-color-input';
+    colorInput.value = p.color.startsWith('#') ? p.color : hslToHex(p.color);
+    colorInput.addEventListener('click', (e) => e.stopPropagation());
+    colorInput.addEventListener('input', async () => {
+      p.color = colorInput.value;
+      renderCanvas();
+      updatePriorityPreview();
+      await api.updatePriority(p.id, { color: p.color });
+    });
+    row.appendChild(colorInput);
+
+    const nameSpan = el('span', 'p-name', escapeHtml(p.name));
+    row.appendChild(nameSpan);
+
+    const del = el('div', 'p-del', '&times;');
+    del.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      state.priorities = state.priorities.filter(x => x.id !== p.id);
+      for (const t of state.tasks) if (t.priorityId === p.id) t.priorityId = null;
+      renderCanvas();
+      if (currentId === p.id) onSelect(null);
+      closeAllPopovers();
+      await api.deletePriority(p.id);
+    });
+    row.appendChild(del);
+
+    row.addEventListener('click', () => {
+      onSelect(p.id);
+      closeAllPopovers();
+    });
+
+    list.appendChild(row);
+  }
+  pop.appendChild(list);
+
+  const addRow = el('div', 'popover-add');
+  const colorInput = el('input');
+  colorInput.type = 'color';
+  colorInput.className = 'p-color-input';
+  colorInput.value = hslToHex(randomPastel());
+  addRow.appendChild(colorInput);
+
+  const nameInput = el('input');
+  nameInput.type = 'text';
+  nameInput.placeholder = 'Новый приоритет…';
+  nameInput.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter' && nameInput.value.trim()){
+      e.preventDefault();
+      const { priority, priorities } = await api.createPriority({ name: nameInput.value.trim(), color: colorInput.value });
+      state.priorities = priorities;
+      onSelect(priority.id);
+      closeAllPopovers();
+    }
+  });
+  addRow.appendChild(nameInput);
+  pop.appendChild(addRow);
+
+  document.body.appendChild(pop);
+  positionPopover(pop, anchorEl);
+}
+
+// ── Smart pick popover ──
+
+function computeSmartPicks(){
+  const todayKey = toDateKey(new Date());
+  const active = state.tasks.filter(t => t.status === 'active');
+  const prioRank = (t) => {
+    const p = priorityById(t.priorityId);
+    return p ? p.order : 999;
+  };
+  const sortFn = (a, b) => prioRank(a) - prioRank(b) || a.createdAt - b.createdAt;
+
+  const dueToday = active.filter(t => t.dueDate === todayKey).sort(sortFn);
+  const overdue = active.filter(t => t.dueDate && t.dueDate < todayKey).sort(sortFn);
+  const rest = active.filter(t => !t.dueDate).sort(sortFn);
+
+  return [...dueToday, ...overdue, ...rest].slice(0, 5);
+}
+
+const btnSmartPick = $('#btn-smart-pick');
+btnSmartPick.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if ($('.popover[data-kind="smart-pick"]')) { closeAllPopovers(); return; }
+  closeAllPopovers();
+  openSmartPickPopover();
+});
+
+function openSmartPickPopover(){
+  const veil = el('div', 'veil');
+  veil.addEventListener('pointerdown', closeAllPopovers);
+  document.body.appendChild(veil);
+
+  const pop = el('div', 'popover smart-pick-popover');
+  pop.dataset.kind = 'smart-pick';
+  pop.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+  const picks = computeSmartPicks();
+  const list = el('div', 'popover-list');
+
+  if (!picks.length){
+    list.appendChild(el('div', 'panel-empty', 'Активных задач нет'));
+  } else {
+    for (const task of picks){
+      const row = el('div', 'popover-item smart-pick-item');
+      const priority = priorityById(task.priorityId);
+      const dot = el('span', 'p-dot');
+      dot.style.background = priority ? priority.color : 'transparent';
+      if (!priority) dot.style.border = '1.4px solid var(--border-strong)';
+      row.appendChild(dot);
+
+      const textWrap = el('div', 'smart-pick-text');
+      textWrap.appendChild(el('div', 'smart-pick-title', escapeHtml(task.title)));
+      const proj = projectById(task.projectId);
+      if (proj) textWrap.appendChild(el('div', 'smart-pick-project', escapeHtml(proj.name)));
+      row.appendChild(textWrap);
+
+      row.addEventListener('click', () => {
+        closeAllPopovers();
+        if (!isMobile() && task.projectId !== HABITS_PROJECT_ID) zoomToProject(task.projectId);
+        else if (isMobile()){ state.mobileActiveProjectId = task.projectId; renderMobileList(); }
+      });
+      list.appendChild(row);
+    }
+  }
+  pop.appendChild(list);
+
+  document.body.appendChild(pop);
+  positionPopover(pop, btnSmartPick);
+}
+
+// ── Timer ──
+
+const TIMER_KEY = 'mylife:timer:v1';
+let timerInterval = null;
+let timerChimeInterval = null;
+
+function loadStoredTimer(){
+  try { return JSON.parse(localStorage.getItem(TIMER_KEY)); } catch { return null; }
+}
+function saveStoredTimer(data){ localStorage.setItem(TIMER_KEY, JSON.stringify(data)); }
+function clearStoredTimer(){ localStorage.removeItem(TIMER_KEY); }
+
+function startTimer(minutes){
+  saveStoredTimer({ endAt: Date.now() + minutes * 60000, minutes });
+  runTimerLoop();
+}
+
+function stopTimer(){
+  clearStoredTimer();
+  if (timerInterval) clearInterval(timerInterval);
+  if (timerChimeInterval) clearInterval(timerChimeInterval);
+  timerInterval = null;
+  timerChimeInterval = null;
+  const w = $('#timer-widget');
+  if (w) w.remove();
+  $('#btn-timer').classList.remove('active');
+}
+
+function ensureTimerWidget(){
+  if ($('#timer-widget')) return;
+  const w = el('div');
+  w.id = 'timer-widget';
+  w.innerHTML = '<span class="timer-time"></span><button class="timer-stop" title="Остановить">&times;</button>';
+  document.body.appendChild(w);
+  w.querySelector('.timer-stop').addEventListener('click', stopTimer);
+  $('#btn-timer').classList.add('active');
+}
+
+function updateTimerDisplay(){
+  const data = loadStoredTimer();
+  if (!data){ stopTimer(); return; }
+  const widget = $('#timer-widget');
+  if (!widget) return;
+  const diffMs = data.endAt - Date.now();
+  const overtime = diffMs < 0;
+  const absSec = Math.floor(Math.abs(diffMs) / 1000);
+  const mm = Math.floor(absSec / 60), ss = absSec % 60;
+  widget.querySelector('.timer-time').textContent = (overtime ? '−' : '') + `${mm}:${String(ss).padStart(2,'0')}`;
+  widget.classList.toggle('overtime', overtime);
+
+  if (overtime && !timerChimeInterval){
+    playChime();
+    timerChimeInterval = setInterval(playChime, 60000);
+  }
+}
+
+function runTimerLoop(){
+  const data = loadStoredTimer();
+  if (!data) return;
+  ensureTimerWidget();
+  if (timerInterval) clearInterval(timerInterval);
+  updateTimerDisplay();
+  timerInterval = setInterval(updateTimerDisplay, 1000);
+}
+
+function playChime(){
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const now = ctx.currentTime;
+    [880, 660].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const t0 = now + i * 0.32;
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.linearRampToValueAtTime(0.16, t0 + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(t0);
+      osc.stop(t0 + 0.55);
+    });
+    setTimeout(() => ctx.close(), 1400);
+  } catch {}
+}
+
+function openTimerPopover(anchorEl){
+  const veil = el('div', 'veil');
+  veil.addEventListener('pointerdown', closeAllPopovers);
+  document.body.appendChild(veil);
+
+  const pop = el('div', 'popover');
+  pop.dataset.kind = 'timer';
+  pop.style.minWidth = '210px';
+  pop.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+  let minutes = 25;
+  const stepper = el('div', 'duration-stepper');
+  const minus = el('button', 'duration-step', '−');
+  const display = el('div', 'duration-value');
+  const plus = el('button', 'duration-step', '+');
+  stepper.appendChild(minus); stepper.appendChild(display); stepper.appendChild(plus);
+  pop.appendChild(stepper);
+
+  function render(){ display.textContent = `${minutes} мин`; }
+  render();
+  minus.addEventListener('click', () => { minutes = Math.max(5, minutes - 5); render(); });
+  plus.addEventListener('click', () => { minutes = Math.min(180, minutes + 5); render(); });
+
+  const presets = el('div', 'duration-presets');
+  [5, 10, 15, 25, 45, 60].forEach(m => {
+    const chip = el('div', 'duration-chip', String(m));
+    chip.addEventListener('click', () => { minutes = m; render(); });
+    presets.appendChild(chip);
+  });
+  pop.appendChild(presets);
+
+  const footer = el('div', 'cal-footer');
+  const startLink = el('div', 'cal-clear', 'Начать');
+  startLink.style.fontWeight = '600';
+  startLink.addEventListener('click', () => { startTimer(minutes); closeAllPopovers(); });
+  footer.appendChild(startLink);
+  pop.appendChild(footer);
+
+  document.body.appendChild(pop);
+  positionPopover(pop, anchorEl);
+}
+
+const btnTimer = $('#btn-timer');
+btnTimer.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (loadStoredTimer()) return;
+  if ($('.popover[data-kind="timer"]')) { closeAllPopovers(); return; }
+  closeAllPopovers();
+  openTimerPopover(btnTimer);
+});
+
+// ───────────────────────────── Day status ─────────────────────────────
+// Not tasks — just timestamped "started work / break / woke up / went to
+// sleep" markers, mirroring the same four quick actions available in the
+// Telegram bot. Logged into the same timeline shown in the Progress panel.
+
+const STATUS_OPTIONS = [
+  { statusType: 'work_start', label: '🟢 Начал работу' },
+  { statusType: 'break', label: '☕ Ушёл отдыхать' },
+  { statusType: 'wake', label: '🌅 Проснулся' },
+  { statusType: 'sleep', label: '😴 Лёг спать' },
+];
+
+function openStatusPopover(anchorEl){
+  const veil = el('div', 'veil');
+  veil.addEventListener('pointerdown', closeAllPopovers);
+  document.body.appendChild(veil);
+
+  const pop = el('div', 'popover');
+  pop.dataset.kind = 'status';
+  pop.style.minWidth = '200px';
+  pop.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+  const row = el('div', 'status-chip-row');
+  STATUS_OPTIONS.forEach(opt => {
+    const chip = el('button', 'status-chip', opt.label);
+    chip.addEventListener('click', async () => {
+      chip.disabled = true;
+      const { elapsedText, extraLogs } = await api.logStatus(opt.statusType);
+      if (extraLogs) state.extraLogs = extraLogs;
+      pop.innerHTML = '';
+      pop.appendChild(el('div', 'status-confirm', `Записал: ${opt.label}${elapsedText ? `<br>${escapeHtml(elapsedText)}` : ''}`));
+      if (state.panelOpen === 'progress') renderPanel();
+      setTimeout(closeAllPopovers, 1400);
+    });
+    row.appendChild(chip);
+  });
+  pop.appendChild(row);
+
+  document.body.appendChild(pop);
+  positionPopover(pop, anchorEl);
+}
+
+const btnStatus = $('#btn-status');
+btnStatus.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if ($('.popover[data-kind="status"]')) { closeAllPopovers(); return; }
+  closeAllPopovers();
+  openStatusPopover(btnStatus);
+});
+
+// ───────────────────────────── Right panel ─────────────────────────────
+
+$all('.rail-btn[data-panel]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const panel = btn.dataset.panel;
+    if (state.panelOpen === panel){
+      state.panelOpen = null;
+    } else {
+      state.panelOpen = panel;
+    }
+    updatePanel();
+  });
+});
+
+const rightPanel = $('#right-panel');
+const progressNav = $('#progress-nav');
+const panelList = $('#panel-list');
+attachThinScroll(panelList);
+
+document.addEventListener('pointerdown', (e) => {
+  if (!state.panelOpen) return;
+  if (e.target.closest('#right-panel') || e.target.closest('.rail-btn')) return;
+  if (e.target.closest('.popover') || e.target.closest('.veil')) return;
+  state.panelOpen = null;
+  updatePanel();
+});
+
+$('#week-prev').addEventListener('click', () => {
+  state.progressWeekStart.setDate(state.progressWeekStart.getDate() - 7);
+  renderPanel();
+});
+$('#week-next').addEventListener('click', () => {
+  state.progressWeekStart.setDate(state.progressWeekStart.getDate() + 7);
+  renderPanel();
+});
+
+function updatePanel(){
+  $all('.rail-btn').forEach(b => b.classList.toggle('active', b.dataset.panel === state.panelOpen));
+  rightPanel.classList.toggle('open', !!state.panelOpen);
+  if (state.panelOpen) renderPanel();
+}
+
+function renderPanel(){
+  progressNav.style.display = state.panelOpen === 'progress' ? 'flex' : 'none';
+  panelList.innerHTML = '';
+
+  if (state.panelOpen === 'progress'){
+    const start = state.progressWeekStart;
+    const end = new Date(start); end.setDate(end.getDate() + 7);
+    $('#week-label').textContent = `${fmtShort(start)} – ${fmtShort(new Date(end.getTime() - 86400000))}`;
+
+    const done = state.tasks.filter(t => t.status === 'done' && t.completedAt >= start.getTime() && t.completedAt < end.getTime());
+    const byDateKey = {};
+    for (const t of done){
+      (byDateKey[toDateKey(new Date(t.completedAt))] ||= []).push(t);
+    }
+    const extraByDateKey = {};
+    for (const entry of state.extraLogs){
+      (extraByDateKey[entry.dateKey] ||= []).push(entry);
+    }
+
+    const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
+    const days = [];
+    for (let i = 6; i >= 0; i--){
+      const d = new Date(start); d.setDate(d.getDate() + i);
+      if (d.getTime() <= todayMidnight.getTime()) days.push(d);
+    }
+
+    for (const d of days){
+      const key = toDateKey(d);
+      panelList.appendChild(buildProgressDayGroup(d, key, byDateKey[key] || [], extraByDateKey[key] || []));
+    }
+    if (!days.length){
+      panelList.appendChild(el('div', 'panel-empty', 'Пока пусто'));
+    }
+  } else if (state.panelOpen === 'archive'){
+    const archived = state.tasks.filter(t => t.status === 'archived');
+    if (!archived.length){
+      panelList.appendChild(el('div', 'panel-empty', 'Архив пуст'));
+      return;
+    }
+    const byProject = {};
+    for (const t of archived) (byProject[t.projectId] ||= []).push(t);
+    const projectIds = Object.keys(byProject).sort((a,b) => (projectById(a)?.order ?? 0) - (projectById(b)?.order ?? 0));
+    for (const pid of projectIds){
+      const pg = el('div', 'panel-project-group');
+      const proj = projectById(pid);
+      pg.appendChild(el('div', 'panel-project-title', escapeHtml(proj ? proj.name : 'Общие')));
+      for (const t of byProject[pid]){
+        pg.appendChild(buildPanelTaskLine(t, { showAge: false, showRestore: true }));
+      }
+      panelList.appendChild(pg);
+    }
+  }
+}
+
+// ── Habits ──
+
+function periodBucketCount(periodDays){
+  return periodDays === 1 ? 7 : periodDays === 7 ? 8 : 6;
+}
+function periodBucketDate(d, periodDays){
+  if (periodDays === 7) return weekStartMonday(d);
+  if (periodDays === 30) return new Date(d.getFullYear(), d.getMonth(), 1);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+function periodBucketEnd(bucketStart, periodDays){
+  if (periodDays === 30) return new Date(bucketStart.getFullYear(), bucketStart.getMonth() + 1, 1);
+  const end = new Date(bucketStart);
+  end.setDate(end.getDate() + periodDays);
+  return end;
+}
+function habitBucketLogDate(habit, bucketStart){
+  const end = periodBucketEnd(bucketStart, habit.periodDays);
+  return habit.log.find(dstr => {
+    const d = new Date(dstr + 'T00:00:00');
+    return d >= bucketStart && d < end;
+  }) || null;
+}
+async function toggleHabitBucket(habit, bucketStart){
+  const existing = habitBucketLogDate(habit, bucketStart);
+  const toggleDate = existing || toDateKey(bucketStart);
+  if (existing) habit.log = habit.log.filter(d => d !== existing);
+  else habit.log.push(toggleDate);
+  renderCanvas();
+  await api.updateHabit(habit.id, { toggleDate });
+}
+
+function habitMatchesDay(habit, date){
+  if (habit.periodDays !== 1) return true;
+  if (!habit.daysOfWeek || !habit.daysOfWeek.length) return true;
+  return habit.daysOfWeek.includes((date.getDay() + 6) % 7);
+}
+
+// Most recent `count` qualifying occurrences ending today, regardless of creation date — used for cell display
+// so a freshly-created habit whose creation day doesn't match its schedule still shows a populated grid.
+function habitRecentDates(habit, count){
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dates = [];
+
+  if (habit.periodDays !== 1){
+    let b = periodBucketDate(today, habit.periodDays);
+    for (let i = 0; i < count; i++){
+      dates.unshift(new Date(b));
+      if (habit.periodDays === 30) b.setMonth(b.getMonth() - 1);
+      else b.setDate(b.getDate() - habit.periodDays);
+    }
+    return dates;
+  }
+
+  const cursor = new Date(today);
+  let guard = 0;
+  while (dates.length < count && guard < 3000){
+    if (habitMatchesDay(habit, cursor)) dates.unshift(new Date(cursor));
+    cursor.setDate(cursor.getDate() - 1);
+    guard++;
+  }
+  return dates;
+}
+
+function habitCellDates(habit, count){
+  return habitRecentDates(habit, count);
+}
+
+function habitCellLabel(date, habit){
+  if (habit.periodDays === 1) return `${WEEKDAYS_SHORT[(date.getDay() + 6) % 7]} ${date.getDate()}`;
+  if (habit.periodDays === 7){
+    const end = new Date(periodBucketEnd(date, 7).getTime() - 86400000);
+    return `${date.getDate()}–${end.getDate()}`;
+  }
+  return MONTHS_NOM[date.getMonth()].slice(0, 3);
+}
+
+function openHabitSchedulePopover(anchorEl, habit){
+  const veil = el('div', 'veil');
+  veil.addEventListener('pointerdown', closeAllPopovers);
+  document.body.appendChild(veil);
+
+  const pop = el('div', 'popover');
+  pop.dataset.kind = 'habit-schedule';
+  pop.style.minWidth = '230px';
+  pop.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+  const choice = el('div', 'habit-period-choice');
+  const weekdayWrap = el('div', 'habit-weekday-choice');
+
+  function renderWeekdays(){
+    weekdayWrap.innerHTML = '';
+    weekdayWrap.style.display = habit.periodDays === 1 ? 'flex' : 'none';
+    WEEKDAYS_SHORT.forEach((label, idx) => {
+      const chip = el('div', 'habit-weekday-chip' + ((habit.daysOfWeek || []).includes(idx) ? ' active' : ''), label);
+      chip.addEventListener('click', async () => {
+        const days = new Set(habit.daysOfWeek || []);
+        if (days.has(idx)) days.delete(idx); else days.add(idx);
+        habit.daysOfWeek = days.size ? [...days].sort() : null;
+        renderWeekdays();
+        renderCanvas();
+        await api.updateHabit(habit.id, { daysOfWeek: habit.daysOfWeek });
+      });
+      weekdayWrap.appendChild(chip);
+    });
+  }
+
+  const periodEls = [[1, 'Дн'], [7, 'Нед'], [30, 'Мес']].map(([days, label]) => {
+    const b = el('div', 'habit-period-btn' + (days === habit.periodDays ? ' active' : ''), label);
+    b.addEventListener('click', async () => {
+      habit.periodDays = days;
+      periodEls.forEach(o => o.el.classList.toggle('active', o.days === habit.periodDays));
+      renderWeekdays();
+      renderCanvas();
+      await api.updateHabit(habit.id, { periodDays: days });
+    });
+    choice.appendChild(b);
+    return { el: b, days };
+  });
+
+  pop.appendChild(choice);
+  pop.appendChild(weekdayWrap);
+  renderWeekdays();
+
+  document.body.appendChild(pop);
+  positionPopover(pop, anchorEl);
+}
+
+function buildHabitRow(habit){
+  const row = el('div', 'habit-row');
+
+  const header = el('div', 'habit-header');
+  const nameEl = el('span', 'habit-name', escapeHtml(habit.name));
+  nameEl.title = 'Изменить расписание';
+  nameEl.style.cursor = 'pointer';
+  nameEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeAllPopovers();
+    openHabitSchedulePopover(nameEl, habit);
+  });
+  header.appendChild(nameEl);
+
+  const del = el('div', 'habit-del', '&times;');
+  del.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    state.habits = state.habits.filter(h => h.id !== habit.id);
+    renderCanvas();
+    await api.deleteHabit(habit.id);
+  });
+  header.appendChild(del);
+  row.appendChild(header);
+
+  const cellsWrap = el('div', 'habit-cells');
+  const dates = habitCellDates(habit, periodBucketCount(habit.periodDays));
+  for (const d of dates){
+    const col = el('div', 'habit-cell-col');
+    const done = !!habitBucketLogDate(habit, d);
+    const cell = el('div', 'habit-cell' + (done ? ' done' : ''));
+    cell.title = fmtShort(d);
+    cell.addEventListener('click', () => toggleHabitBucket(habit, d));
+    col.appendChild(cell);
+    col.appendChild(el('div', 'habit-cell-label', habitCellLabel(d, habit)));
+    cellsWrap.appendChild(col);
+  }
+  row.appendChild(cellsWrap);
+  return row;
+}
+
+function buildHabitAddBox(){
+  const addBox = el('div', 'habit-add');
+  const nameInput = el('input');
+  nameInput.type = 'text';
+  nameInput.placeholder = 'Новая привычка…';
+  addBox.appendChild(nameInput);
+
+  const configWrap = el('div', 'habit-add-config');
+  configWrap.style.display = 'none';
+  addBox.appendChild(configWrap);
+
+  const choice = el('div', 'habit-period-choice');
+  const weekdayWrap = el('div', 'habit-weekday-choice');
+  let selectedPeriod = 1;
+  const selectedDays = new Set();
+
+  function renderWeekdayChips(){
+    weekdayWrap.innerHTML = '';
+    weekdayWrap.style.display = selectedPeriod === 1 ? 'flex' : 'none';
+    WEEKDAYS_SHORT.forEach((label, idx) => {
+      const chip = el('div', 'habit-weekday-chip' + (selectedDays.has(idx) ? ' active' : ''), label);
+      chip.addEventListener('mousedown', (e) => e.preventDefault());
+      chip.addEventListener('click', () => {
+        if (selectedDays.has(idx)) selectedDays.delete(idx); else selectedDays.add(idx);
+        renderWeekdayChips();
+      });
+      weekdayWrap.appendChild(chip);
+    });
+  }
+
+  const optionEls = [[1, 'Дн'], [7, 'Нед'], [30, 'Мес']].map(([days, label]) => {
+    const b = el('div', 'habit-period-btn' + (days === selectedPeriod ? ' active' : ''), label);
+    b.addEventListener('mousedown', (e) => e.preventDefault());
+    b.addEventListener('click', () => {
+      selectedPeriod = days;
+      optionEls.forEach(o => o.el.classList.toggle('active', o.days === selectedPeriod));
+      renderWeekdayChips();
+    });
+    choice.appendChild(b);
+    return { el: b, days };
+  });
+  configWrap.appendChild(choice);
+  configWrap.appendChild(weekdayWrap);
+  renderWeekdayChips();
+
+  nameInput.addEventListener('input', () => {
+    configWrap.style.display = nameInput.value.trim() ? 'block' : 'none';
+  });
+
+  nameInput.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter' && nameInput.value.trim()){
+      e.preventDefault();
+      const { habits } = await api.createHabit({
+        name: nameInput.value.trim(),
+        periodDays: selectedPeriod,
+        daysOfWeek: selectedPeriod === 1 && selectedDays.size ? [...selectedDays].sort() : null,
+      });
+      state.habits = habits;
+      renderCanvas();
+    }
+  });
+
+  return addBox;
+}
+
+function buildHabitsBody(){
+  const wrap = el('div', 'habits-body');
+  const sorted = [...state.habits].sort((a,b) => a.order - b.order);
+  if (!sorted.length){
+    wrap.appendChild(el('div', 'panel-empty', 'Пока нет привычек'));
+  }
+  for (const habit of sorted) wrap.appendChild(buildHabitRow(habit));
+  wrap.appendChild(buildHabitAddBox());
+  return wrap;
+}
+
+function buildProgressDayGroup(dateObj, dateKey, doneTasks, extraEntries){
+  const group = el('div', 'panel-day-group');
+
+  const header = el('div', 'panel-day-header');
+  header.appendChild(el('div', 'panel-day-title', dayLabel(dateObj.getTime())));
+  const pencil = el('div', 'panel-day-edit', '<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 20h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>');
+  pencil.title = 'Добавить задачу за этот день';
+  header.appendChild(pencil);
+  group.appendChild(header);
+
+  const byProject = {};
+  for (const t of doneTasks) (byProject[t.projectId] ||= []).push(t);
+  const projectIds = Object.keys(byProject).sort((a,b) => (projectById(a)?.order ?? 0) - (projectById(b)?.order ?? 0));
+  for (const pid of projectIds){
+    const pg = el('div', 'panel-project-group');
+    const proj = projectById(pid);
+    pg.appendChild(el('div', 'panel-project-title', escapeHtml(proj ? proj.name : 'Общие')));
+    for (const t of byProject[pid]) pg.appendChild(buildPanelTaskLine(t, { showAge: true, showRestore: false }));
+    group.appendChild(pg);
+  }
+
+  if (extraEntries.length){
+    const extraWrap = el('div', 'panel-extra-list');
+    for (const entry of extraEntries) extraWrap.appendChild(buildExtraLogLine(entry));
+    group.appendChild(extraWrap);
+  }
+
+  if (!doneTasks.length && !extraEntries.length){
+    group.appendChild(el('div', 'panel-empty', 'Ничего не отмечено'));
+  }
+
+  const addRow = el('div', 'panel-extra-add');
+  addRow.style.display = 'none';
+  const input = el('input');
+  input.type = 'text';
+  input.placeholder = 'Что ещё было сделано в этот день…';
+  addRow.appendChild(input);
+  group.appendChild(addRow);
+
+  pencil.addEventListener('click', () => {
+    const showing = addRow.style.display !== 'none';
+    addRow.style.display = showing ? 'none' : 'block';
+    if (!showing) input.focus();
+  });
+
+  input.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter' && input.value.trim()){
+      e.preventDefault();
+      const text = input.value.trim();
+      input.value = '';
+      const { extraLogs } = await api.createExtraLog({ dateKey, text });
+      state.extraLogs = extraLogs;
+      renderPanel();
+    }
+  });
+
+  return group;
+}
+
+function buildExtraLogLine(entry){
+  const line = el('div', 'panel-task-line');
+  line.appendChild(el('span', 'panel-task-title', escapeHtml(entry.text)));
+  if (entry.createdAt) line.appendChild(el('span', 'panel-task-age', fmtTime(entry.createdAt)));
+  const del = el('div', 'panel-restore', '&times;');
+  del.title = 'Удалить';
+  del.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    state.extraLogs = state.extraLogs.filter(l => l.id !== entry.id);
+    renderPanel();
+    await api.deleteExtraLog(entry.id);
+  });
+  line.appendChild(del);
+  return line;
+}
+
+function buildPanelTaskLine(task, { showAge, showRestore }){
+  const line = el('div', 'panel-task-line');
+  line.appendChild(el('span', 'panel-task-title', escapeHtml(task.title)));
+
+  if (showAge){
+    const timeLabel = task.completedAt ? fmtTime(task.completedAt) : '';
+    line.appendChild(el('span', 'panel-task-age', timeLabel || daysActiveLabel(task.createdAt, task.completedAt)));
+  }
+
+  if (showRestore){
+    const restoreBtn = el('div', 'panel-restore', '<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+    restoreBtn.title = 'Вернуть на доску';
+    restoreBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setTaskStatus(task.id, 'active');
+    });
+    line.appendChild(restoreBtn);
+  }
+
+  return line;
+}
+
+// ───────────────────────────── Keyboard ─────────────────────────────
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape'){
+    if (state.editingTaskId) closeEditor(true);
+    else if ($('.popover')) closeAllPopovers();
+    else if (ctxMenu.style.display !== 'none') hideContextMenu();
+    else if (state.panelOpen){ state.panelOpen = null; updatePanel(); }
+  }
+});
+
+// ───────────────────────────── Morning Focus Lock ─────────────────────────────
+
+const FOCUS_EVENING_HOUR = 18;
+
+function isEveningNow(){
+  return new Date().getHours() >= FOCUS_EVENING_HOUR;
+}
+function tomorrowKey(){
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return toDateKey(d);
+}
+
+let focusLockActive = false;
+let focusTimerInterval = null;
+
+function isFocusDayDismissed(dateKey){
+  try { return localStorage.getItem('mylife:focusDismissed:' + dateKey) === '1'; } catch { return false; }
+}
+function dismissFocusDay(dateKey){
+  try { localStorage.setItem('mylife:focusDismissed:' + dateKey, '1'); } catch {}
+}
+
+function checkFocusFlow(){
+  const todayKey = toDateKey(new Date());
+  const todayFocus = state.focus[todayKey];
+  const todayResolved = todayFocus && todayFocus.tasks.length > 0
+    && todayFocus.tasks.every(t => t.status === 'done' || t.status === 'skipped');
+
+  if (!isFocusDayDismissed(todayKey) && (!todayFocus || !todayResolved)){
+    renderMorningLock(todayKey, todayFocus || null);
+    return;
+  }
+
+  if (isEveningNow() && !state.eveningPromptDismissed){
+    const tKey = tomorrowKey();
+    const tomorrowFocus = state.focus[tKey];
+    if (!tomorrowFocus || tomorrowFocus.tasks.length < 3){
+      renderEveningPrompt(tKey);
+    }
+  }
+}
+
+function buildFocusEntryForm(opts){
+  const wrap = el('div', 'focus-entry');
+  wrap.appendChild(el('div', 'focus-entry-title', opts.title));
+
+  const rows = [];
+  for (let i = 0; i < 3; i++){
+    const row = el('div', 'focus-entry-row');
+    const nameInput = el('input');
+    nameInput.type = 'text';
+    nameInput.className = 'focus-entry-name';
+    nameInput.placeholder = `Задача ${i + 1}`;
+    const estInput = el('input');
+    estInput.type = 'number';
+    estInput.min = '5';
+    estInput.step = '5';
+    estInput.className = 'focus-entry-estimate';
+    estInput.placeholder = 'мин';
+    row.appendChild(nameInput);
+    row.appendChild(estInput);
+    wrap.appendChild(row);
+    rows.push({ nameInput, estInput });
+  }
+
+  const actions = el('div', 'focus-entry-actions');
+  if (opts.allowSkip){
+    const skipBtn = el('button', 'focus-entry-skip', 'Позже');
+    skipBtn.addEventListener('click', () => opts.onSkip());
+    actions.appendChild(skipBtn);
+  }
+  const submitBtn = el('button', 'focus-entry-submit', opts.submitLabel || 'Сохранить');
+  submitBtn.addEventListener('click', () => {
+    const tasks = rows.map(r => ({
+      name: r.nameInput.value.trim(),
+      estimatedMinutes: r.estInput.value ? Math.max(5, Math.round(Number(r.estInput.value) / 5) * 5) : null,
+    }));
+    if (tasks.some(t => !t.name)) return;
+    opts.onSubmit(tasks);
+  });
+  actions.appendChild(submitBtn);
+  wrap.appendChild(actions);
+
+  return wrap;
+}
+
+function renderEveningPrompt(dateKey){
+  if ($('.focus-modal')) return;
+
+  const veil = el('div', 'veil focus-veil');
+  document.body.appendChild(veil);
+
+  const modal = el('div', 'focus-modal');
+  const close = () => { veil.remove(); modal.remove(); };
+  veil.addEventListener('pointerdown', () => {
+    state.eveningPromptDismissed = true;
+    close();
+  });
+
+  modal.appendChild(buildFocusEntryForm({
+    title: 'Какие 3 приоритетные задачи на завтра?',
+    submitLabel: 'Сохранить',
+    allowSkip: true,
+    onSkip: () => {
+      state.eveningPromptDismissed = true;
+      close();
+    },
+    onSubmit: async (tasks) => {
+      const { focus } = await api.setFocusDay(dateKey, tasks);
+      state.focus = focus;
+      close();
+    },
+  }));
+
+  document.body.appendChild(modal);
+}
+
+function closeFocusLock(){
+  focusLockActive = false;
+  document.body.classList.remove('focus-locked');
+  if (focusTimerInterval){ clearInterval(focusTimerInterval); focusTimerInterval = null; }
+  $('#focus-lock-root')?.remove();
+}
+
+function renderMorningLock(dateKey, dayData){
+  if (focusLockActive) return;
+  focusLockActive = true;
+  document.body.classList.add('focus-locked');
+
+  const root = el('div');
+  root.id = 'focus-lock-root';
+  document.body.appendChild(root);
+
+  if (!dayData){
+    root.appendChild(buildFocusEntryForm({
+      title: 'Какие 3 задачи в приоритете сегодня утром?',
+      submitLabel: 'Начать',
+      allowSkip: true,
+      onSkip: () => {
+        dismissFocusDay(dateKey);
+        closeFocusLock();
+      },
+      onSubmit: async (tasks) => {
+        const { focus } = await api.setFocusDay(dateKey, tasks);
+        state.focus = focus;
+        renderFocusExecution(root, dateKey, state.focus[dateKey]);
+      },
+    }));
+  } else {
+    renderFocusExecution(root, dateKey, dayData);
+  }
+}
+
+function focusHistoryLine(t){
+  if (t.status === 'skipped') return `⊘ ${escapeHtml(t.name)} — пропущено`;
+  const pause = t.pausedMinutes ? `, пауза ${t.pausedMinutes} мин` : '';
+  return `✓ ${escapeHtml(t.name)} — ${t.actualMinutes ?? '?'} мин${t.estimatedMinutes ? ` (план ${t.estimatedMinutes})` : ''}${pause}`;
+}
+
+function buildFocusSideCapture(dateKey){
+  const wrap = el('div', 'focus-side-capture');
+
+  const ideaRow = el('div', 'focus-side-row');
+  const ideaInput = el('input');
+  ideaInput.type = 'text';
+  ideaInput.className = 'focus-side-input';
+  ideaInput.placeholder = 'Новая идея задачи — в общий список';
+  const ideaBtn = el('button', 'focus-side-btn', '+');
+  const addIdea = async () => {
+    const title = ideaInput.value.trim();
+    if (!title) return;
+    ideaBtn.disabled = true;
+    try {
+      const { task } = await api.createTask({ title });
+      if (task) state.tasks.push(task);
+      ideaInput.value = '';
+    } finally { ideaBtn.disabled = false; ideaInput.focus(); }
+  };
+  ideaBtn.addEventListener('click', addIdea);
+  ideaInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addIdea(); });
+  ideaRow.appendChild(ideaInput);
+  ideaRow.appendChild(ideaBtn);
+  wrap.appendChild(ideaRow);
+
+  const sideRow = el('div', 'focus-side-row');
+  const sideInput = el('input');
+  sideInput.type = 'text';
+  sideInput.className = 'focus-side-input';
+  sideInput.placeholder = 'Сделал попутно, не по фокусу';
+  const sideBtn = el('button', 'focus-side-btn', '+');
+  const addSide = async () => {
+    const text = sideInput.value.trim();
+    if (!text) return;
+    sideBtn.disabled = true;
+    try {
+      const { extraLogs } = await api.createExtraLog({ dateKey, text });
+      if (extraLogs) state.extraLogs = extraLogs;
+      sideInput.value = '';
+    } finally { sideBtn.disabled = false; sideInput.focus(); }
+  };
+  sideBtn.addEventListener('click', addSide);
+  sideInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addSide(); });
+  sideRow.appendChild(sideInput);
+  sideRow.appendChild(sideBtn);
+  wrap.appendChild(sideRow);
+
+  return wrap;
+}
+
+function renderFocusExecution(root, dateKey, dayData){
+  root.innerHTML = '';
+  if (focusTimerInterval){ clearInterval(focusTimerInterval); focusTimerInterval = null; }
+
+  const tasks = dayData.tasks;
+  const activeIdx = tasks.findIndex(t => t.status !== 'done' && t.status !== 'skipped');
+
+  if (activeIdx === -1){
+    const allDone = tasks.every(t => t.status === 'done');
+    const wrap = el('div', 'focus-done');
+    wrap.appendChild(el('div', 'focus-done-title', allDone ? 'Отлично! Все 3 задачи выполнены 💪' : 'Готово на сегодня'));
+    const list = el('div', 'focus-history');
+    for (const t of tasks) list.appendChild(el('div', 'focus-history-item', focusHistoryLine(t)));
+    wrap.appendChild(list);
+    wrap.appendChild(buildFocusSideCapture(dateKey));
+    const btn = el('button', 'focus-action-btn', 'Продолжить');
+    btn.addEventListener('click', () => closeFocusLock());
+    wrap.appendChild(btn);
+    root.appendChild(wrap);
+    return;
+  }
+
+  const card = el('div', 'focus-card');
+
+  const closeBtn = el('button', 'focus-entry-skip', 'Закрыть на сегодня');
+  closeBtn.style.cssText = 'display:block;margin:-4px 0 4px auto;';
+  closeBtn.addEventListener('click', () => {
+    dismissFocusDay(dateKey);
+    closeFocusLock();
+  });
+  card.appendChild(closeBtn);
+
+  card.appendChild(el('div', 'focus-progress', `Задача ${activeIdx + 1} из ${tasks.length}`));
+
+  if (activeIdx > 0){
+    const list = el('div', 'focus-history');
+    for (let i = 0; i < activeIdx; i++) list.appendChild(el('div', 'focus-history-item', focusHistoryLine(tasks[i])));
+    card.appendChild(list);
+  }
+
+  const current = tasks[activeIdx];
+  card.appendChild(el('div', 'focus-task-name', escapeHtml(current.name)));
+  if (current.estimatedMinutes) card.appendChild(el('div', 'focus-task-estimate', `~${current.estimatedMinutes} мин`));
+
+  const timerEl = el('div', 'focus-timer');
+  card.appendChild(timerEl);
+
+  const pausedInfoEl = el('div', 'focus-paused-info');
+  card.appendChild(pausedInfoEl);
+
+  const actionsRow = el('div', 'focus-actions-row');
+  const pauseBtn = el('button', 'focus-pause-btn');
+  const skipBtn = el('button', 'focus-pause-btn', 'Пропустить');
+  const actionBtn = el('button', 'focus-action-btn');
+  actionsRow.appendChild(pauseBtn);
+  actionsRow.appendChild(skipBtn);
+  actionsRow.appendChild(actionBtn);
+  card.appendChild(actionsRow);
+
+  card.appendChild(buildFocusSideCapture(dateKey));
+
+  root.appendChild(card);
+
+  skipBtn.addEventListener('click', async () => {
+    clearInterval(focusTimerInterval); focusTimerInterval = null;
+    current.status = 'skipped';
+    await api.updateFocusTask(dateKey, current.id, { status: 'skipped', pausedAt: null });
+    renderFocusExecution(root, dateKey, dayData);
+  });
+
+  function updateTimerDisplay(){
+    const pausedMs = current.pausedMs || 0;
+    const nowRef = current.status === 'paused' ? current.pausedAt : Date.now();
+    const elapsedMs = Math.max(0, nowRef - current.startedAt - pausedMs);
+    const estMs = (current.estimatedMinutes || 0) * 60000;
+    const overtime = current.estimatedMinutes ? elapsedMs > estMs : false;
+    const baseMs = current.estimatedMinutes ? Math.abs(estMs - elapsedMs) : elapsedMs;
+    const totalSec = Math.floor(baseMs / 1000);
+    const mm = Math.floor(totalSec / 60), ss = totalSec % 60;
+    timerEl.textContent = (overtime ? '−' : '') + `${mm}:${String(ss).padStart(2, '0')}`;
+    timerEl.classList.toggle('overtime', overtime);
+    const pausedMin = Math.round(pausedMs / 60000);
+    pausedInfoEl.textContent = pausedMin > 0 ? `На паузе: ${pausedMin} мин` : '';
+  }
+
+  async function finishTask(){
+    clearInterval(focusTimerInterval); focusTimerInterval = null;
+    const now = Date.now();
+    if (current.status === 'paused' && current.pausedAt){
+      current.pausedMs = (current.pausedMs || 0) + (now - current.pausedAt);
+      current.pausedAt = null;
+    }
+    current.completedAt = now;
+    current.actualMinutes = Math.max(1, Math.round((current.completedAt - current.startedAt - (current.pausedMs || 0)) / 60000));
+    current.pausedMinutes = Math.round((current.pausedMs || 0) / 60000);
+    current.status = 'done';
+    await api.updateFocusTask(dateKey, current.id, {
+      status: 'done',
+      completedAt: current.completedAt,
+      actualMinutes: current.actualMinutes,
+      pausedMinutes: current.pausedMinutes,
+      pausedMs: current.pausedMs,
+      pausedAt: null,
+    });
+    renderFocusExecution(root, dateKey, dayData);
+  }
+
+  function renderActive(){
+    updateTimerDisplay();
+    focusTimerInterval = setInterval(updateTimerDisplay, 1000);
+    timerEl.classList.remove('paused');
+    actionBtn.textContent = 'Готово';
+    actionBtn.onclick = finishTask;
+    pauseBtn.textContent = 'Пауза';
+    pauseBtn.style.display = '';
+    pauseBtn.onclick = async () => {
+      clearInterval(focusTimerInterval); focusTimerInterval = null;
+      current.status = 'paused';
+      current.pausedAt = Date.now();
+      await api.updateFocusTask(dateKey, current.id, { status: 'paused', pausedAt: current.pausedAt });
+      renderPaused();
+    };
+  }
+
+  function renderPaused(){
+    updateTimerDisplay();
+    timerEl.classList.add('paused');
+    actionBtn.textContent = 'Готово';
+    actionBtn.onclick = finishTask;
+    pauseBtn.textContent = 'Продолжить';
+    pauseBtn.style.display = '';
+    pauseBtn.onclick = async () => {
+      const now = Date.now();
+      current.pausedMs = (current.pausedMs || 0) + (now - current.pausedAt);
+      current.pausedAt = null;
+      current.status = 'active';
+      await api.updateFocusTask(dateKey, current.id, { status: 'active', pausedAt: null, pausedMs: current.pausedMs });
+      renderActive();
+    };
+  }
+
+  function renderIdle(){
+    timerEl.classList.remove('paused');
+    timerEl.textContent = current.estimatedMinutes ? `${current.estimatedMinutes}:00` : '';
+    pausedInfoEl.textContent = '';
+    actionBtn.textContent = 'Начать';
+    pauseBtn.style.display = 'none';
+    actionBtn.onclick = async () => {
+      current.status = 'active';
+      current.startedAt = Date.now();
+      current.pausedMs = current.pausedMs || 0;
+      await api.updateFocusTask(dateKey, current.id, { status: 'active', startedAt: current.startedAt, pausedMs: current.pausedMs });
+      renderActive();
+    };
+  }
+
+  if (current.status === 'active' && current.startedAt) renderActive();
+  else if (current.status === 'paused' && current.startedAt) renderPaused();
+  else renderIdle();
+}
+
+// ───────────────────────────── Init ─────────────────────────────
+
+async function loadData(){
+  const data = await api.getData();
+  state.projects = data.projects;
+  state.priorities = data.priorities;
+  state.tasks = data.tasks;
+  state.habits = data.habits || [];
+  state.extraLogs = data.extraLogs || [];
+  state.focus = data.focus || {};
+
+  updatePriorityPreview();
+  updateDateBadge();
+  updateProjectBadge();
+  renderCanvas();
+  if (state.panelOpen) renderPanel();
+  checkFocusFlow();
+}
+
+// ── Mobile pull-to-refresh (no browser refresh button in the mobile view) ──
+
+(function setupPullToRefresh(){
+  const listEl = $('#mobile-list');
+  const indicator = el('div', 'pull-refresh-indicator', 'Потяните для обновления');
+  document.body.appendChild(indicator);
+
+  let startY = null, pulling = false, refreshing = false;
+  const THRESHOLD = 70;
+
+  listEl.addEventListener('touchstart', (e) => {
+    if (refreshing) return;
+    if (listEl.scrollTop <= 0){
+      startY = e.touches[0].clientY;
+      pulling = true;
+    } else {
+      startY = null;
+      pulling = false;
+    }
+  }, { passive: true });
+
+  listEl.addEventListener('touchmove', (e) => {
+    if (!pulling || startY === null) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy > 12){
+      indicator.classList.add('visible');
+      indicator.textContent = dy > THRESHOLD ? 'Отпустите для обновления' : 'Потяните для обновления';
+    }
+  }, { passive: true });
+
+  async function doRefresh(){
+    refreshing = true;
+    indicator.textContent = 'Обновление…';
+    indicator.classList.add('visible');
+    await loadData();
+    indicator.classList.remove('visible');
+    refreshing = false;
+  }
+
+  listEl.addEventListener('touchend', (e) => {
+    if (!pulling || startY === null) return;
+    const dy = (e.changedTouches[0]?.clientY ?? startY) - startY;
+    pulling = false;
+    startY = null;
+    if (dy > THRESHOLD) doRefresh();
+    else indicator.classList.remove('visible');
+  }, { passive: true });
+})();
+
+async function init(){
+  await loadData();
+  runTimerLoop();
+  initPushNotifications();
+}
+
+init();
+})();
+</script>
+</body>
+</html>
