@@ -135,7 +135,7 @@
   </button>
 </header>
 <main id="main"></main>
-<footer><span id="updated"></span><a href="/mylife/" target="_blank">MyLife →</a></footer>
+<footer><span id="updated"></span><a href="/mylife/tasks/" target="_blank">Задачи →</a></footer>
 
 <script>
 (function(){
@@ -309,7 +309,7 @@ $('#main').addEventListener('click', (e) => {
   if (btn) completeTask(btn.dataset.done, btn.closest('.row'));
 });
 $('#refresh').addEventListener('click', load);
-$('#open-full').addEventListener('click', () => window.open('/mylife/', '_blank'));
+$('#open-full').addEventListener('click', () => window.open('/mylife/tasks/', '_blank'));
 window.addEventListener('focus', load);
 window.addEventListener('storage', (e) => { if (e.key === TIMER_KEY) renderTimer(); });
 

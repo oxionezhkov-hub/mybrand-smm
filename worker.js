@@ -287,6 +287,11 @@ async function handleMylifeApi(request, env, url) {
     return jsonResponse(await mlLoadAll(env));
   }
 
+  if (['life', 'trackers', 'moods', 'plans', 'manifesto'].includes(resource)) {
+    const res = await handleLifeApi(request, env, resource, id);
+    if (res) return res;
+  }
+
   if (resource === 'tasks') {
     if (id === 'reorder' && request.method === 'POST') return mlReorderTasks(env, await readJson(request));
     if (request.method === 'POST') return mlCreateTask(env, await readJson(request));
@@ -1408,14 +1413,24 @@ async function handleMessage(env, msg, origin) {
   }
 
   if (text === '/start' || text === '/help') {
-    await send(env, `<b>MyLife-бот</b>\n\nПришли ссылку на YouTube-видео — верну файл с транскрипцией и саммари. Ответь на сообщение с саммари вопросом — отвечу по содержанию видео.\n\n<b>Транскрипция встречи:</b> пришли файлом .txt/.vtt/.srt (например транскрипт из Zoom) — сделаю саммари решений в формате «Имя — решения (дата)».\n\n<b>Задачи:</b> напиши, что ты сделал (например «сделал дизайн лендинга») — найду похожую задачу в трекере и предложу отметить выполненной, а если не найду — спрошу, в какой проект добавить.\n\n<b>Статус дня:</b> кнопки ниже (или просто напиши) — «начал работу» / «ушёл отдыхать» / «проснулся» / «лёг спать». Это не задачи, а метки времени — помогают понять, сколько ты работаешь.\n\nЛюбое другое сообщение — это разговор с твоим MyLife-коучем, который видит твои актуальные задачи, проекты и привычки.\n\n/today — саммари задач на сегодня\n/help — справка`, {
+    await send(env, `<b>MyLife-бот</b>\n\nПришли ссылку на YouTube-видео — верну файл с транскрипцией и саммари. Ответь на сообщение с саммари вопросом — отвечу по содержанию видео.\n\n<b>Транскрипция встречи:</b> пришли файлом .txt/.vtt/.srt (например транскрипт из Zoom) — сделаю саммари решений в формате «Имя — решения (дата)».\n\n<b>Задачи:</b> напиши, что ты сделал (например «сделал дизайн лендинга») — найду похожую задачу в трекере и предложу отметить выполненной, а если не найду — спрошу, в какой проект добавить.\n\n<b>Статус дня:</b> кнопки ниже (или просто напиши) — «начал работу» / «ушёл отдыхать» / «проснулся» / «лёг спать». Это не задачи, а метки времени — помогают понять, сколько ты работаешь.\n\nЛюбое другое сообщение — это разговор с твоим MyLife-коучем, который видит твои актуальные задачи, проекты и привычки.\n\n<b>Состояние:</b> 3 раза в день спрошу «как ты?» — нажми оценку 0–10, потом ответь, почему так и что сделаешь, чтобы стало лучше.\n\n/today — календарики и фокус месяца\n/mood — отметить состояние сейчас\n/tasks — саммари старого трекера задач\n/help — справка`, {
       reply_markup: STATUS_KEYBOARD,
     });
     return;
   }
 
   if (text === '/today') {
+    await send(env, await lifeMorningBriefText(env));
+    return;
+  }
+
+  if (text === '/tasks') {
     await send(env, await mlMorningBriefText(env));
+    return;
+  }
+
+  if (text === '/mood') {
+    await send(env, '🫀 <b>Как ты сейчас?</b>\nОцени состояние от 0 до 10:', { reply_markup: lifeScoreKeyboard(lifeSlotFor()) });
     return;
   }
 
@@ -1423,6 +1438,9 @@ async function handleMessage(env, msg, origin) {
     await send(env, 'Неизвестная команда. /help');
     return;
   }
+
+  // Answers inside the "как ты сейчас?" dialog (why → what to do)
+  if (await lifeHandleMoodMessage(env, text)) return;
 
   // Day status ping (started work / break / woke up / went to sleep) — not a task
   const statusType = detectStatusEvent(text);
@@ -1489,6 +1507,11 @@ async function handleCallback(env, query) {
   const data = query.data;
   await tgReq(env, 'answerCallbackQuery', { callback_query_id: query.id });
 
+  if (data.startsWith('mood:') || data.startsWith('moodgo:')) {
+    await lifeHandleMoodCallback(env, data);
+    return;
+  }
+
   if (data === 'taskdone:yes') {
     const session = await kget(env, 'session', {});
     if (session.state !== 'awaiting_task_confirm') return;
@@ -1550,6 +1573,345 @@ async function handleChat(env, text) {
   await mlTouchActivity(env, todayMSK());
 }
 
+// ── MyLife «Сегодня»: календарики-кубики, состояние 0–10, фокус месяца ────────
+// The new MyLife home (public/mylife/index.html). The old task canvas moved to
+// /mylife/tasks/ and keeps its own API above. Everything here is single-user,
+// stored in four KV keys:
+//   mylife:trackers  — habit "calendars": a period + a regularity → N cubes
+//   mylife:moods     — check-ins: score 0–10, why, what to do, "I'm on it"
+//   mylife:plans     — { 'YYYY-MM': { intention, projects:[{focus, tasks, notes}] } }
+//   mylife:manifesto — the user's own standard, shown on top of the page
+
+const LIFE_TRACKER_MODES = ['daily', 'weekdays', 'weekly', 'total'];
+const LIFE_MOOD_KEEP_DAYS = 400;
+
+function lifeAddDays(dateKey, n) {
+  const d = new Date(dateKey + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function lifeDaysBetween(a, b) { // inclusive count of days a..b, 0 if b < a
+  const diff = Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000);
+  return diff < 0 ? 0 : diff + 1;
+}
+
+// 0 = Monday … 6 = Sunday
+function lifeWeekday(dateKey) {
+  return (new Date(dateKey + 'T00:00:00Z').getUTCDay() + 6) % 7;
+}
+
+// How many cubes the tracker should have filled over [startDate, untilKey].
+// Mirrors trackerTarget() in public/mylife/index.html.
+function lifeTrackerTarget(t, untilKey = t.endDate) {
+  const end = untilKey < t.endDate ? untilKey : t.endDate;
+  const days = lifeDaysBetween(t.startDate, end);
+  if (!days) return 0;
+  if (t.mode === 'daily') return days;
+  if (t.mode === 'weekdays') {
+    let n = 0;
+    for (let i = 0; i < days; i++) if (t.days.includes(lifeWeekday(lifeAddDays(t.startDate, i)))) n++;
+    return n;
+  }
+  if (t.mode === 'weekly') return Math.round((days * t.perWeek) / 7);
+  // total: spread evenly over the whole period
+  const all = lifeDaysBetween(t.startDate, t.endDate);
+  return Math.round((t.target * days) / all);
+}
+
+function lifeTrackerDone(t, untilKey = t.endDate) {
+  let n = 0;
+  for (const [d, c] of Object.entries(t.log || {})) if (d >= t.startDate && d <= t.endDate && d <= untilKey) n += c;
+  return n;
+}
+
+function lifeSanitizeTracker(body, prev = {}) {
+  const t = { ...prev };
+  if (body.name !== undefined) t.name = String(body.name).trim().slice(0, 80) || 'Без названия';
+  if (body.emoji !== undefined) t.emoji = String(body.emoji).slice(0, 8);
+  if (body.color !== undefined && /^#[0-9a-f]{6}$/i.test(body.color)) t.color = body.color;
+  if (body.why !== undefined) t.why = String(body.why).slice(0, 300);
+  if (body.mode !== undefined && LIFE_TRACKER_MODES.includes(body.mode)) t.mode = body.mode;
+  if (body.days !== undefined) {
+    const days = Array.isArray(body.days) ? [...new Set(body.days.filter(d => Number.isInteger(d) && d >= 0 && d <= 6))].sort() : [];
+    t.days = days;
+  }
+  if (body.perWeek !== undefined) t.perWeek = Math.min(7, Math.max(1, parseInt(body.perWeek, 10) || 1));
+  if (body.target !== undefined) t.target = Math.min(5000, Math.max(1, parseInt(body.target, 10) || 1));
+  if (body.startDate !== undefined && isValidDateKey(body.startDate)) t.startDate = body.startDate;
+  if (body.endDate !== undefined && isValidDateKey(body.endDate)) t.endDate = body.endDate;
+  if (body.archived !== undefined) t.archived = !!body.archived;
+  if (body.order !== undefined && Number.isFinite(body.order)) t.order = body.order;
+  if (!t.mode) t.mode = 'daily';
+  if (!Array.isArray(t.days) || !t.days.length) t.days = [0, 1, 2, 3, 4];
+  if (!t.perWeek) t.perWeek = 3;
+  if (!t.target) t.target = 30;
+  if (!t.startDate) t.startDate = todayMSK();
+  if (!t.endDate || t.endDate < t.startDate) t.endDate = lifeAddDays(t.startDate, 29);
+  if (lifeDaysBetween(t.startDate, t.endDate) > 731) t.endDate = lifeAddDays(t.startDate, 730);
+  if (!t.color) t.color = '#3F8F6B';
+  if (!t.emoji) t.emoji = '';
+  if (!t.log || typeof t.log !== 'object') t.log = {};
+  return t;
+}
+
+async function lifeLoad(env) {
+  const [trackers, moods, plans, manifesto] = await Promise.all([
+    kget(env, 'mylife:trackers', []),
+    kget(env, 'mylife:moods', []),
+    kget(env, 'mylife:plans', {}),
+    kget(env, 'mylife:manifesto', null),
+  ]);
+  return { trackers, moods, plans, manifesto, today: todayMSK(), now: Date.now() };
+}
+
+// MSK hour → check-in slot shown on the page and in notifications
+function lifeSlotFor(ts = Date.now()) {
+  const h = new Date(ts + TZ_OFFSET * 3600 * 1000).getUTCHours();
+  return h < 12 ? 'morning' : h < 18 ? 'day' : 'evening';
+}
+
+async function lifeCreateMood(env, body) {
+  const score = Number(body.score);
+  if (!Number.isInteger(score) || score < 0 || score > 10) return { error: 'score 0..10 required' };
+  const moods = await kget(env, 'mylife:moods', []);
+  const now = Date.now();
+  const entry = {
+    id: crypto.randomUUID(),
+    dateKey: todayMSK(),
+    slot: ['morning', 'day', 'evening'].includes(body.slot) ? body.slot : lifeSlotFor(now),
+    score,
+    why: String(body.why || '').slice(0, 2000),
+    action: String(body.action || '').slice(0, 2000),
+    committedAt: null,
+    source: body.source === 'telegram' ? 'telegram' : 'web',
+    createdAt: now,
+  };
+  const cutoff = lifeAddDays(todayMSK(), -LIFE_MOOD_KEEP_DAYS);
+  const next = moods.filter(m => m.dateKey >= cutoff);
+  next.push(entry);
+  await kset(env, 'mylife:moods', next);
+  await mlTouchActivity(env, entry.dateKey);
+  return { mood: entry };
+}
+
+async function lifeUpdateMood(env, id, patch) {
+  const moods = await kget(env, 'mylife:moods', []);
+  const m = moods.find(x => x.id === id);
+  if (!m) return { error: 'not found' };
+  if (patch.score !== undefined && Number.isInteger(patch.score) && patch.score >= 0 && patch.score <= 10) m.score = patch.score;
+  if (patch.why !== undefined) m.why = String(patch.why).slice(0, 2000);
+  if (patch.action !== undefined) m.action = String(patch.action).slice(0, 2000);
+  if (patch.committed === true) m.committedAt = m.committedAt || Date.now();
+  if (patch.committed === false) m.committedAt = null;
+  await kset(env, 'mylife:moods', moods);
+  return { mood: m };
+}
+
+async function handleLifeApi(request, env, resource, id) {
+  const method = request.method;
+
+  if (resource === 'life' && method === 'GET') {
+    return jsonResponse(await lifeLoad(env));
+  }
+
+  if (resource === 'trackers') {
+    const trackers = await kget(env, 'mylife:trackers', []);
+    if (method === 'POST' && !id) {
+      const t = lifeSanitizeTracker(await readJson(request), {
+        id: crypto.randomUUID(), createdAt: Date.now(), order: trackers.length, archived: false,
+      });
+      trackers.push(t);
+      await kset(env, 'mylife:trackers', trackers);
+      return jsonResponse({ tracker: t, trackers });
+    }
+    const idx = trackers.findIndex(t => t.id === id);
+    if (idx === -1) return jsonResponse({ error: 'not found' }, 404);
+    if (method === 'PATCH') {
+      const body = await readJson(request);
+      const t = lifeSanitizeTracker(body, trackers[idx]);
+      // {mark: {date, value}} sets that day's count; {mark: {date, delta}} adds to it
+      if (body.mark && isValidDateKey(body.mark.date) && body.mark.date <= todayMSK()) {
+        const cur = t.log[body.mark.date] || 0;
+        let v = Number.isFinite(body.mark.value) ? body.mark.value : cur + (Number(body.mark.delta) || 0);
+        v = Math.max(0, Math.min(t.mode === 'total' ? 99 : 1, Math.round(v)));
+        if (v) t.log[body.mark.date] = v; else delete t.log[body.mark.date];
+        if (v > cur) await mlTouchActivity(env, body.mark.date);
+      }
+      trackers[idx] = t;
+      await kset(env, 'mylife:trackers', trackers);
+      return jsonResponse({ tracker: t });
+    }
+    if (method === 'DELETE') {
+      trackers.splice(idx, 1);
+      await kset(env, 'mylife:trackers', trackers);
+      return jsonResponse({ trackers });
+    }
+  }
+
+  if (resource === 'moods') {
+    if (method === 'POST' && !id) {
+      const r = await lifeCreateMood(env, await readJson(request));
+      return jsonResponse(r, r.error ? 400 : 200);
+    }
+    if (method === 'PATCH' && id) {
+      const r = await lifeUpdateMood(env, id, await readJson(request));
+      return jsonResponse(r, r.error ? 404 : 200);
+    }
+    if (method === 'DELETE' && id) {
+      const moods = await kget(env, 'mylife:moods', []);
+      await kset(env, 'mylife:moods', moods.filter(m => m.id !== id));
+      return jsonResponse({ ok: true });
+    }
+  }
+
+  if (resource === 'plans' && id && /^\d{4}-\d{2}$/.test(id)) {
+    const plans = await kget(env, 'mylife:plans', {});
+    if (method === 'GET') return jsonResponse({ plan: plans[id] || null });
+    if (method === 'PUT') {
+      const text = await request.text();
+      if (text.length > 200 * 1024) return jsonResponse({ error: 'payload too large' }, 413);
+      let plan;
+      try { plan = JSON.parse(text); } catch { return jsonResponse({ error: 'invalid json' }, 400); }
+      if (!plan || typeof plan !== 'object' || Array.isArray(plan)) return jsonResponse({ error: 'expected an object' }, 400);
+      plans[id] = {
+        intention: String(plan.intention || '').slice(0, 1000),
+        projects: (Array.isArray(plan.projects) ? plan.projects : []).slice(0, 30).map(p => ({
+          id: String(p.id || crypto.randomUUID()),
+          name: String(p.name || '').slice(0, 120),
+          color: /^#[0-9a-f]{6}$/i.test(p.color) ? p.color : '#3F8F6B',
+          focus: String(p.focus || '').slice(0, 500),
+          notes: String(p.notes || '').slice(0, 10000),
+          tasks: (Array.isArray(p.tasks) ? p.tasks : []).slice(0, 50).map(t => ({
+            id: String(t.id || crypto.randomUUID()),
+            text: String(t.text || '').slice(0, 300),
+            done: !!t.done,
+            doneAt: t.done ? (Number(t.doneAt) || Date.now()) : null,
+          })),
+        })),
+        updatedAt: Date.now(),
+      };
+      await kset(env, 'mylife:plans', plans);
+      return jsonResponse({ plan: plans[id] });
+    }
+  }
+
+  if (resource === 'manifesto' && method === 'PUT') {
+    const body = await readJson(request);
+    const text = String(body.text || '').slice(0, 1000);
+    await kset(env, 'mylife:manifesto', text);
+    return jsonResponse({ manifesto: text });
+  }
+
+  return null;
+}
+
+// ── Notifications: three check-ins a day (push + Telegram 0–10 buttons) ──────
+
+const LIFE_SLOT_TEXT = {
+  morning: { title: 'Доброе утро. Как ты сейчас?', body: 'Оцени состояние 0–10 и посмотри фокус дня.' },
+  day: { title: 'Как ты сейчас?', body: 'Середина дня — оцени состояние 0–10.' },
+  evening: { title: 'Как ты сейчас?', body: 'Вечер — оцени состояние 0–10 и отметь календарики.' },
+};
+
+function lifeScoreKeyboard(slot) {
+  const row = n => ({ text: String(n), callback_data: `mood:${slot}:${n}` });
+  return { inline_keyboard: [[0, 1, 2, 3, 4, 5].map(row), [6, 7, 8, 9, 10].map(row)] };
+}
+
+async function lifeSendCheckinPrompts(env, slot) {
+  const t = LIFE_SLOT_TEXT[slot];
+  await pushBroadcast(env, { title: t.title, body: t.body, tag: `mylife-checkin-${slot}`, url: `/mylife/?checkin=${slot}` });
+  if (env.TG_TOKEN && env.OWNER_CHAT_ID) {
+    await send(env, `🫀 <b>${t.title}</b>\nОцени состояние от 0 до 10:`, { reply_markup: lifeScoreKeyboard(slot) });
+  }
+}
+
+// Telegram side of the check-in: score button → "почему?" → "что сделаешь?" →
+// "иду улучшать" button. Session state lives in the shared 'session' KV key.
+async function lifeHandleMoodCallback(env, data) {
+  if (data.startsWith('mood:')) {
+    const [, slot, raw] = data.split(':');
+    const r = await lifeCreateMood(env, { score: parseInt(raw, 10), slot, source: 'telegram' });
+    if (r.error) return;
+    await kset(env, 'session', { state: 'awaiting_mood_why', moodId: r.mood.id, at: Date.now() });
+    await send(env, `Записал: <b>${r.mood.score}/10</b>.\n\nПочему ты себя так ощущаешь?`);
+    return;
+  }
+  if (data.startsWith('moodgo:')) {
+    const id = data.slice('moodgo:'.length);
+    const r = await lifeUpdateMood(env, id, { committed: true });
+    if (r.error) return;
+    await send(env, '✊ Принято. Иди и делай — ты сам за это отвечаешь.');
+  }
+}
+
+// Returns true if the message was consumed by the check-in dialog.
+async function lifeHandleMoodMessage(env, text) {
+  const session = await kget(env, 'session', {});
+  if (!String(session.state || '').startsWith('awaiting_mood_')) return false;
+  // An unanswered check-in mustn't swallow unrelated messages hours later.
+  if (!session.at || Date.now() - session.at > 3 * 3600 * 1000) {
+    await kset(env, 'session', { state: 'idle' });
+    return false;
+  }
+  if (session.state === 'awaiting_mood_why') {
+    await lifeUpdateMood(env, session.moodId, { why: text });
+    await kset(env, 'session', { state: 'awaiting_mood_action', moodId: session.moodId, at: Date.now() });
+    await send(env, 'Что ты должен сделать, чтобы улучшить своё состояние?');
+    return true;
+  }
+  if (session.state === 'awaiting_mood_action') {
+    await lifeUpdateMood(env, session.moodId, { action: text });
+    await kset(env, 'session', { state: 'idle' });
+    await send(env, `Твой шаг: <b>${escapeHtml(text)}</b>`, {
+      reply_markup: { inline_keyboard: [[{ text: '✊ Иду улучшать состояние', callback_data: `moodgo:${session.moodId}` }]] },
+    });
+    return true;
+  }
+  return false;
+}
+
+// Morning Telegram brief for the new home: calendars, month focus, yesterday's mood.
+async function lifeMorningBriefText(env) {
+  const { trackers, moods, plans, manifesto, today } = await lifeLoad(env);
+  const yesterday = lifeAddDays(today, -1);
+  const lines = ['🌅 <b>MyLife — сегодня</b>'];
+  if (manifesto) lines.push(`<i>${escapeHtml(manifesto)}</i>`);
+
+  const live = trackers.filter(t => !t.archived && t.startDate <= today && t.endDate >= today);
+  if (live.length) {
+    lines.push('', '<b>Календарики:</b>');
+    for (const t of live) {
+      const total = lifeTrackerTarget(t);
+      const done = lifeTrackerDone(t);
+      const expected = lifeTrackerTarget(t, yesterday);
+      const doneByYesterday = lifeTrackerDone(t, yesterday);
+      const gap = expected - doneByYesterday;
+      const pace = gap > 0 ? `отстаёшь на ${gap}` : 'в графике';
+      lines.push(`${t.emoji || '▪️'} ${escapeHtml(t.name)} — ${done}/${total} · ${pace}`);
+    }
+  }
+
+  const plan = plans[today.slice(0, 7)];
+  if (plan) {
+    if (plan.intention) lines.push('', `🎯 <b>Месяц:</b> ${escapeHtml(plan.intention)}`);
+    for (const p of plan.projects || []) {
+      const open = (p.tasks || []).filter(t => !t.done && t.text);
+      if (!p.focus && !open.length) continue;
+      lines.push('', `<b>${escapeHtml(p.name || 'Проект')}</b>${p.focus ? ` — ${escapeHtml(p.focus)}` : ''}`);
+      for (const t of open.slice(0, 3)) lines.push(`⬜ ${escapeHtml(t.text)}`);
+    }
+  }
+
+  const yMoods = moods.filter(m => m.dateKey === yesterday);
+  if (yMoods.length) {
+    const avg = yMoods.reduce((s, m) => s + m.score, 0) / yMoods.length;
+    lines.push('', `Вчера состояние в среднем: <b>${avg.toFixed(1)}/10</b>`);
+  }
+  return lines.join('\n');
+}
+
 // ── Scheduled jobs ────────────────────────────────────────────────────────────
 
 async function handleScheduled(env, cron) {
@@ -1572,37 +1934,23 @@ async function handleScheduled(env, cron) {
     return;
   }
 
-  // 7:00 MSK = 4:00 UTC — morning task summary in Telegram + browser push
+  // Three check-ins a day — "как ты сейчас?" 0–10 (push + Telegram buttons).
+  // 7:00 MSK = 4:00 UTC — plus the morning brief (calendars + month focus).
   if (cron === '0 4 * * *') {
-    await send(env, await mlMorningBriefText(env));
-    await pushBroadcast(env, {
-      title: 'Доброе утро',
-      body: 'Загляни в задачи на сегодня.',
-      tag: 'mylife-morning',
-      url: '/mylife/',
-    });
+    await send(env, await lifeMorningBriefText(env));
+    await lifeSendCheckinPrompts(env, 'morning');
     return;
   }
 
-  // 13:00 MSK = 10:00 UTC — daytime browser push: update task statuses
+  // 13:00 MSK = 10:00 UTC
   if (cron === '0 10 * * *') {
-    await pushBroadcast(env, {
-      title: 'Обновление задач',
-      body: 'Проверь и обнови статусы задач.',
-      tag: 'mylife-day',
-      url: '/mylife/',
-    });
+    await lifeSendCheckinPrompts(env, 'day');
     return;
   }
 
-  // 21:00 MSK = 18:00 UTC — evening browser push: plan tomorrow
+  // 21:00 MSK = 18:00 UTC
   if (cron === '0 18 * * *') {
-    await pushBroadcast(env, {
-      title: 'План на завтра',
-      body: 'Спланируй, что сделать завтра.',
-      tag: 'mylife-evening',
-      url: '/mylife/',
-    });
+    await lifeSendCheckinPrompts(env, 'evening');
     return;
   }
 }
@@ -1992,6 +2340,11 @@ async function mcpResponseToToolResult(resPromise) {
 }
 
 const MCP_TOOLS = [
+  {
+    name: 'mylife_life_overview',
+    description: 'Get the MyLife home screen data: habit calendars (trackers with period, regularity, per-day log), mood check-ins (score 0-10, why, what to do, whether the user committed), monthly plans (intention, projects with focus, key tasks, notes) and the user\'s personal standard (manifesto). Use this to coach on consistency, state and monthly focus.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
   {
     name: 'mylife_get_snapshot',
     description: 'Get everything in MyLife: tasks, projects, priorities, habits, extra notes/logs and the focus-day plan. Use this first to see current state.',
@@ -2496,6 +2849,13 @@ async function mcpCallTool(env, name, args) {
     case 'mylife_update_comm_profile':
       if (!args.text) return mcpToolText({ error: 'text required' }, true);
       return mcpResponseToToolResult(mlUpdateTextBlob(env, 'mylife:comm-profile', args));
+    case 'mylife_life_overview': {
+      const life = await lifeLoad(env);
+      const cutoff = lifeAddDays(life.today, -60);
+      life.moods = life.moods.filter(m => m.dateKey >= cutoff);
+      life.trackers = life.trackers.map(t => ({ ...t, cubesTotal: lifeTrackerTarget(t), cubesDone: lifeTrackerDone(t), expectedByToday: lifeTrackerTarget(t, life.today) }));
+      return mcpToolText(life);
+    }
     case 'mylife_im_stuck': {
       if (!args.task) return mcpToolText({ error: 'task required' }, true);
       const reply = await callClaudeCoach(env, { system: MYLIFE_STUCK_SYSTEM, user: args.task });
@@ -4089,8 +4449,8 @@ export default {
     if (url.pathname === '/debug/morning') {
       if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
       try {
-        await send(env, await mlMorningBriefText(env));
-        await pushBroadcast(env, { title: 'Доброе утро', body: 'Загляни в задачи на сегодня.', tag: 'mylife-morning', url: '/mylife/' });
+        await send(env, await lifeMorningBriefText(env));
+        await lifeSendCheckinPrompts(env, 'morning');
         return new Response('Sent');
       } catch (e) {
         console.error('Manual trigger failed:', e);
