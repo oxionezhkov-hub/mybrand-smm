@@ -1889,7 +1889,7 @@ async function lifeMorningBriefText(env) {
       const doneByYesterday = lifeTrackerDone(t, yesterday);
       const gap = expected - doneByYesterday;
       const pace = gap > 0 ? `отстаёшь на ${gap}` : 'в графике';
-      lines.push(`${t.emoji || '▪️'} ${escapeHtml(t.name)} — ${done}/${total} · ${pace}`);
+      lines.push(`• ${escapeHtml(t.name)} — ${done}/${total} · ${pace}`);
     }
   }
 
