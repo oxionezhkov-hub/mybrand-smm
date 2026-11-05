@@ -1,7 +1,7 @@
 // MyLife companion bot — Cloudflare Worker
 // Telegram bot (task summaries, YouTube transcription) + MyLife web app backend + MCP server
 
-import { threadsTick, threadsReportText, threadsStatus } from './threads/threads.js';
+import { threadsTick, threadsReportText, threadsStatus, threadsAcceptToken, threadsPublicStatus } from './threads/threads.js';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -4654,6 +4654,13 @@ export default {
     }
 
     // Manual trigger for debugging scheduled jobs (secured with bot token as secret)
+    if (url.pathname === '/threads/status') return threadsPublicStatus(env);
+
+    if (url.pathname === '/threads/token' && request.method === 'POST') {
+      const r = await threadsAcceptToken(env, send, request);
+      return jsonResponse(r.body, r.status);
+    }
+
     // Threads: /debug/threads — статусы очереди, ?run=1 — выполнить тик сейчас, ?report=1 — прислать отчёт
     if (url.pathname === '/debug/threads') {
       if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
