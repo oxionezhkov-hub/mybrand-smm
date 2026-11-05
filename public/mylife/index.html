@@ -40,12 +40,10 @@ svg{display:block}
 /* ── Hero ── */
 .hero{display:flex;gap:32px;align-items:flex-start;margin-bottom:36px}
 .hero-main{flex:1;min-width:0}
-.eyebrow{font-size:14px;color:var(--muted);font-weight:500;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
-.eyebrow .sep{width:3px;height:3px;border-radius:50%;background:var(--faint)}
-.manifesto{margin:14px 0 0;font-size:44px;line-height:1.08;font-weight:600;letter-spacing:-.035em;max-width:900px;cursor:text;white-space:pre-wrap;overflow-wrap:anywhere}
+.manifesto{margin:0;font-size:44px;line-height:1.08;font-weight:600;letter-spacing:-.035em;max-width:900px;cursor:text;white-space:pre-wrap;overflow-wrap:anywhere}
 .manifesto .rest{color:var(--muted)}
 :root[data-theme="dark"] .manifesto .rest{color:var(--accent)}
-.manifesto-edit{width:100%;max-width:900px;margin:14px 0 0;font-size:44px;line-height:1.08;font-weight:600;letter-spacing:-.035em;resize:none;display:block;overflow:hidden}
+.manifesto-edit{width:100%;max-width:900px;margin:0;font-size:44px;line-height:1.08;font-weight:600;letter-spacing:-.035em;resize:none;display:block;overflow:hidden}
 .hint{font-size:13px;color:var(--muted);margin-top:10px}
 .rail{display:flex;gap:10px;flex:none}
 .rail-btn{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--border);color:var(--muted);box-shadow:0 8px 24px var(--shadow);transition:color .15s,background .15s;position:relative;text-decoration:none}
@@ -81,6 +79,28 @@ svg{display:block}
 .btn.ghost{color:var(--muted)}
 .btn.ghost:hover{color:var(--text)}
 .btn.block{width:100%}
+.btn.soft{background:var(--cell);color:var(--text)}
+.btn svg{width:17px;height:17px}
+.round:disabled{opacity:.25;pointer-events:none}
+.pill-btn.danger:hover{color:var(--red)}
+.tm-top{display:flex;gap:12px;align-items:flex-start;margin-bottom:22px}
+.tm-top .round{margin:-6px -8px 0 0}
+.tm-action{display:flex;gap:8px;margin-bottom:26px}
+.tm-cal-head{display:flex;align-items:center;font-size:15px;font-weight:600;margin-bottom:8px}
+.tm-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.tm-cal .wd{font-size:12px;color:var(--muted);text-align:center;font-weight:500;padding-bottom:2px}
+.tm-cal button,.tm-cal span{aspect-ratio:1;border-radius:12px;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center;position:relative;color:var(--text)}
+.tm-cal button{background:var(--cell);transition:transform .15s var(--ease)}
+.tm-cal button:hover{background:var(--border-strong)}
+.tm-cal button:active{transform:scale(.9)}
+.tm-cal span{color:var(--faint)}
+.tm-cal .rest{color:var(--muted)}
+.tm-cal button.rest{background:transparent;box-shadow:inset 0 0 0 1px var(--border)}
+.tm-cal .out{color:transparent;background:transparent;box-shadow:none}
+.tm-cal .f{background:var(--accent)!important;color:var(--on-accent);box-shadow:none}
+.tm-cal .td:not(.f){box-shadow:inset 0 0 0 1.5px var(--accent)}
+.tm-cal sup{position:absolute;top:3px;right:5px;font-size:9px}
+.tm-foot{display:flex;align-items:center;margin:22px -16px -8px}
 
 /* ── Week grid (calendars × days) ── */
 .week{width:100%;border-collapse:collapse}
@@ -117,9 +137,12 @@ button.cell.done:hover{background:var(--accent);opacity:.85}
 
 /* ── Cube cards ── */
 .cubes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr));gap:22px;margin-top:28px}
-.tcard{min-width:0;display:flex;flex-direction:column;gap:14px;transition:transform .18s var(--ease),box-shadow .18s var(--ease)}
+.tcard{min-width:0;width:100%;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:12px;transition:transform .18s var(--ease),box-shadow .18s var(--ease)}
 .tcard:hover{transform:translateY(-2px);box-shadow:0 10px 30px var(--shadow)}
-.tcard-name{font-size:16px;font-weight:500;line-height:1.4;cursor:pointer;overflow-wrap:anywhere}
+.tcard-name{font-size:17px;font-weight:600;letter-spacing:-.01em;line-height:1.35;overflow-wrap:anywhere;display:flex;align-items:center;gap:8px}
+.tcard .cubes{margin-top:6px}
+.today-ok{width:20px;height:20px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:inline-flex;align-items:center;justify-content:center;flex:none}
+.today-ok svg{width:11px;height:11px}
 .tcard-meta{font-size:13px;color:var(--muted);margin-top:2px}
 .big{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
 .big b{font-size:44px;font-weight:500;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums}
@@ -177,8 +200,8 @@ button.cell.done:hover{background:var(--accent);opacity:.85}
 /* ── Check-in ── */
 .ci-title{font-size:22px;font-weight:600;letter-spacing:-.01em;margin:0 0 6px}
 .ci-sub{font-size:14px;color:var(--muted);margin:0 0 20px;line-height:1.5}
-.scale{display:grid;grid-template-columns:repeat(11,1fr);gap:4px}
-.scale button{aspect-ratio:1;border-radius:50%;font-size:14px;font-weight:600;color:var(--muted);box-shadow:inset 0 0 0 1px var(--border-strong);transition:background .15s,color .15s,transform .15s var(--ease)}
+.scale{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.scale button{height:54px;border-radius:16px;font-size:18px;font-weight:600;color:var(--muted);box-shadow:inset 0 0 0 1px var(--border-strong);transition:background .15s,color .15s,transform .15s var(--ease)}
 .scale button:hover{background:var(--accent);color:var(--on-accent);box-shadow:none}
 .scale button:active{transform:scale(.9)}
 .scale-ends{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:10px}
@@ -276,17 +299,18 @@ button.cell.done:hover{background:var(--accent);opacity:.85}
   /* One column; the morning ritual order: check-in → calendars → progress → focus → journal */
   .layout{display:flex;flex-direction:column;align-items:stretch}
   .col,.side,.side-wrap{display:contents}
-  #ci{order:1} #cal{order:2} #prog{order:3} #focus{order:4} #journal{order:5}
+  #ci{order:1} #cal{order:2} #focus{order:3} #journal{order:4}
 }
 @media (max-width:760px){
   .page{padding:calc(20px + env(safe-area-inset-top)) 16px 60px}
-  .hero{gap:12px;margin-bottom:24px}
-  .eyebrow{gap:2px 10px}
-  .eyebrow .sep{display:none}
-  .eyebrow span{width:100%}
+  .hero{flex-direction:column-reverse;gap:14px;margin-bottom:22px}
+  .rail{flex-direction:row;align-self:flex-end;gap:8px}
+  .rail-btn{width:38px;height:38px;box-shadow:none}
+  .rail-btn svg{width:17px;height:17px}
+  .modal{left:0;right:0;top:auto;bottom:0;width:100%;max-height:92vh;border-radius:24px 24px 0 0;transform:translateY(100%);opacity:1;padding:26px 20px calc(24px + env(safe-area-inset-bottom))}
+  .modal.show{transform:none}
+  .scale button{height:50px}
   .manifesto,.manifesto-edit{font-size:30px;letter-spacing:-.03em}
-  .rail{gap:6px;flex-direction:column}
-  .rail-btn{width:40px;height:40px}
   .panel{padding:22px 16px;border-radius:24px}
   .panel-head{margin:0 0 18px 2px}
   .float{padding:22px 18px}
@@ -462,11 +486,10 @@ function renderAll() {
       </div>
       <aside class="side"><div class="side-wrap col">
         <div class="float" id="ci"></div>
-        <div class="float" id="prog"></div>
         <div class="float" id="journal"></div>
       </div></aside>
     </div>`;
-  renderHero(); renderCal(); renderFocus(); renderCheckin(); renderProgress(); renderJournal();
+  renderHero(); renderCal(); renderFocus(); renderCheckin(); renderJournal();
 }
 const liveTrackers = () => S.life.trackers.filter(t => !t.archived).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 function activeDaySet() {
@@ -486,7 +509,6 @@ function dayStreak() {
 const DEFAULT_MANIFESTO = 'Делаю максимум каждый день. Последовательность важнее настроения.';
 function renderHero() {
   const el = $('#hero'); if (!el) return;
-  const streak = dayStreak();
   const m = S.life.manifesto ?? DEFAULT_MANIFESTO;
   const dark = document.documentElement.dataset.theme === 'dark';
   const pushOff = pushSupported() && Notification.permission !== 'granted';
@@ -506,7 +528,6 @@ function renderHero() {
   }
   el.innerHTML = `
     <div class="hero-main">
-      <div class="eyebrow"><span>${fmtLong(todayKey())}</span><i class="sep"></i><span>${streak} ${plural(streak, 'день', 'дня', 'дней')} в системе подряд</span></div>
       ${body}
     </div>
     <div class="rail">
@@ -536,22 +557,6 @@ async function saveManifesto(v) {
 }
 
 // ══ Calendars: week grid + cube cards ═════════════════════════════════════════
-function weekDays() {
-  const today = todayKey();
-  const mon = addDays(today, -weekday(today) + S.weekOffset * 7);
-  return Array.from({ length: 7 }, (_, i) => addDays(mon, i));
-}
-function cellHtml(t, d) {
-  const today = todayKey();
-  if (d < t.startDate || d > t.endDate) return `<span class="cell na"></span>`;
-  const v = (t.log || {})[d] || 0;
-  if (d > today) return `<span class="cell ${isScheduled(t, d) ? 'up' : 'off'}"></span>`;
-  const click = `onclick="tapCell('${t.id}','${d}')" oncontextmenu="event.preventDefault();tapCell('${t.id}','${d}',-1)"`;
-  if (v) return `<button class="cell done" ${click} title="${fmtShort(d)}${t.mode === 'total' ? ' · правый клик — минус' : ''}">${t.mode === 'total' && v > 1 ? v : I.check}</button>`;
-  if (!isScheduled(t, d)) return `<button class="cell off" ${click} title="${fmtShort(d)} — не по графику"></button>`;
-  if (d === today) return `<button class="cell due" ${click} title="Сегодня"></button>`;
-  return `<button class="cell ${perDay(t) ? 'missed' : ''}" ${click} title="${fmtShort(d)}"></button>`;
-}
 function cubeSize(n) { return n <= 31 ? [16, 5] : n <= 70 ? [13, 4] : n <= 140 ? [11, 3] : n <= 250 ? [9, 3] : [7, 2]; }
 function cubesHtml(t, st) {
   const [c, g] = cubeSize(st.total);
@@ -567,75 +572,27 @@ function cubesHtml(t, st) {
   for (let i = 0; i < Math.min(st.done - st.total, 60); i++) h += '<i class="cube plus"></i>';
   return `<div class="cubes" style="--c:${c}px;--g:${g}px">${h}</div>`;
 }
-function stateText(t, st) {
-  if (st.total && st.done >= st.total) return `<span class="state good">Цель выполнена${st.done > st.total ? ` · +${st.done - st.total} сверху` : ''}</span>`;
-  if (st.upcoming) return `<span class="state">Старт ${fmtShort(t.startDate)}</span>`;
-  if (st.ended) return `<span class="state">Период закончился · ${st.pct}%</span>`;
-  if (st.debt > 0) return `<span class="state late">Отстаёшь на ${st.debt}</span>`;
-  const parts = ['В графике'];
-  if (st.streak > 1) parts.push(`${st.streak} подряд`);
-  if (st.daysLeft) parts.push(`ещё ${st.daysLeft} ${plural(st.daysLeft, 'день', 'дня', 'дней')}`);
-  return `<span class="state good">${parts.join(' · ')}</span>`;
-}
 function renderCal() {
   const el = $('#cal'); if (!el) return;
   const trackers = liveTrackers();
-  const head = `<div class="panel-head"><h2 class="panel-title">Календарики</h2>${trackers.length ? `<span class="panel-sub">${trackers.length}</span>` : ''}<span class="grow"></span>
-    ${trackers.length ? `<button class="round solid" onclick="openTrackerEditor()" title="Новый календарик">${I.plus}</button>` : ''}</div>`;
+  const head = `<div class="panel-head"><h2 class="panel-title">Календарики</h2><span class="grow"></span>
+    <button class="round solid" onclick="openTrackerEditor()" title="Новый календарик">${I.plus}</button></div>`;
   if (!trackers.length) {
     el.innerHTML = head + `<div class="empty">
       <div class="demo-cubes">${'<i class="f"></i>'.repeat(5)}${'<i></i>'.repeat(9)}</div>
-      <div class="empty-title">Каждое действие — кубик</div>
-      <p>Задай цель на период: тренировки 3 раза в неделю до конца года, немецкий каждый день, 20 продаж за месяц. Кубики создадутся сами, а ты будешь их заполнять.</p>
-      <button class="pill-btn solid" onclick="openTrackerEditor()">${I.plus} Создать календарик</button>
+      <p>Задай цель на период — тренировки, немецкий, продажи. Каждое действие заполняет кубик. Нажми «+».</p>
     </div>`;
     return;
   }
-  const days = weekDays();
-  const today = todayKey();
-  const label = S.weekOffset === 0 ? 'Эта неделя' : S.weekOffset === -1 ? 'Прошлая неделя' : `${fmtShort(days[0])} — ${fmtShort(days[6])}`;
-  const table = `<table class="week">
-    <thead><tr>
-      <th><div class="week-nav"><button class="round" onclick="moveWeek(-1)" title="Неделя назад">${I.left}</button><span class="week-label">${label}</span>${S.weekOffset < 0 ? `<button class="round" onclick="moveWeek(1)" title="Неделя вперёд">${I.right}</button>` : ''}</div></th>
-      ${days.map(d => `<th class="${d === today ? 'today' : ''}">${WD[weekday(d)]}<span class="dn">${+d.slice(8)}</span></th>`).join('')}
-      <th class="cnt-h"></th>
-    </tr></thead>
-    <tbody>${trackers.map(t => {
-      const st = trackerStats(t);
-      return `<tr>
-        <td class="name"><span class="t-name" onclick="openTrackerEditor('${t.id}')" title="${esc(t.name)}">${esc(t.name)}</span><span class="t-reg">${esc(regularityText(t))}</span></td>
-        ${days.map(d => `<td>${cellHtml(t, d)}</td>`).join('')}
-        <td class="cnt"><b>${st.done}</b> / ${st.total}</td>
-      </tr>`;
-    }).join('')}</tbody>
-  </table>
-  <div class="legend">
-    <span><i class="cell done"></i>Сделано</span><span><i class="cell missed"></i>Пропущено</span><span><i class="cell due"></i>Сегодня</span><span><i class="cell up"></i>Впереди</span><span><i class="cell off"></i>Не по графику</span>
-  </div>`;
-  const cards = trackers.map(t => {
+  el.innerHTML = head + `<div class="cubes-grid">${trackers.map(t => {
     const st = trackerStats(t);
-    let btn = '';
-    if (st.active) {
-      if (t.mode === 'total') {
-        btn = `<div class="counter">${st.todayCount ? `<button class="round" onclick="tapCell('${t.id}','${today}',-1)" title="Минус">${I.minus}</button><span class="n">${st.todayCount}</span>` : ''}<button class="round solid" onclick="tapCell('${t.id}','${today}',1)" title="+1 сегодня">${I.plus}</button></div>`;
-      } else {
-        btn = st.todayCount
-          ? `<button class="round solid" onclick="tapCell('${t.id}','${today}')" title="Отменить отметку">${I.check}</button>`
-          : `<button class="pill-btn solid" onclick="tapCell('${t.id}','${today}')">${I.check} Сделал</button>`;
-      }
-    }
-    return `<div class="card tcard">
-      <div><div class="tcard-name" onclick="openTrackerEditor('${t.id}')">${esc(t.name)}</div>
-        <div class="tcard-meta">${esc(regularityText(t))} · ${fmtShort(t.startDate)} — ${fmtShort(t.endDate)}</div></div>
-      <div class="big"><b>${st.done}</b><span>из ${st.total}</span></div>
-      ${cubesHtml(t, st)}
+    return `<button class="card tcard" onclick="openTracker('${t.id}')">
+      <div class="tcard-name">${esc(t.name)}${st.todayCount ? `<span class="today-ok" title="Сегодня отмечено">${I.check}</span>` : ''}</div>
       ${t.why ? `<div class="why">${esc(t.why)}</div>` : ''}
-      <div class="tcard-foot">${stateText(t, st)}${btn}</div>
-    </div>`;
-  }).join('');
-  el.innerHTML = head + table + `<div class="cubes-grid">${cards}<button class="add-hint" onclick="openTrackerEditor()">${I.plus} Новый календарик</button></div>`;
+      ${cubesHtml(t, st)}
+    </button>`;
+  }).join('')}</div>`;
 }
-window.moveWeek = n => { S.weekOffset = Math.min(0, S.weekOffset + n); renderCal(); };
 window.tapCell = (id, d, delta) => {
   const t = S.life.trackers.find(x => x.id === id); if (!t) return;
   if (t.mode === 'total' && delta === undefined) delta = 1;
@@ -650,9 +607,9 @@ async function setMark(t, date, delta) {
   if (v > cur) {
     navigator.vibrate?.(12);
     const st = trackerStats(t);
-    toast(st.done === st.total ? `${t.name}: цель выполнена` : `${t.name} · ${st.done} из ${st.total}`);
+    if (st.done === st.total) toast(`${t.name}: цель выполнена`);
   }
-  renderCal(); renderProgress(); renderHero();
+  renderCal(); renderHero(); refreshTrackerModal(t);
   try { await api('trackers/' + t.id, 'PATCH', { mark: { date, value: v } }); } catch (e) { fail(e); }
 }
 
@@ -669,25 +626,17 @@ function renderCheckin() {
   const el = $('#ci'); if (!el) return;
   const today = todayKey(), slot = slotNow();
   const todays = S.life.moods.filter(m => m.dateKey === today);
-  const slots = `<div class="slots">${['morning', 'day', 'evening'].map(s => {
-    const last = todays.filter(m => m.slot === s).pop();
-    return `<div class="slot ${s === slot ? 'cur' : ''}"><div class="l">${SLOT_LABEL[s]}</div><div class="v ${last ? '' : 'none'}">${last ? last.score : '—'}</div></div>`;
-  }).join('')}</div>`;
   const ci = S.ci;
   const last = todays.filter(m => m.slot === slot).pop();
   if (!ci && last) {
-    el.innerHTML = `<div class="ci-score"><span class="num">${last.score}</span><div><div class="ttl">${SLOT_LABEL[slot]} отмечено</div><div class="lbl">Следующий вопрос в ${NEXT_SLOT[slot]}</div></div></div>
-      ${last.action ? `<div class="step-quote">${last.committedAt ? 'Ты взял ответственность:' : 'Твой шаг:'}</div><div class="commit-text">${esc(last.action)}</div>` : ''}
-      ${slots}
-      <div class="ci-row"><button class="pill-btn" onclick="startCheckin()">Отметить ещё раз</button></div>`;
+    el.innerHTML = `<div class="ci-score"><span class="num">${last.score}</span><div class="ttl">${scoreWord(last.score)}</div></div>
+      ${last.action ? `<div class="commit-text">${esc(last.action)}</div>` : ''}
+      <div class="ci-row"><button class="pill-btn" style="margin-left:-16px" onclick="startCheckin()">Отметить ещё раз</button></div>`;
     return;
   }
   if (!ci || ci.step === 0) {
-    el.innerHTML = `<h3 class="ci-title">Как ты сейчас?</h3>
-      <p class="ci-sub">Оцени своё состояние честно — от 0 до 10.</p>
-      <div class="scale">${Array.from({ length: 11 }, (_, i) => `<button onclick="pickScore(${i})">${i}</button>`).join('')}</div>
-      <div class="scale-ends"><span>Совсем плохо</span><span>На максимуме</span></div>
-      ${slots}`;
+    el.innerHTML = `<h3 class="ci-title" style="margin-bottom:20px">Как ты сейчас?</h3>
+      <div class="scale">${Array.from({ length: 11 }, (_, i) => `<button onclick="pickScore(${i})">${i}</button>`).join('')}</div>`;
     return;
   }
   const head = `<div class="ci-score"><span class="num">${ci.score}</span><span class="lbl">${scoreWord(ci.score)}</span>
@@ -716,7 +665,7 @@ window.pickScore = score => {
   const ci = S.ci = { step: 1, score, why: '', action: '', focus: true };
   renderCheckin();
   ci.pending = api('moods', 'POST', { score, slot: slotNow() }).then(({ mood }) => {
-    S.life.moods.push(mood); ci.moodId = mood.id; renderProgress(); renderJournal(); renderHero();
+    S.life.moods.push(mood); ci.moodId = mood.id; renderJournal(); renderHero();
   }).catch(fail);
 };
 function ciRead() { const ta = $('#ci-in'); if (ta) S.ci[S.ci.step === 1 ? 'why' : 'action'] = ta.value.trim(); }
@@ -744,50 +693,12 @@ window.ciCommit = async () => {
   S.ci = null;
   const m = ci?.moodId && S.life.moods.find(x => x.id === ci.moodId);
   if (m) m.committedAt = Date.now();
-  renderCheckin(); renderProgress(); renderJournal();
+  renderCheckin(); renderJournal();
   toast('Принято. Действуй.');
   if (m) try { await api('moods/' + m.id, 'PATCH', { committed: true }); } catch (e) { fail(e); }
 };
 
 // ══ Progress: week / month / state ════════════════════════════════════════════
-function renderProgress() {
-  const el = $('#prog'); if (!el) return;
-  const today = todayKey();
-  const trackers = liveTrackers();
-  const range = (a, b) => {
-    let done = 0, due = 0;
-    for (const t of trackers) {
-      const from = a > t.startDate ? a : t.startDate;
-      const to = b < t.endDate ? b : t.endDate;
-      if (from > to) continue;
-      due += targetBetween(t, from, to);
-      done += trackerDone(t, to, from);
-    }
-    return { done, due };
-  };
-  const w = range(addDays(today, -weekday(today)), today);
-  const m = range(monthKey(today) + '-01', today);
-  const days = Array.from({ length: 14 }, (_, i) => addDays(today, i - 13));
-  const avgOf = l => l.length ? l.reduce((s, x) => s + x.score, 0) / l.length : null;
-  const last7 = S.life.moods.filter(x => x.dateKey > addDays(today, -7));
-  const avg7 = avgOf(last7);
-  const committed = last7.filter(x => x.committedAt).length;
-  const row = (label, { done, due }) => `<div class="prog-row"><div class="l">${label}</div>
-    <div class="big" style="margin-top:6px"><b>${done}</b><span>из ${due}</span></div>
-    <div class="bar"><i style="width:${due ? Math.min(100, Math.round(done / due * 100)) : 0}%"></i></div></div>`;
-  el.innerHTML = `<h3 class="ci-title" style="margin-bottom:16px">Прогресс</h3>
-    ${trackers.length ? row('Эта неделя', w) + row(MONTHS_NOM[+today.slice(5, 7) - 1], m) : ''}
-    <div class="prog-row"><div class="l">Состояние · 14 дней</div>
-      <div class="big" style="margin-top:6px"><b>${avg7 === null ? '—' : avg7.toFixed(1)}</b><span>в среднем за неделю${last7.length ? ` · шаг сделан ${committed} из ${last7.length}` : ''}</span></div>
-      <div class="dotcols">${days.map(d => {
-        const a = avgOf(S.life.moods.filter(x => x.dateKey === d));
-        const n = a === null ? 0 : Math.round(a);
-        return `<div class="dotcol ${a === null ? 'none' : ''}" title="${fmtShort(d)}: ${a === null ? 'нет отметок' : a.toFixed(1)}">${Array.from({ length: 10 }, (_, i) => `<i class="${i < n ? 'f' : ''}"></i>`).join('')}</div>`;
-      }).join('')}</div>
-      <div class="dot-x"><span>${fmtShort(days[0])}</span><span>сегодня</span></div>
-    </div>`;
-}
-
 // ══ Journal ═══════════════════════════════════════════════════════════════════
 function renderJournal() {
   const el = $('#journal'); if (!el) return;
@@ -939,6 +850,57 @@ window.closeModal = instant => {
 };
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && modalEl) closeModal(); });
 
+// ── Tracker sheet: mark today, fix past days, edit, delete ─────────────────────
+let tm = null; // { id, month }
+window.openTracker = id => {
+  const t = S.life.trackers.find(x => x.id === id); if (!t) return;
+  const today = todayKey();
+  const mk = monthKey(today < t.startDate ? t.startDate : today > t.endDate ? t.endDate : today);
+  tm = { id, month: mk };
+  openModal(trackerSheetHtml(t));
+};
+function refreshTrackerModal(t) { if (modalEl && tm?.id === t.id) setModal(trackerSheetHtml(t)); }
+window.tmMonth = n => { const t = S.life.trackers.find(x => x.id === tm.id); tm.month = shiftMonth(tm.month, n); setModal(trackerSheetHtml(t)); };
+function trackerSheetHtml(t) {
+  const today = todayKey();
+  const st = trackerStats(t);
+  let action = '';
+  if (st.active) {
+    if (t.mode === 'total') {
+      action = `<div class="tm-action">
+        <button class="btn primary grow" onclick="tapCell('${t.id}','${today}',1)">${I.plus} Сегодня${st.todayCount ? ` · ${st.todayCount}` : ''}</button>
+        ${st.todayCount ? `<button class="btn ghost" onclick="tapCell('${t.id}','${today}',-1)">${I.minus}</button>` : ''}
+      </div>`;
+    } else {
+      action = `<div class="tm-action">${st.todayCount
+        ? `<button class="btn soft block" onclick="tapCell('${t.id}','${today}')">${I.check} Сегодня отмечено</button>`
+        : `<button class="btn primary block" onclick="tapCell('${t.id}','${today}')">${I.check} Отметить сегодня</button>`}</div>`;
+    }
+  } else if (st.upcoming) {
+    action = `<p class="muted" style="font-size:14px;margin:0 0 20px">Начнётся ${fmtShort(t.startDate)}</p>`;
+  }
+  const mk = tm.month, first = mk + '-01', last = endOfMonth(first);
+  let cells = WD.map(w => `<div class="wd">${w}</div>`).join('');
+  for (let i = 0; i < weekday(first); i++) cells += '<span></span>';
+  for (let d = first; d <= last; d = addDays(d, 1)) {
+    const inP = d >= t.startDate && d <= t.endDate;
+    const v = (t.log || {})[d] || 0;
+    const can = inP && d <= today;
+    const cls = [v ? 'f' : '', !inP ? 'out' : '', inP && !isScheduled(t, d) ? 'rest' : '', d === today ? 'td' : ''].join(' ');
+    cells += can
+      ? `<button class="${cls}" onclick="tapCell('${t.id}','${d}')" oncontextmenu="event.preventDefault();tapCell('${t.id}','${d}',-1)">${+d.slice(8)}${v > 1 ? `<sup>${v}</sup>` : ''}</button>`
+      : `<span class="${cls}">${+d.slice(8)}</span>`;
+  }
+  const canPrev = mk > monthKey(t.startDate), canNext = mk < monthKey(t.endDate);
+  return `<div class="tm-top"><div class="grow"><h3 style="margin:0">${esc(t.name)}</h3>${t.why ? `<div class="why" style="margin-top:6px">${esc(t.why)}</div>` : ''}</div>
+      <button class="round" onclick="closeModal()" title="Закрыть">${I.x}</button></div>
+    ${action}
+    <div class="tm-cal-head"><span>${MONTHS_NOM[+mk.slice(5) - 1]}</span><span class="grow"></span>
+      <button class="round" ${canPrev ? '' : 'disabled'} onclick="tmMonth(-1)">${I.left}</button><button class="round" ${canNext ? '' : 'disabled'} onclick="tmMonth(1)">${I.right}</button></div>
+    <div class="tm-cal">${cells}</div>
+    <div class="tm-foot"><button class="pill-btn" onclick="openTrackerEditor('${t.id}')">Изменить</button><span class="grow"></span><button class="pill-btn danger" onclick="deleteTracker('${t.id}')">Удалить</button></div>`;
+}
+
 // ── Tracker editor ────────────────────────────────────────────────────────────
 let draft = null;
 window.openTrackerEditor = id => {
@@ -966,8 +928,8 @@ function editorHtml() {
     </div>
     <div class="m-field"><span class="m-label">Зачем мне это</span><input class="inline-in" style="width:100%" placeholder="Необязательно: чтобы сдать экзамен в январе" value="${esc(d.why || '')}" oninput="draft.why=this.value"></div>
     <div class="preview" id="tr-preview">${previewHtml()}</div>
-    <div class="m-actions"><button class="btn ghost" onclick="closeModal()">Отмена</button><button class="btn primary" onclick="saveTracker()">${d._edit ? 'Сохранить' : 'Создать'}</button></div>
-    ${d._edit ? `<div class="m-danger"><button class="pill-btn" onclick="archiveTracker('${d.id}')">В архив</button><button class="pill-btn" onclick="deleteTracker('${d.id}')">Удалить</button></div>` : ''}`;
+    <div class="m-actions"><button class="btn ghost" onclick="${d._edit ? `openTracker('${d.id}')` : 'closeModal()'}">Отмена</button><button class="btn primary" onclick="saveTracker()">${d._edit ? 'Сохранить' : 'Создать'}</button></div>
+    ${d._edit ? `<div class="m-danger"><button class="pill-btn" onclick="archiveTracker('${d.id}')">В архив</button><button class="pill-btn danger" onclick="deleteTracker('${d.id}')">Удалить</button></div>` : ''}`;
 }
 function previewHtml() {
   const d = draft;
@@ -992,24 +954,25 @@ window.saveTracker = async () => {
     if (d._edit) {
       const { tracker } = await api('trackers/' + d.id, 'PATCH', body);
       S.life.trackers[S.life.trackers.findIndex(t => t.id === d.id)] = tracker;
+      renderCal(); openTracker(d.id); return;
     } else {
       const { tracker } = await api('trackers', 'POST', body);
       S.life.trackers.push(tracker);
       const n = trackerTarget(tracker);
       toast(`Создано ${n} ${plural(n, 'кубик', 'кубика', 'кубиков')}`);
     }
-    renderCal(); renderProgress();
+    renderCal();
   } catch (e) { fail(e); }
 };
 window.archiveTracker = async id => {
   const t = S.life.trackers.find(x => x.id === id); if (!t) return;
-  t.archived = true; closeModal(); renderCal(); renderProgress(); renderHero(); toast('Убрано в архив');
+  t.archived = true; closeModal(); renderCal(); renderHero(); toast('Убрано в архив');
   try { await api('trackers/' + id, 'PATCH', { archived: true }); } catch (e) { fail(e); }
 };
 window.deleteTracker = async id => {
   const t = S.life.trackers.find(x => x.id === id); if (!t) return;
   if (!confirm(`Удалить «${t.name}» вместе со всеми отметками?`)) return;
-  S.life.trackers = S.life.trackers.filter(x => x.id !== id); closeModal(); renderCal(); renderProgress(); renderHero();
+  S.life.trackers = S.life.trackers.filter(x => x.id !== id); closeModal(); renderCal(); renderHero();
   try { await api('trackers/' + id, 'DELETE'); } catch (e) { fail(e); }
 };
 window.openArchive = () => {
@@ -1019,7 +982,7 @@ window.openArchive = () => {
 };
 window.restoreTracker = async id => {
   const t = S.life.trackers.find(x => x.id === id); if (!t) return;
-  t.archived = false; renderCal(); renderProgress(); renderHero();
+  t.archived = false; renderCal(); renderHero();
   S.life.trackers.some(x => x.archived) ? openArchive() : closeModal();
   try { await api('trackers/' + id, 'PATCH', { archived: false }); } catch (e) { fail(e); }
 };
