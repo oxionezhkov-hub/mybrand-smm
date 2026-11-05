@@ -13,6 +13,9 @@ const REPORT_HOUR_MSK = 22;
 const STATE_KEY = 'threads:state';
 const TOKEN_KEY = 'threads:token';
 const USER_KEY = 'threads:user_id';
+const METRICS_KEY = 'threads:metrics';   // { posts: {id: {views,likes,replies,reposts,quotes,at}}, profile: {...}, daily: {date: {followers}} }
+const METRICS_BATCH = 8;                  // постов за один тик: держим мало подзапросов на вызов
+const METRICS_EVERY_MS = 20 * 60 * 1000;  // один и тот же пост обновляем не чаще раза в 20 минут
 
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const norm = s => String(s || '').replace(/\s+/g, ' ').trim();
@@ -115,6 +118,7 @@ export async function threadsTick(env, send, now = Date.now()) {
   }
 
   await maybeRefreshToken(env, state, token, now, send);
+  try { await collectMetrics(env, state, token, now); } catch (e) { log.push('метрики: ' + e.message); }
   const today = mskDate(now);
   const hourMsk = new Date(now + 3 * 3600e3).getUTCHours();
   if (hourMsk === REPORT_HOUR_MSK && state.report_date !== today) {
@@ -130,11 +134,37 @@ export async function threadsTick(env, send, now = Date.now()) {
 
 async function insights(token, id) {
   try {
-    const r = await api(token, 'GET', `${id}/insights`, { metric: 'views,likes,replies,reposts' });
+    const r = await api(token, 'GET', `${id}/insights`, { metric: 'views,likes,replies,reposts,quotes' });
     const m = {};
     for (const x of r.data || []) m[x.name] = x.values?.[0]?.value ?? x.total_value?.value ?? 0;
     return m;
   } catch { return null; }
+}
+
+async function collectMetrics(env, state, token, now) {
+  const m = (await env.KV.get(METRICS_KEY, 'json')) || { posts: {}, profile: {}, daily: {} };
+  const published = QUEUE.map(p => ({ p, s: state.posts[p.id] || (p.published_id ? { status: 'published', published_id: p.published_id } : null) }))
+    .filter(x => x.s?.status === 'published');
+  const stale = published
+    .filter(x => now - (m.posts[x.p.id]?.at || 0) > METRICS_EVERY_MS)
+    .sort((a, b) => (m.posts[a.p.id]?.at || 0) - (m.posts[b.p.id]?.at || 0))
+    .slice(0, METRICS_BATCH);
+  for (const { p, s } of stale) {
+    const v = await insights(token, s.published_id);
+    if (v) m.posts[p.id] = { ...v, at: now };
+  }
+  if (now - (m.profile.at || 0) > METRICS_EVERY_MS) {
+    try {
+      const r = await api(token, 'GET', 'me/threads_insights', { metric: 'followers_count' });
+      const f = r.data?.find(x => x.name === 'followers_count');
+      const followers = f?.total_value?.value ?? f?.values?.[0]?.value;
+      if (followers != null) {
+        m.profile = { followers, at: now };
+        m.daily[mskDate(now)] = { followers };
+      }
+    } catch {}
+  }
+  if (stale.length || m.profile.at === now) await env.KV.put(METRICS_KEY, JSON.stringify(m));
 }
 
 export async function threadsReportText(env, state, token, day) {
@@ -199,30 +229,70 @@ export async function threadsAcceptToken(env, send, request) {
   return { status: 200, body: { ok: true, username: me.username } };
 }
 
-// GET /threads/status — открытая сводка без текстов постов: подключён ли токен и что в очереди.
+// GET /threads/status — открытая страница: статус автопостинга и аналитика по вышедшим постам.
+// Тексты будущих постов не показываются.
 export async function threadsPublicStatus(env) {
   const state = await loadState(env);
   const token = await getToken(env);
+  const m = (await env.KV.get(METRICS_KEY, 'json')) || { posts: {}, profile: {}, daily: {} };
   const now = Date.now();
-  const st = QUEUE.map(p => ({ at: p.scheduled_at, status: postStatus(p, state) }));
-  const count = s => st.filter(x => x.status === s).length;
-  const next = st.filter(x => x.status === 'approved' && Date.parse(x.at) > now).sort((a, b) => Date.parse(a.at) - Date.parse(b.at))[0];
-  const last = Object.values(state.posts).filter(x => x.status === 'published' && x.published_at)
-    .sort((a, b) => b.published_at.localeCompare(a.published_at))[0];
-  const row = (k, v) => `<tr><th>${k}</th><td>${v}</td></tr>`;
-  const fmt = iso => iso ? new Date(Date.parse(iso) + 3 * 3600e3).toISOString().slice(0, 16).replace('T', ' ') + ' МСК' : '—';
+  const rows = QUEUE.map(p => ({ p, st: postStatus(p, state), s: state.posts[p.id] || {}, v: m.posts[p.id] }));
+  const pub = rows.filter(r => r.st === 'published').sort((a, b) => Date.parse(a.p.scheduled_at) - Date.parse(b.p.scheduled_at));
+  const waiting = rows.filter(r => r.st === 'approved');
+  const next = waiting.filter(r => Date.parse(r.p.scheduled_at) > now).sort((a, b) => Date.parse(a.p.scheduled_at) - Date.parse(b.p.scheduled_at))[0];
+  const withV = pub.filter(r => r.v);
+  const sum = k => withV.reduce((a, r) => a + (r.v[k] || 0), 0);
+  const views = sum('views'), likes = sum('likes'), replies = sum('replies'), reposts = sum('reposts') + sum('quotes');
+  const avg = withV.length ? Math.round(views / withV.length) : 0;
+  const er = views ? ((likes + replies + reposts) / views * 100).toFixed(1) : '0';
+  const fmtN = n => Number(n || 0).toLocaleString('ru-RU');
+  const fmtT = iso => new Date(Date.parse(iso) + 3 * 3600e3).toISOString().slice(5, 16).replace('T', ' ').replace(/^(\d\d)-(\d\d)/, '$2.$1');
+  const group = key => {
+    const g = {};
+    for (const r of withV) { const k = key(r); (g[k] ??= { n: 0, views: 0, replies: 0 }); g[k].n++; g[k].views += r.v.views || 0; g[k].replies += r.v.replies || 0; }
+    return Object.entries(g).map(([k, x]) => ({ k, n: x.n, avg: Math.round(x.views / x.n), rep: (x.replies / x.n).toFixed(1) })).sort((a, b) => b.avg - a.avg);
+  };
+  const byHour = group(r => mskTime(r.p.scheduled_at));
+  const byTheme = group(r => r.p.theme || '—');
+  const top = [...withV].sort((a, b) => (b.v.views || 0) - (a.v.views || 0)).slice(0, 5);
+  const maxV = Math.max(1, ...withV.map(r => r.v.views || 0));
+  const bars = pub.map(r => {
+    const h = r.v ? Math.max(2, Math.round((r.v.views || 0) / maxV * 100)) : 2;
+    return `<div class="bar" style="height:${h}%" title="${fmtT(r.p.scheduled_at)} · ${fmtN(r.v?.views)} просмотров"></div>`;
+  }).join('');
+  const groupTable = (title, list, label) => list.length ? `<section><h2>${title}</h2><div class="wrap"><table><tr><th>${label}</th><th class="n">Постов</th><th class="n">👁 в среднем</th><th class="n">💬 в среднем</th></tr>
+${list.map(x => `<tr><td>${esc(x.k)}</td><td class="n">${x.n}</td><td class="n">${fmtN(x.avg)}</td><td class="n">${x.rep}</td></tr>`).join('')}</table></div></section>` : '';
+  const postLink = r => r.s.permalink ? `<a href="${esc(r.s.permalink)}">${esc(norm(r.p.text).slice(0, 70))}…</a>` : esc(norm(r.p.text).slice(0, 70)) + '…';
+  const updated = m.profile.at ? fmtT(new Date(m.profile.at).toISOString()) : '—';
   const html = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Threads: статус</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:480px;margin:32px auto;padding:0 16px;color:#141414;background:#f5f5f3}
-h1{font-size:20px}table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden}th,td{text-align:left;padding:10px 14px;border-bottom:1px solid #e5e5e1}th{font-weight:500;color:#666}
-@media(prefers-color-scheme:dark){body{background:#111;color:#eee}table{background:#1c1c1c}th,td{border-color:#2c2c2a}th{color:#999}}</style>
-<h1>Threads: автопостинг</h1><table>
-${row('Токен', token ? '✅ подключён' : '❌ не подключён')}
-${row('Опубликовано', count('published'))}
-${row('Ждут публикации', count('approved'))}
-${row('Пропущено', count('missed'))}
-${row('Следующий пост', fmt(next?.at))}
-${row('Последний вышел', fmt(last?.published_at))}
-${last?.permalink ? row('Ссылка', `<a href="${last.permalink}">открыть пост</a>`) : ''}
-</table>`;
-  return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+<title>Threads: аналитика</title><style>
+:root{--bg:#f5f5f3;--card:#fff;--fg:#141414;--muted:#6b6b68;--line:#e5e5e1;--accent:#3b3bd6}
+@media(prefers-color-scheme:dark){:root{--bg:#111;--card:#1c1c1c;--fg:#eee;--muted:#9a9a95;--line:#2c2c2a;--accent:#8f8fff}}
+*{box-sizing:border-box}body{font:15px/1.5 system-ui,-apple-system,sans-serif;max-width:760px;margin:0 auto;padding:24px 16px 48px;color:var(--fg);background:var(--bg)}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:28px 0 10px}.sub{color:var(--muted);margin:0 0 18px;font-size:14px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.kpi b{display:block;font-size:22px;font-variant-numeric:tabular-nums}.kpi span{color:var(--muted);font-size:13px}
+.chart{display:flex;align-items:flex-end;gap:3px;height:140px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.bar{flex:1;min-width:3px;background:var(--accent);border-radius:3px 3px 0 0;opacity:.85}.bar:hover{opacity:1}
+.wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:14px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}th{font-weight:500;color:var(--muted)}.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+a{color:var(--accent)}.t{display:block;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}td:first-child{min-width:0}.note{color:var(--muted);font-size:13px;margin-top:8px}</style>
+<h1>Threads: аналитика</h1>
+<p class="sub">${token ? '✅ Автопостинг работает' : '❌ Токен не подключён'} · опубликовано ${pub.length}, ждут ${waiting.length}${rows.some(r => r.st === 'missed') ? `, пропущено ${rows.filter(r => r.st === 'missed').length}` : ''} · следующий пост ${next ? fmtT(next.p.scheduled_at) + ' МСК' : '—'}</p>
+<div class="kpis">
+<div class="kpi"><b>${m.profile.followers != null ? fmtN(m.profile.followers) : '—'}</b><span>подписчиков</span></div>
+<div class="kpi"><b>${fmtN(views)}</b><span>просмотров</span></div>
+<div class="kpi"><b>${fmtN(avg)}</b><span>в среднем на пост</span></div>
+<div class="kpi"><b>${fmtN(replies)}</b><span>ответов</span></div>
+<div class="kpi"><b>${er}%</b><span>вовлечённость</span></div>
+</div>
+${pub.length ? `<h2>Просмотры по постам</h2><div class="chart">${bars}</div><p class="note">Столбик — один пост, по порядку выхода. Наведите, чтобы увидеть дату и просмотры.</p>` : ''}
+${top.length ? `<section><h2>Лучшие посты</h2><div class="wrap"><table><tr><th>Пост</th><th class="n">👁</th><th class="n">❤️</th><th class="n">💬</th></tr>
+${top.map(r => `<tr><td>${postLink(r)}</td><td class="n">${fmtN(r.v.views)}</td><td class="n">${fmtN(r.v.likes)}</td><td class="n">${fmtN(r.v.replies)}</td></tr>`).join('')}</table></div></section>` : ''}
+${groupTable('Лучшее время', byHour, 'Время МСК')}
+${groupTable('Темы', byTheme, 'Тема')}
+${pub.length ? `<section><h2>Все вышедшие посты</h2><div class="wrap"><table><tr><th>Пост</th><th class="n">👁</th><th class="n">❤️</th><th class="n">💬</th><th class="n">🔁</th></tr>
+${[...pub].reverse().map(r => `<tr><td><span class="t">${fmtT(r.p.scheduled_at)}</span>${postLink(r)}</td><td class="n">${r.v ? fmtN(r.v.views) : '…'}</td><td class="n">${r.v ? fmtN(r.v.likes) : '…'}</td><td class="n">${r.v ? fmtN(r.v.replies) : '…'}</td><td class="n">${r.v ? fmtN((r.v.reposts || 0) + (r.v.quotes || 0)) : '…'}</td></tr>`).join('')}</table></div></section>` : ''}
+<p class="note">Статистика обновляется каждые 20 минут, последнее обновление ${updated} МСК. Вовлечённость — лайки, ответы и репосты к просмотрам.</p>`;
+  return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }
