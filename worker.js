@@ -1,6 +1,8 @@
 // MyLife companion bot — Cloudflare Worker
 // Telegram bot (task summaries, YouTube transcription) + MyLife web app backend + MCP server
 
+import { threadsTick, threadsReportText, threadsStatus } from './threads/threads.js';
+
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const TZ_OFFSET = 3; // Moscow UTC+3
@@ -2126,7 +2128,7 @@ async function handleScheduled(env, cron) {
   // mailings shouldn't also stop recordings from reaching Telegram.
   if (cron === '*/5 * * * *') {
     // Independent jobs — one failing mustn't skip the other.
-    const results = await Promise.allSettled([checkPendingZoomTranscripts(env), crmProcessQueue(env)]);
+    const results = await Promise.allSettled([checkPendingZoomTranscripts(env), crmProcessQueue(env), threadsTick(env, send)]);
     const failed = results.find(r => r.status === 'rejected');
     if (failed) throw failed.reason;
     return;
@@ -4652,6 +4654,21 @@ export default {
     }
 
     // Manual trigger for debugging scheduled jobs (secured with bot token as secret)
+    // Threads: /debug/threads — статусы очереди, ?run=1 — выполнить тик сейчас, ?report=1 — прислать отчёт
+    if (url.pathname === '/debug/threads') {
+      if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
+      try {
+        if (url.searchParams.get('report') === '1') {
+          await send(env, await threadsReportText(env), { disable_web_page_preview: true });
+          return new Response('Report sent');
+        }
+        const tick = url.searchParams.get('run') === '1' ? await threadsTick(env, send) : null;
+        return jsonResponse({ tick, posts: await threadsStatus(env) });
+      } catch (e) {
+        return jsonResponse({ ok: false, error: e.message || String(e) }, 500);
+      }
+    }
+
     if (url.pathname === '/debug/morning') {
       if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
       try {
