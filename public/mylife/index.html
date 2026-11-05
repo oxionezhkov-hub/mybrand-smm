@@ -61,7 +61,7 @@ svg{display:block}
 .panel-sub{font-size:14px;color:var(--muted);font-weight:500}
 .grow{flex:1}
 .card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-card);padding:20px}
-.float{min-width:0;background:var(--card);border:1px solid var(--border);border-radius:24px;padding:28px;box-shadow:0 24px 60px var(--shadow)}
+.float{--pad:28px;min-width:0;background:var(--card);border:1px solid var(--border);border-radius:24px;padding:28px;box-shadow:0 24px 60px var(--shadow)}
 
 .round{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--muted);transition:background .15s,color .15s;flex:none}
 .round:hover{background:var(--hover);color:var(--text)}
@@ -200,11 +200,14 @@ button.cell.done:hover{background:var(--accent);opacity:.85}
 /* ── Check-in ── */
 .ci-title{font-size:22px;font-weight:600;letter-spacing:-.01em;margin:0 0 6px}
 .ci-sub{font-size:14px;color:var(--muted);margin:0 0 20px;line-height:1.5}
-.scale{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
-.scale button{height:54px;border-radius:16px;font-size:18px;font-weight:600;color:var(--muted);box-shadow:inset 0 0 0 1px var(--border-strong);transition:background .15s,color .15s,transform .15s var(--ease)}
-.scale button:hover{background:var(--accent);color:var(--on-accent);box-shadow:none}
-.scale button:active{transform:scale(.9)}
-.scale-ends{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:10px}
+/* Score wheel: swipe / drag / mouse wheel / arrows, the centred number is the value */
+.wheel{position:relative;margin:0 calc(-1 * var(--pad,28px))}
+.wheel::before{content:'';position:absolute;left:50%;top:10px;bottom:10px;width:76px;transform:translateX(-50%);border-radius:22px;background:var(--cell);pointer-events:none}
+.wheel::after{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(to right,var(--card),transparent 24%,transparent 76%,var(--card))}
+.wheel-track{display:flex;align-items:center;height:96px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior:contain;padding:0 calc(50% - 32px);cursor:grab;outline-offset:-2px}
+.wheel-track::-webkit-scrollbar{display:none}
+.wheel-track button{flex:none;width:64px;height:64px;scroll-snap-align:center;font-size:44px;font-weight:600;font-variant-numeric:tabular-nums;display:flex;align-items:center;justify-content:center;will-change:transform,opacity;position:relative}
+.wheel-next{margin-top:18px}
 .ta{width:100%;min-height:96px;resize:none;font-size:16px;line-height:1.5;border:1px solid var(--border-strong);border-radius:16px;padding:14px 16px;background:var(--bg);display:block}
 .ta:focus{border-color:var(--muted)}
 .ci-score{display:flex;align-items:center;gap:12px;margin-bottom:18px}
@@ -309,11 +312,10 @@ button.cell.done:hover{background:var(--accent);opacity:.85}
   .rail-btn svg{width:17px;height:17px}
   .modal{left:0;right:0;top:auto;bottom:0;width:100%;max-height:92vh;border-radius:24px 24px 0 0;transform:translateY(100%);opacity:1;padding:26px 20px calc(24px + env(safe-area-inset-bottom))}
   .modal.show{transform:none}
-  .scale button{height:50px}
   .manifesto,.manifesto-edit{font-size:30px;letter-spacing:-.03em}
   .panel{padding:22px 16px;border-radius:24px}
   .panel-head{margin:0 0 18px 2px}
-  .float{padding:22px 18px}
+  .float{padding:22px 18px;--pad:18px}
   .layout{gap:16px}
   .week td.cnt,.week th.cnt-h{display:none}
   .week-label{display:none}
@@ -331,8 +333,6 @@ button.cell.done:hover{background:var(--accent);opacity:.85}
 @media (max-width:400px){
   .cell{width:26px;height:26px;border-radius:7px}
   .t-name{max-width:84px}
-  .scale{gap:3px}
-  .scale button{font-size:12px}
 }
 </style>
 </head>
@@ -636,7 +636,9 @@ function renderCheckin() {
   }
   if (!ci || ci.step === 0) {
     el.innerHTML = `<h3 class="ci-title" style="margin-bottom:20px">Как ты сейчас?</h3>
-      <div class="scale">${Array.from({ length: 11 }, (_, i) => `<button onclick="pickScore(${i})">${i}</button>`).join('')}</div>`;
+      <div class="wheel"><div class="wheel-track" id="wheel" tabindex="0" aria-label="Состояние от 0 до 10">${Array.from({ length: 11 }, (_, i) => `<button aria-label="${i}">${i}</button>`).join('')}</div></div>
+      <button class="btn primary block wheel-next" onclick="pickScore(S.wheel)">Дальше</button>`;
+    initWheel(last ? last.score : S.wheel ?? 5);
     return;
   }
   const head = `<div class="ci-score"><span class="num">${ci.score}</span><span class="lbl">${scoreWord(ci.score)}</span>
@@ -661,6 +663,47 @@ function renderCheckin() {
     </div>`;
 }
 window.startCheckin = () => { S.ci = { step: 0 }; renderCheckin(); };
+// ── Score wheel ───────────────────────────────────────────────────────────────
+function initWheel(start) {
+  const track = $('#wheel'); if (!track) return;
+  const items = [...track.children];
+  const pos = el => el.offsetLeft + el.offsetWidth / 2;
+  const goTo = (i, smooth = true) => track.scrollTo({ left: pos(items[i]) - track.clientWidth / 2, behavior: smooth ? 'smooth' : 'auto' });
+  let cur = -1;
+  const update = () => {
+    const c = track.scrollLeft + track.clientWidth / 2, step = pos(items[1]) - pos(items[0]);
+    let best = 0, bd = Infinity;
+    items.forEach((el, i) => {
+      const d = (pos(el) - c) / step, a = Math.min(Math.abs(d), 3);
+      if (Math.abs(d) < bd) { bd = Math.abs(d); best = i; }
+      el.style.transform = `scale(${1 - a * .2})`; el.style.opacity = String(1 - a * .3);
+    });
+    if (best !== cur) { if (cur !== -1) try { navigator.vibrate?.(4); } catch {} cur = best; S.wheel = cur; }
+  };
+  track.addEventListener('scroll', () => requestAnimationFrame(update), { passive: true });
+  // Mouse drag with the left button held; snap is paused while dragging.
+  let drag = null, dragged = false;
+  track.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    drag = { x: e.clientX, s: track.scrollLeft }; dragged = false; track.setPointerCapture(e.pointerId);
+  });
+  track.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const d = e.clientX - drag.x;
+    if (!dragged && Math.abs(d) > 4) { dragged = true; track.style.scrollSnapType = 'none'; track.style.cursor = 'grabbing'; }
+    if (dragged) track.scrollLeft = drag.s - d;
+  });
+  const endDrag = () => { if (!drag) return; drag = null; track.style.cursor = ''; if (dragged) { update(); track.style.scrollSnapType = ''; goTo(cur); } };
+  track.addEventListener('pointerup', endDrag);
+  track.addEventListener('pointercancel', endDrag);
+  track.addEventListener('click', e => { if (dragged) { dragged = false; return; } const el = e.target.closest('button'); if (el) goTo(items.indexOf(el)); });
+  track.addEventListener('wheel', e => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { e.preventDefault(); goTo(Math.max(0, Math.min(10, cur + Math.sign(e.deltaY)))); } }, { passive: false });
+  track.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); goTo(Math.max(0, Math.min(10, cur + (e.key === 'ArrowRight' ? 1 : -1)))); }
+    if (e.key === 'Enter') pickScore(cur);
+  });
+  requestAnimationFrame(() => { goTo(start, false); update(); });
+}
 window.pickScore = score => {
   const ci = S.ci = { step: 1, score, why: '', action: '', focus: true };
   renderCheckin();
