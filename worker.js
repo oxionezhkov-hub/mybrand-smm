@@ -1310,12 +1310,25 @@ async function handleYoutubeQuestion(env, ytData, question) {
 // session then re-renders, or sends the cover + caption + pinned comment back
 // through /reels/send-photo and /reels/send-text.
 //
+// Approvals/edits are queued in KV and collected by the session (POST /reels/events,
+// polled hourly). If a Routine "Call via API" trigger is configured, they are also
+// pushed to it right away.
+//
 // Secrets (wrangler secret put …):
-//   REELS_API_TOKEN      — bearer token the reels session uses for /reels/*
-//   REELS_TRIGGER_URL    — "Call via API" URL of the Routine «Рилсы: ответы из Telegram-бота»
-//   REELS_TRIGGER_TOKEN  — bearer token of that trigger
+//   REELS_API_TOKEN      — bearer token the reels session uses for /reels/* (required)
+//   REELS_TRIGGER_URL    — optional "Call via API" URL of a Claude Code Routine
+//   REELS_TRIGGER_TOKEN  — optional bearer token of that trigger
 
 const REELS_TTL = 60 * 60 * 24 * 60;
+const REELS_EVENTS_KEY = 'reels:events';
+
+// Approvals/edits wait here until the reels session collects them (POST /reels/events),
+// so the flow works even without a Routine "Call via API" trigger configured.
+async function reelsQueueEvent(env, event) {
+  const list = (await kget(env, REELS_EVENTS_KEY, [])) || [];
+  list.push({ ...event, at: Date.now() });
+  await kset(env, REELS_EVENTS_KEY, list.slice(-50), { expirationTtl: REELS_TTL });
+}
 
 function reelsAuthorized(request, env) {
   const h = request.headers.get('Authorization') || '';
@@ -1430,6 +1443,12 @@ async function handleReelsApi(request, env, path) {
     return res?.ok ? jsonResponse({ ok: true, message_id: res.result.message_id }) : jsonResponse({ ok: false, telegram: res }, 502);
   }
 
+  if (path === 'events') {
+    const list = (await kget(env, REELS_EVENTS_KEY, [])) || [];
+    await kset(env, REELS_EVENTS_KEY, [], { expirationTtl: REELS_TTL });
+    return jsonResponse({ ok: true, events: list });
+  }
+
   if (path === 'status') {
     const b = await request.json().catch(() => ({}));
     return jsonResponse({ ok: true, reel: await kget(env, `reel:${b.reel_id}`, null) });
@@ -1450,12 +1469,11 @@ async function handleReelsReply(env, msg, reelRef) {
   }
   const reel = await kget(env, `reel:${reelRef.id}`, {}) || {};
   await kset(env, `reel:${reelRef.id}`, { ...reel, status: 'feedback', last_feedback: feedback, feedback_at: Date.now() }, { expirationTtl: REELS_TTL });
-  const fired = await fireReelsRoutine(env, { event: 'feedback', reel_id: reelRef.id, version: reelRef.version, text: feedback });
-  if (fired.ok) {
-    await send(env, `✍️ Принял правки к «${escapeHtml(reelRef.title || reelRef.id)}»:\n<i>${escapeHtml(feedback).slice(0, 800)}</i>\n\nПеределываю и пришлю новую версию.`, { reply_to_message_id: msg.message_id });
-  } else {
-    await send(env, `⚠️ Правки сохранил, но не смог передать Claude (${fired.status}): <code>${escapeHtml(fired.body).slice(0, 200)}</code>`);
-  }
+  const event = { event: 'feedback', reel_id: reelRef.id, version: reelRef.version, text: feedback };
+  await reelsQueueEvent(env, event);
+  const fired = (env.REELS_TRIGGER_URL && env.REELS_TRIGGER_TOKEN) ? await fireReelsRoutine(env, event) : { ok: false };
+  const when = fired.ok ? 'Переделываю и пришлю новую версию.' : 'Claude заберёт правки в течение часа, переделает и пришлёт новую версию.';
+  await send(env, `✍️ Принял правки к «${escapeHtml(reelRef.title || reelRef.id)}»:\n<i>${escapeHtml(feedback).slice(0, 800)}</i>\n\n${when}`, { reply_to_message_id: msg.message_id });
 }
 
 async function handleReelsApprove(env, query, id) {
@@ -1464,9 +1482,12 @@ async function handleReelsApprove(env, query, id) {
   if (query.message?.message_id) {
     await tgReq(env, 'editMessageReplyMarkup', { chat_id: env.OWNER_CHAT_ID, message_id: query.message.message_id, reply_markup: reelsKeyboard(id, true) });
   }
-  const fired = await fireReelsRoutine(env, { event: 'approved', reel_id: id, version: reel.version || '1' });
-  if (fired.ok) await send(env, '✅ Принято. Готовлю обложку, описание и закреплённый комментарий.');
-  else await send(env, `⚠️ Одобрение сохранил, но не смог передать Claude (${fired.status}): <code>${escapeHtml(fired.body).slice(0, 200)}</code>`);
+  const event = { event: 'approved', reel_id: id, version: reel.version || '1' };
+  await reelsQueueEvent(env, event);
+  const fired = (env.REELS_TRIGGER_URL && env.REELS_TRIGGER_TOKEN) ? await fireReelsRoutine(env, event) : { ok: false };
+  await send(env, fired.ok
+    ? '✅ Принято. Готовлю обложку, описание и закреплённый комментарий.'
+    : '✅ Принято. В течение часа пришлю обложку, описание и закреплённый комментарий.');
 }
 
 // ── Telegram ──────────────────────────────────────────────────────────────────
