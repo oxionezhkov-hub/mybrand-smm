@@ -4473,22 +4473,7 @@ export default {
     }
 
     if (url.pathname === '/inbox/webhook') {
-      if (url.pathname.startsWith('/reels/')) {
-      try {
-        return await handleReelsApi(request, env, url.pathname.slice('/reels/'.length));
-      } catch (e) {
-        console.error('Reels API error:', e);
-        return jsonResponse({ ok: false, error: e.message || String(e) }, 500);
-      }
-    }
-
-    // Manual check that REELS_TRIGGER_URL/REELS_TRIGGER_TOKEN reach the reels Routine
-    if (url.pathname === '/debug/reels-trigger') {
-      if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
-      return jsonResponse(await fireReelsRoutine(env, { event: 'ping', reel_id: 'debug', text: 'проверка связи из воркера' }));
-    }
-
-    if (request.method !== 'POST') return new Response('OK');
+      if (request.method !== 'POST') return new Response('OK');
       try {
         return await handleInboxWebhook(request, env, ctx);
       } catch (e) {
@@ -4707,6 +4692,21 @@ export default {
 
     if (url.pathname.startsWith('/transcript-callback/')) {
       return handleTranscriptCallback(request, env, url.pathname.slice('/transcript-callback/'.length));
+    }
+
+    if (url.pathname.startsWith('/reels/')) {
+      try {
+        return await handleReelsApi(request, env, url.pathname.slice('/reels/'.length));
+      } catch (e) {
+        console.error('Reels API error:', e);
+        return jsonResponse({ ok: false, error: e.message || String(e) }, 500);
+      }
+    }
+
+    // Manual check that REELS_TRIGGER_URL/REELS_TRIGGER_TOKEN reach the reels Routine
+    if (url.pathname === '/debug/reels-trigger') {
+      if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
+      return jsonResponse(await fireReelsRoutine(env, { event: 'ping', reel_id: 'debug', text: 'проверка связи из воркера' }));
     }
 
     if (request.method !== 'POST') return new Response('OK');
