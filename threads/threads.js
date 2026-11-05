@@ -12,6 +12,7 @@ const REFRESH_EVERY_MS = 7 * 24 * 60 * 60 * 1000;
 const REPORT_HOUR_MSK = 22;
 const STATE_KEY = 'threads:state';
 const TOKEN_KEY = 'threads:token';
+const USER_KEY = 'threads:user_id';
 
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const norm = s => String(s || '').replace(/\s+/g, ' ').trim();
@@ -174,4 +175,26 @@ export async function threadsReportText(env, state, token, day) {
 export async function threadsStatus(env) {
   const state = await loadState(env);
   return QUEUE.map(p => ({ id: p.id, at: p.scheduled_at, status: postStatus(p, state), ...(state.posts[p.id] || {}) }));
+}
+
+// POST /threads/token — принять токен Threads (его присылает GitHub Actions из своего секрета).
+// Токен проверяется у самого Threads. Первый принятый токен закрепляет аккаунт:
+// дальше принимаются только токены этого же аккаунта.
+export async function threadsAcceptToken(env, send, request) {
+  let token = '';
+  try {
+    const ct = request.headers.get('content-type') || '';
+    token = ct.includes('json') ? (await request.json()).token : (await request.formData()).get('token');
+  } catch {}
+  token = String(token || '').trim();
+  if (!token) return { status: 400, body: { ok: false, error: 'нет token' } };
+  let me;
+  try { me = await api(token, 'GET', 'me', { fields: 'id,username' }); }
+  catch (e) { return { status: 401, body: { ok: false, error: 'Threads не принял токен' } }; }
+  const locked = await env.KV.get(USER_KEY);
+  if (locked && locked !== me.id) return { status: 403, body: { ok: false, error: 'токен другого аккаунта' } };
+  await env.KV.put(TOKEN_KEY, token);
+  if (!locked) await env.KV.put(USER_KEY, me.id);
+  await send(env, `🔑 <b>Threads подключён</b> к воркеру: @${esc(me.username)}. Посты будут выходить по расписанию, отчёт в 22:00.`);
+  return { status: 200, body: { ok: true, username: me.username } };
 }
