@@ -1299,6 +1299,176 @@ async function handleYoutubeQuestion(env, ytData, question) {
   }, msgId);
 }
 
+
+// ── Reels approval (videos made by the Claude Code reels session) ─────────────
+//
+// The reels session (Claude Code Remote, repo ai-zarabotok-sales) renders a reel
+// and posts it here; the bot sends it to the owner with an "Одобрено" button.
+// The owner either taps the button or replies to the video (text or voice) with
+// edits. Both are forwarded to the session's Routine "Call via API" trigger as
+// {"event":"approved"|"feedback","reel_id":...,"version":...,"text":...}; the
+// session then re-renders, or sends the cover + caption + pinned comment back
+// through /reels/send-photo and /reels/send-text.
+//
+// Secrets (wrangler secret put …):
+//   REELS_API_TOKEN      — bearer token the reels session uses for /reels/*
+//   REELS_TRIGGER_URL    — "Call via API" URL of the Routine «Рилсы: ответы из Telegram-бота»
+//   REELS_TRIGGER_TOKEN  — bearer token of that trigger
+
+const REELS_TTL = 60 * 60 * 24 * 60;
+
+function reelsAuthorized(request, env) {
+  const h = request.headers.get('Authorization') || '';
+  return !!env.REELS_API_TOKEN && h === `Bearer ${env.REELS_API_TOKEN}`;
+}
+
+function reelsKeyboard(id, approved = false) {
+  return approved
+    ? { inline_keyboard: [[{ text: '✅ Одобрено, готовлю описание', callback_data: 'reel_noop' }]] }
+    : { inline_keyboard: [[{ text: '✅ Одобрено', callback_data: `reel_ok:${id}` }]] };
+}
+
+async function tgMultipart(env, method, form) {
+  form.append('chat_id', String(env.OWNER_CHAT_ID));
+  const res = await fetch(`https://api.telegram.org/bot${env.TG_TOKEN}/${method}`, { method: 'POST', body: form });
+  return res.json();
+}
+
+async function fireReelsRoutine(env, payload) {
+  if (!env.REELS_TRIGGER_URL || !env.REELS_TRIGGER_TOKEN) {
+    return { ok: false, status: 0, body: 'REELS_TRIGGER_URL or REELS_TRIGGER_TOKEN secret not set' };
+  }
+  const res = await fetch(env.REELS_TRIGGER_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${env.REELS_TRIGGER_TOKEN}`,
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'experimental-cc-routine-2026-04-01',
+    },
+    body: JSON.stringify({ text: JSON.stringify(payload) }),
+  });
+  const body = await res.text().catch(() => '');
+  return { ok: res.ok, status: res.status, body: body.slice(0, 500) };
+}
+
+// Voice reply → text, via Workers AI Whisper (already bound as env.AI).
+async function reelsTranscribeVoice(env, fileId) {
+  const fileRes = await tgReq(env, 'getFile', { file_id: fileId });
+  const filePath = fileRes?.result?.file_path;
+  if (!filePath) return '';
+  const audioRes = await fetch(`https://api.telegram.org/file/bot${env.TG_TOKEN}/${filePath}`);
+  const bytes = new Uint8Array(await audioRes.arrayBuffer());
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const result = await env.AI.run('@cf/openai/whisper-large-v3-turbo', { audio: btoa(bin), language: 'ru' });
+  return (result?.text || '').trim();
+}
+
+async function handleReelsApi(request, env, path) {
+  if (!reelsAuthorized(request, env)) return jsonResponse({ ok: false, error: 'unauthorized' }, 401);
+  if (request.method !== 'POST') return jsonResponse({ ok: false, error: 'POST only' }, 405);
+
+  if (path === 'send-video') {
+    const fd = await request.formData();
+    const id = String(fd.get('reel_id') || '').trim();
+    const version = String(fd.get('version') || '1').trim();
+    const title = String(fd.get('title') || id).trim();
+    const note = String(fd.get('note') || '').trim();
+    const file = fd.get('file');
+    if (!id || !file || typeof file === 'string') return jsonResponse({ ok: false, error: 'reel_id and file are required' }, 400);
+    const caption = `🎬 <b>${escapeHtml(title)}</b> · версия ${escapeHtml(version)}`
+      + (note ? `\n\n${escapeHtml(note).slice(0, 600)}` : '')
+      + `\n\nНажмите «Одобрено» или ответьте на это сообщение текстом или голосовым с правками.`;
+    const form = new FormData();
+    form.append('video', file, `${id}-v${version}.mp4`);
+    form.append('caption', caption);
+    form.append('parse_mode', 'HTML');
+    form.append('supports_streaming', 'true');
+    form.append('reply_markup', JSON.stringify(reelsKeyboard(id)));
+    const res = await tgMultipart(env, 'sendVideo', form);
+    if (!res?.ok) return jsonResponse({ ok: false, telegram: res }, 502);
+    const messageId = res.result.message_id;
+    await kset(env, `reelmsg:${messageId}`, { id, version, title }, { expirationTtl: REELS_TTL });
+    await kset(env, `reel:${id}`, { id, version, title, message_id: messageId, status: 'sent', sent_at: Date.now() }, { expirationTtl: REELS_TTL });
+    return jsonResponse({ ok: true, message_id: messageId });
+  }
+
+  if (path === 'send-photo') {
+    const fd = await request.formData();
+    const file = fd.get('file');
+    if (!file || typeof file === 'string') return jsonResponse({ ok: false, error: 'file is required' }, 400);
+    const form = new FormData();
+    form.append('photo', file, String(fd.get('filename') || 'cover.jpg'));
+    const caption = String(fd.get('caption') || '');
+    if (caption) { form.append('caption', caption); form.append('parse_mode', 'HTML'); }
+    const replyTo = String(fd.get('reply_to_message_id') || '');
+    if (replyTo) form.append('reply_to_message_id', replyTo);
+    const res = await tgMultipart(env, 'sendPhoto', form);
+    return res?.ok ? jsonResponse({ ok: true, message_id: res.result.message_id }) : jsonResponse({ ok: false, telegram: res }, 502);
+  }
+
+  if (path === 'send-document') {
+    const fd = await request.formData();
+    const file = fd.get('file');
+    if (!file || typeof file === 'string') return jsonResponse({ ok: false, error: 'file is required' }, 400);
+    const form = new FormData();
+    form.append('document', file, String(fd.get('filename') || 'file.bin'));
+    const caption = String(fd.get('caption') || '');
+    if (caption) { form.append('caption', caption); form.append('parse_mode', 'HTML'); }
+    const res = await tgMultipart(env, 'sendDocument', form);
+    return res?.ok ? jsonResponse({ ok: true, message_id: res.result.message_id }) : jsonResponse({ ok: false, telegram: res }, 502);
+  }
+
+  if (path === 'send-text') {
+    const b = await request.json().catch(() => ({}));
+    if (!b.text) return jsonResponse({ ok: false, error: 'text is required' }, 400);
+    const extra = { disable_web_page_preview: true };
+    if (b.reply_to_message_id) extra.reply_to_message_id = b.reply_to_message_id;
+    if (b.parse_mode === 'none') extra.parse_mode = undefined;
+    const res = await send(env, String(b.text), extra);
+    return res?.ok ? jsonResponse({ ok: true, message_id: res.result.message_id }) : jsonResponse({ ok: false, telegram: res }, 502);
+  }
+
+  if (path === 'status') {
+    const b = await request.json().catch(() => ({}));
+    return jsonResponse({ ok: true, reel: await kget(env, `reel:${b.reel_id}`, null) });
+  }
+
+  return jsonResponse({ ok: false, error: 'unknown /reels/ path' }, 404);
+}
+
+// Reply to a reel video (text or voice) = edits for that reel.
+async function handleReelsReply(env, msg, reelRef) {
+  let feedback = (msg.text || msg.caption || '').trim();
+  if (!feedback && msg.voice) {
+    try { feedback = await reelsTranscribeVoice(env, msg.voice.file_id); } catch (e) { console.error('reels voice transcription failed:', e); }
+  }
+  if (!feedback) {
+    await send(env, 'Не смог разобрать правки. Ответьте на видео текстом или голосовым.');
+    return;
+  }
+  const reel = await kget(env, `reel:${reelRef.id}`, {}) || {};
+  await kset(env, `reel:${reelRef.id}`, { ...reel, status: 'feedback', last_feedback: feedback, feedback_at: Date.now() }, { expirationTtl: REELS_TTL });
+  const fired = await fireReelsRoutine(env, { event: 'feedback', reel_id: reelRef.id, version: reelRef.version, text: feedback });
+  if (fired.ok) {
+    await send(env, `✍️ Принял правки к «${escapeHtml(reelRef.title || reelRef.id)}»:\n<i>${escapeHtml(feedback).slice(0, 800)}</i>\n\nПеределываю и пришлю новую версию.`, { reply_to_message_id: msg.message_id });
+  } else {
+    await send(env, `⚠️ Правки сохранил, но не смог передать Claude (${fired.status}): <code>${escapeHtml(fired.body).slice(0, 200)}</code>`);
+  }
+}
+
+async function handleReelsApprove(env, query, id) {
+  const reel = await kget(env, `reel:${id}`, {}) || {};
+  await kset(env, `reel:${id}`, { ...reel, status: 'approved', approved_at: Date.now() }, { expirationTtl: REELS_TTL });
+  if (query.message?.message_id) {
+    await tgReq(env, 'editMessageReplyMarkup', { chat_id: env.OWNER_CHAT_ID, message_id: query.message.message_id, reply_markup: reelsKeyboard(id, true) });
+  }
+  const fired = await fireReelsRoutine(env, { event: 'approved', reel_id: id, version: reel.version || '1' });
+  if (fired.ok) await send(env, '✅ Принято. Готовлю обложку, описание и закреплённый комментарий.');
+  else await send(env, `⚠️ Одобрение сохранил, но не смог передать Claude (${fired.status}): <code>${escapeHtml(fired.body).slice(0, 200)}</code>`);
+}
+
 // ── Telegram ──────────────────────────────────────────────────────────────────
 
 async function tgReq(env, method, params = {}) {
@@ -1387,6 +1557,15 @@ async function handleMessage(env, msg, origin) {
   const dedupKey = `dedup:${msg.message_id}`;
   if (await env.KV.get(dedupKey)) return;
   await env.KV.put(dedupKey, '1', { expirationTtl: 300 });
+
+  // Reply to a reel video (text or voice) = edits for the reels session
+  if (msg.reply_to_message) {
+    const reelRef = await kget(env, `reelmsg:${msg.reply_to_message.message_id}`, null);
+    if (reelRef) {
+      await handleReelsReply(env, msg, reelRef);
+      return;
+    }
+  }
 
   // Uploaded file = meeting transcript (Zoom, etc.) → decisions-format summary
   if (msg.document) {
@@ -1506,6 +1685,12 @@ async function matchTaskReport(env, text, activeTasks) {
 async function handleCallback(env, query) {
   const data = query.data;
   await tgReq(env, 'answerCallbackQuery', { callback_query_id: query.id });
+
+  if (data === 'reel_noop') return;
+  if (data.startsWith('reel_ok:')) {
+    await handleReelsApprove(env, query, data.slice('reel_ok:'.length));
+    return;
+  }
 
   if (data.startsWith('mood:') || data.startsWith('moodgo:')) {
     await lifeHandleMoodCallback(env, data);
@@ -4267,7 +4452,22 @@ export default {
     }
 
     if (url.pathname === '/inbox/webhook') {
-      if (request.method !== 'POST') return new Response('OK');
+      if (url.pathname.startsWith('/reels/')) {
+      try {
+        return await handleReelsApi(request, env, url.pathname.slice('/reels/'.length));
+      } catch (e) {
+        console.error('Reels API error:', e);
+        return jsonResponse({ ok: false, error: e.message || String(e) }, 500);
+      }
+    }
+
+    // Manual check that REELS_TRIGGER_URL/REELS_TRIGGER_TOKEN reach the reels Routine
+    if (url.pathname === '/debug/reels-trigger') {
+      if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
+      return jsonResponse(await fireReelsRoutine(env, { event: 'ping', reel_id: 'debug', text: 'проверка связи из воркера' }));
+    }
+
+    if (request.method !== 'POST') return new Response('OK');
       try {
         return await handleInboxWebhook(request, env, ctx);
       } catch (e) {
