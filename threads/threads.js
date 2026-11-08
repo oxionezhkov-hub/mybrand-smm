@@ -1,8 +1,17 @@
 // Автопостинг в Threads: воркер сам публикует посты из threads/queue.json,
-// хранит статусы в KV и пишет отчёты в Telegram.
+// хранит статусы в KV, сам отвечает на комментарии и раз в день присылает
+// в Telegram статистику аккаунта за всё время.
 //
 // Секрет THREADS_TOKEN — долгоживущий токен Threads. Воркер раз в неделю
 // продлевает его сам и хранит свежий в KV (ключ threads:token).
+//
+// Автоответы пишет бесплатная Llama на Workers AI (binding AI). Для них токену
+// нужны права threads_read_replies и threads_manage_replies.
+//   THREADS_AUTOREPLY = "off"  — выключить автоответы (переменная в wrangler.toml)
+//   THREADS_REPLY_CTA          — необязательно: куда звать тех, кто спрашивает,
+//                                где научиться (например «анкета по ссылке в профиле»).
+//                                Не задано — ИИ никуда не зовёт.
+
 
 import QUEUE from './queue.json';
 
@@ -17,13 +26,30 @@ const METRICS_KEY = 'threads:metrics';   // { posts: {id: {views,likes,replies,r
 const METRICS_BATCH = 8;                  // постов за один тик: держим мало подзапросов на вызов
 const METRICS_EVERY_MS = 20 * 60 * 1000;  // один и тот же пост обновляем не чаще раза в 20 минут
 
+const AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+const REPLY_POST_WINDOW_MS = 7 * 24 * 3600e3;     // отвечаем под постами младше недели
+const REPLY_COMMENT_MAX_AGE_MS = 3 * 24 * 3600e3; // и на комментарии младше трёх дней
+const REPLY_POSTS_PER_TICK = 3;                   // сколько постов проверяем за тик (раз в 5 минут)
+const REPLIES_PER_TICK = 2;
+const REPLIES_PER_DAY = 60;
+const REPLIES_PER_USER_PER_POST = 3;              // чтобы не уйти в бесконечную переписку
+const INSIGHTS_SINCE = 1712991600;                // раньше этой даты Threads статистику не отдаёт
+
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const norm = s => String(s || '').replace(/\s+/g, ' ').trim();
 const mskTime = iso => new Date(new Date(iso).getTime() + 3 * 3600e3).toISOString().slice(11, 16);
 const mskDate = ms => new Date(ms + 3 * 3600e3).toISOString().slice(0, 10);
+const num = n => String(Math.round(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const plus = n => (n > 0 ? `+${num(n)}` : n < 0 ? `−${num(-n)}` : '0');
 
 async function loadState(env) {
-  return (await env.KV.get(STATE_KEY, 'json')) || { posts: {}, report_date: '', token_refreshed_at: 0 };
+  const s = (await env.KV.get(STATE_KEY, 'json')) || {};
+  return {
+    posts: {}, report_date: '', token_refreshed_at: 0,
+    replied: {}, reply_checked: {}, reply_log: [], needs_owner: [], metrics: {},
+    reply_total: 0, replies_since_report: 0, reply_day: { date: '', count: 0 },
+    ...s,
+  };
 }
 async function saveState(env, state) {
   await env.KV.put(STATE_KEY, JSON.stringify(state));
@@ -39,12 +65,17 @@ async function api(token, method, path, params = {}) {
     ...(method === 'POST' ? { body: qs, headers: { 'content-type': 'application/x-www-form-urlencoded' } } : {}),
   });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`Threads ${path}: ${res.status} ${body?.error?.message || JSON.stringify(body).slice(0, 200)}`);
+  if (!res.ok) {
+    const err = new Error(`Threads ${path}: ${res.status} ${body?.error?.message || JSON.stringify(body).slice(0, 200)}`);
+    err.status = res.status;
+    err.code = body?.error?.code;
+    throw err;
+  }
   return body;
 }
 
-async function publishText(token, text) {
-  const { id: creation } = await api(token, 'POST', 'me/threads', { media_type: 'TEXT', text });
+async function publishText(token, text, extra = {}) {
+  const { id: creation } = await api(token, 'POST', 'me/threads', { media_type: 'TEXT', text, ...extra });
   await new Promise(r => setTimeout(r, 3000)); // Meta советует подождать обработку контейнера
   const { id } = await api(token, 'POST', 'me/threads_publish', { creation_id: creation });
   let permalink = '';
@@ -57,6 +88,20 @@ function postStatus(post, state) {
   if (s?.status) return s.status;
   if (post.published_id) return 'published';
   return post.status;
+}
+
+// Все опубликованные посты очереди: { id, published_id, permalink, published_at(ms), text }
+function publishedPosts(state) {
+  const out = [];
+  for (const p of QUEUE) {
+    if (postStatus(p, state) !== 'published') continue;
+    const s = state.posts[p.id] || {};
+    const pid = s.published_id || p.published_id;
+    if (!pid) continue;
+    const at = Date.parse(s.published_at || p.published_at || p.scheduled_at);
+    out.push({ id: p.id, published_id: pid, permalink: s.permalink || '', published_at: at, text: p.text });
+  }
+  return out;
 }
 
 async function maybeRefreshToken(env, state, token, now, send) {
@@ -101,10 +146,6 @@ export async function threadsTick(env, send, now = Date.now()) {
       const res = dup ? { id: dup.id, permalink: dup.permalink || '' } : await publishText(token, p.text);
       state.posts[p.id] = { status: 'published', published_id: res.id, permalink: res.permalink, published_at: new Date(now).toISOString() };
       await saveState(env, state);
-      if (!dup) {
-        await send(env, `🧵 <b>Threads:</b> вышел пост на ${time}\n\n${esc(p.text.slice(0, 300))}${res.permalink ? `\n\n${res.permalink}` : ''}`,
-          { disable_web_page_preview: true });
-      }
       log.push(`${p.id}: ${dup ? 'уже был опубликован' : 'опубликован'} ${res.id}`);
     } catch (e) {
       const prev = state.posts[p.id] || {};
@@ -117,6 +158,10 @@ export async function threadsTick(env, send, now = Date.now()) {
     }
   }
 
+  try { log.push(...await autoReplyTick(env, state, token, now, send)); }
+  catch (e) { log.push(`автоответы: ошибка ${e.message}`); }
+  await saveState(env, state);
+
   await maybeRefreshToken(env, state, token, now, send);
   try { await collectMetrics(env, state, token, now); } catch (e) { log.push('метрики: ' + e.message); }
   const today = mskDate(now);
@@ -124,13 +169,186 @@ export async function threadsTick(env, send, now = Date.now()) {
   if (hourMsk === REPORT_HOUR_MSK && state.report_date !== today) {
     state.report_date = today;
     await saveState(env, state);
-    await send(env, await threadsReportText(env, state, token, today), { disable_web_page_preview: true });
+    await send(env, await threadsReportText(env, state, token, now), { disable_web_page_preview: true });
+    await saveState(env, state); // отчёт запомнил итоги для разницы «с прошлого отчёта»
     log.push('отчёт отправлен');
   } else {
     await saveState(env, state);
   }
   return { log };
 }
+
+// ── Автоответы на комментарии ────────────────────────────────────────────────
+
+function replySystemPrompt(env) {
+  const cta = String(env.THREADS_REPLY_CTA || '').trim();
+  return [
+    'Ты ведёшь аккаунт в Threads и отвечаешь на комментарии под своими постами от первого лица.',
+    'Темы аккаунта: поиск работы, подработка, как нейросети помогают зарабатывать и быстрее делать работу.',
+    'Аудитория: люди, которым нужны деньги или работа: помощники, ассистенты, уволенные, студенты, мамы в декрете.',
+    '',
+    'Как отвечать:',
+    '- по-русски, на «вы», живо и просто, как человек в соцсети, без канцелярита и без пафоса;',
+    '- 1–2 коротких предложения, не длиннее 250 символов;',
+    '- по делу комментария: согласиться, поддержать, добавить мысль или конкретный совет;',
+    '- иногда заканчивай коротким встречным вопросом, чтобы разговор продолжился;',
+    '- без ссылок, хэштегов и списков, максимум один эмодзи, лучше без него;',
+    '- не обещай заработок и не называй суммы, не продавай в лоб;',
+    '- о себе пиши без указания рода: вместо «согласна» или «согласен» — «да, так и есть», «полностью поддерживаю».',
+    cta
+      ? `- если человек прямо спрашивает, где этому научиться или как начать, можно предложить: ${cta}.`
+      : '- если человек спрашивает, где научиться, ответь, что скоро расскажете подробнее, и спроси, что ему интереснее всего.',
+    '',
+    'Ответь ровно словом SKIP, если комментарий — спам, реклама, бессмыслица, набор эмодзи, явный бот, оскорбление, агрессия, политика или религия.',
+    'Ответь ровно словом OWNER, если комментарий спрашивает лично про автора (сколько зарабатываете, где живёте, кто вы, вы бот?), предлагает сотрудничество или просит то, что нельзя ответить коротко и честно.',
+    '',
+    'Выведи только текст ответа, SKIP или OWNER, без кавычек и пояснений.',
+  ].join('\n');
+}
+
+// Возвращает { text } или { skip: 'spam' | 'owner' }.
+function cleanReply(raw) {
+  const unquote = x => x.replace(/^["«„“']+|["»“”']+$/g, '').trim();
+  let t = unquote(String(raw || '').trim());
+  if (/^OWNER\b/i.test(t)) return { skip: 'owner' };
+  if (!t || /\bSKIP\b/i.test(t)) return { skip: 'spam' };
+  t = unquote(t.replace(/^(ответ|reply)\s*:\s*/i, ''));
+  if (/https?:\/\/|www\.|#\S/.test(t)) return { skip: 'owner' };
+  if (t.length > 480) {
+    const cut = t.slice(0, 480);
+    t = cut.slice(0, Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('? '), cut.lastIndexOf('! ')) + 1) || cut;
+  }
+  return { text: t.trim() };
+}
+
+async function generateReply(env, post, chain) {
+  const dialog = chain.map(c => `${c.mine ? 'Вы' : '@' + (c.username || 'гость')}: ${norm(c.text)}`).join('\n');
+  const user = `Ваш пост:\n${norm(post.text)}\n\nПереписка под постом (последнее сообщение — то, на которое отвечаете):\n${dialog}\n\nВаш ответ:`;
+  const r = await env.AI.run(AI_MODEL, {
+    messages: [{ role: 'system', content: replySystemPrompt(env) }, { role: 'user', content: user }],
+    max_tokens: 200,
+    temperature: 0.7,
+  });
+  return cleanReply(r?.response);
+}
+
+function isPermissionError(e) {
+  return e?.status === 403 || e?.code === 10 || e?.code === 200 || /permission|scope/i.test(e?.message || '');
+}
+
+async function autoReplyTick(env, state, token, now, send) {
+  if (String(env.THREADS_AUTOREPLY || '').toLowerCase() === 'off' || !env.AI) return [];
+  // нет прав на комментарии — пробуем снова раз в сутки
+  if (state.autoreply_error_at && now - state.autoreply_error_at < 24 * 3600e3) return [];
+
+  const today = mskDate(now);
+  if (state.reply_day.date !== today) state.reply_day = { date: today, count: 0 };
+  // чистим память об отвеченных комментариях старше двух недель
+  for (const [k, v] of Object.entries(state.replied)) if (now - (v.at || 0) > 14 * 24 * 3600e3) delete state.replied[k];
+
+  const posts = publishedPosts(state)
+    .filter(p => now - p.published_at < REPLY_POST_WINDOW_MS)
+    .filter(p => now - (state.reply_checked[p.published_id] || 0) >= (now - p.published_at < 24 * 3600e3 ? 10 * 60e3 : 2 * 3600e3))
+    .sort((a, b) => (state.reply_checked[a.published_id] || 0) - (state.reply_checked[b.published_id] || 0))
+    .slice(0, REPLY_POSTS_PER_TICK);
+  for (const k of Object.keys(state.reply_checked)) if (now - state.reply_checked[k] > REPLY_POST_WINDOW_MS + 24 * 3600e3) delete state.reply_checked[k];
+
+  const log = [];
+  let sent = 0;
+  for (const post of posts) {
+    let items;
+    try {
+      const r = await api(token, 'GET', `${post.published_id}/conversation`, {
+        fields: 'id,text,username,timestamp,permalink,replied_to,is_reply_owned_by_me,hide_status',
+        reverse: 'false', limit: '100',
+      });
+      items = r.data || [];
+    } catch (e) {
+      if (isPermissionError(e)) {
+        const first = !state.autoreply_error_notified;
+        state.autoreply_error_at = now;
+        state.autoreply_error_notified = true;
+        if (first) {
+          await send(env, `⚠️ <b>Threads:</b> не могу читать комментарии, автоответы на паузе. Токену нужны права <code>threads_read_replies</code> и <code>threads_manage_replies</code>: выпустите новый токен с ними и запустите workflow «Threads — передать токен воркеру».\n<code>${esc(e.message.slice(0, 200))}</code>`);
+        }
+        return [`автоответы: нет прав — ${e.message}`];
+      }
+      log.push(`${post.id}: комментарии не загрузились — ${e.message}`);
+      continue;
+    }
+    state.reply_checked[post.published_id] = now;
+    state.autoreply_error_at = 0;
+    state.autoreply_error_notified = false;
+
+    const byId = new Map(items.map(i => [i.id, i]));
+    const mine = new Set([post.published_id, ...items.filter(i => i.is_reply_owned_by_me).map(i => i.id)]);
+    const answered = new Set(items.filter(i => i.is_reply_owned_by_me).map(i => i.replied_to?.id).filter(Boolean));
+    const myRepliesTo = name => items.filter(i => i.is_reply_owned_by_me && byId.get(i.replied_to?.id)?.username === name).length;
+
+    for (const c of items) {
+      if (sent >= REPLIES_PER_TICK || state.reply_day.count >= REPLIES_PER_DAY) break;
+      if (c.is_reply_owned_by_me || !c.text) continue;
+      if (!mine.has(c.replied_to?.id)) continue;          // отвечаем только на то, что адресовано нам
+      if (answered.has(c.id) || state.replied[c.id]) continue;
+      if (c.hide_status && !['NOT_HUSHED', 'UNHUSHED'].includes(c.hide_status)) continue;
+      if (now - Date.parse(c.timestamp) > REPLY_COMMENT_MAX_AGE_MS) continue;
+      if (myRepliesTo(c.username) >= REPLIES_PER_USER_PER_POST) continue;
+
+      // цепочка от поста до этого комментария, чтобы ИИ видел контекст
+      const chain = [];
+      for (let cur = c; cur && chain.length < 6; cur = byId.get(cur.replied_to?.id)) {
+        chain.unshift({ text: cur.text, username: cur.username, mine: !!cur.is_reply_owned_by_me });
+      }
+
+      let gen;
+      try { gen = await generateReply(env, post, chain); }
+      catch (e) { log.push(`${c.id}: ИИ не ответил — ${e.message}`); continue; }
+
+      if (gen.skip) {
+        state.replied[c.id] = { at: now, skip: gen.skip };
+        if (gen.skip === 'owner') {
+          state.needs_owner = [...state.needs_owner, {
+            at: now, username: c.username, text: norm(c.text).slice(0, 120), permalink: c.permalink || post.permalink,
+          }].slice(-15);
+        }
+        log.push(`${c.id}: пропущен (${gen.skip === 'owner' ? 'оставил вам' : 'спам'})`);
+        continue;
+      }
+      const text = gen.text;
+      try {
+        state.replied[c.id] = { at: now, pending: true };
+        await saveState(env, state); // сначала запоминаем, чтобы не ответить дважды при сбое
+        const res = await publishText(token, text, { reply_to_id: c.id });
+        state.replied[c.id] = { at: now, reply_id: res.id };
+        state.reply_total += 1;
+        state.replies_since_report += 1;
+        state.reply_day.count += 1;
+        state.reply_log = [...state.reply_log, {
+          at: new Date(now).toISOString(), post: post.id, username: c.username,
+          comment: norm(c.text).slice(0, 200), reply: text, permalink: res.permalink,
+        }].slice(-30);
+        answered.add(c.id);
+        sent += 1;
+        log.push(`${c.id}: ответил`);
+      } catch (e) {
+        delete state.replied[c.id]; // ответ не ушёл — попробуем в следующий раз
+        if (isPermissionError(e)) {
+          state.autoreply_error_at = now;
+          if (!state.autoreply_error_notified) {
+            state.autoreply_error_notified = true;
+            await send(env, `⚠️ <b>Threads:</b> не могу отвечать на комментарии, автоответы на паузе. Токену нужно право <code>threads_manage_replies</code>.\n<code>${esc(e.message.slice(0, 200))}</code>`);
+          }
+          return [...log, `автоответы: нет прав — ${e.message}`];
+        }
+        log.push(`${c.id}: ответ не ушёл — ${e.message}`);
+      }
+      await saveState(env, state);
+    }
+  }
+  return log;
+}
+
+// ── Статистика ───────────────────────────────────────────────────────────────
 
 async function insights(token, id) {
   try {
@@ -167,44 +385,84 @@ async function collectMetrics(env, state, token, now) {
   if (stale.length || m.profile.at === now) await env.KV.put(METRICS_KEY, JSON.stringify(m));
 }
 
-export async function threadsReportText(env, state, token, day) {
+// Итоги всего аккаунта (включая посты, опубликованные не воркером).
+async function accountTotals(token, now) {
+  try {
+    const r = await api(token, 'GET', 'me/threads_insights', {
+      metric: 'views,likes,replies,reposts,quotes,followers_count',
+      since: String(INSIGHTS_SINCE), until: String(Math.floor(now / 1000)),
+    });
+    const t = {};
+    for (const x of r.data || []) {
+      t[x.name === 'followers_count' ? 'followers' : x.name] = x.total_value?.value
+        ?? (x.values || []).reduce((s, v) => s + (v.value || 0), 0);
+    }
+    return t;
+  } catch { return null; }
+}
+
+export async function threadsReportText(env, state, token, now = Date.now()) {
   state = state || await loadState(env);
   token = token || await getToken(env);
-  day = day || mskDate(Date.now());
-  const todays = QUEUE.filter(p => mskDate(Date.parse(p.scheduled_at)) === day && p.status === 'approved');
-  const lines = [];
-  let views = 0, replies = 0;
-  for (const p of todays) {
-    const s = state.posts[p.id] || (p.published_id ? { status: 'published', published_id: p.published_id } : {});
-    const t = mskTime(p.scheduled_at);
-    const head = esc(norm(p.text).slice(0, 60));
-    if (s.status === 'published') {
-      const m = await insights(token, s.published_id);
-      if (m) { views += m.views || 0; replies += m.replies || 0; }
-      lines.push(`✅ ${t} ${head}…${m ? `\n     👁 ${m.views || 0} · ❤️ ${m.likes || 0} · 💬 ${m.replies || 0} · 🔁 ${m.reposts || 0}` : ''}`);
-    } else if (s.status === 'missed') {
-      lines.push(`⏭ ${t} ${head}… — пропущен`);
-    } else {
-      lines.push(`⏳ ${t} ${head}… — ${s.last_error ? 'ошибка: ' + esc(s.last_error.slice(0, 80)) : 'ждёт'}`);
-    }
-  }
-  const tomorrow = mskDate(Date.parse(day + 'T12:00:00Z') + 24 * 3600e3);
-  const nextCount = QUEUE.filter(p => mskDate(Date.parse(p.scheduled_at)) === tomorrow && postStatus(p, state) === 'approved').length;
+  if (typeof now === 'string') now = Date.parse(now + 'T19:00:00Z'); // старый вызов с датой
+
+  const published = publishedPosts(state);
+  const metrics = (await env.KV.get(METRICS_KEY, 'json')) || { posts: {}, profile: {} };
+  const cached = published.map(p => ({ ...p, m: metrics.posts?.[p.id] || {} }));
+  const sum = k => cached.reduce((s, p) => s + (p.m[k] || 0), 0);
+  const totals = (await accountTotals(token, now))
+    || { views: sum('views'), likes: sum('likes'), replies: sum('replies'), reposts: sum('reposts'), quotes: sum('quotes'),
+         followers: metrics.profile?.followers };
+  const prev = state.report_prev?.totals;
+  const d = k => (prev && prev[k] != null && totals[k] != null ? ` (${plus(totals[k] - prev[k])})` : '');
+
+  const top = cached.filter(p => p.m.views).sort((a, b) => b.m.views - a.m.views).slice(0, 3);
+  const nextPost = QUEUE.filter(p => postStatus(p, state) === 'approved' && Date.parse(p.scheduled_at) > now)
+    .sort((a, b) => Date.parse(a.scheduled_at) - Date.parse(b.scheduled_at))[0];
   const left = QUEUE.filter(p => postStatus(p, state) === 'approved').length;
-  return [
-    `📊 <b>Threads за ${day}</b>`,
-    todays.length ? `Постов: ${todays.length} · просмотров: ${views} · ответов: ${replies}` : 'Сегодня постов не было.',
+  const owner = state.needs_owner || [];
+
+  const lines = [
+    '📊 <b>Threads за всё время</b>',
+    totals.followers != null ? `👥 Подписчики: ${num(totals.followers)}${d('followers')}` : '',
+    `📝 Постов вышло: ${published.length}`,
+    `👁 Просмотры: ${num(totals.views)}${d('views')}`,
+    `❤️ Лайки: ${num(totals.likes)}${d('likes')}`,
+    `💬 Комментарии: ${num(totals.replies)}${d('replies')}`,
+    `🔁 Репосты: ${num(totals.reposts)}${d('reposts')}${totals.quotes ? ` · цитаты: ${num(totals.quotes)}${d('quotes')}` : ''}`,
+    `🤖 Автоответов: ${num(state.reply_total)}${state.replies_since_report ? ` (+${state.replies_since_report})` : ''}`,
+    prev ? `<i>в скобках — изменение с прошлого отчёта</i>` : '',
     '',
-    ...lines,
+    top.length ? '🔥 <b>Лучшие посты</b>' : '',
+    ...top.map((p, i) => `${i + 1}. ${p.permalink ? `<a href="${p.permalink}">${esc(norm(p.text).slice(0, 50))}…</a>` : esc(norm(p.text).slice(0, 50)) + '…'}\n     👁 ${num(p.m.views)} · ❤️ ${num(p.m.likes)} · 💬 ${num(p.m.replies)}`),
     '',
-    `Завтра в очереди: ${nextCount}. Всего осталось: ${left}.`,
+    owner.length ? `🙋 <b>Ждут вашего ответа</b> (ИИ не стал отвечать)` : '',
+    ...owner.map(o => `• @${esc(o.username || '?')}: ${esc(o.text)}${o.permalink ? ` — <a href="${o.permalink}">открыть</a>` : ''}`),
+    owner.length ? ' ' : '',
+    `В очереди: ${left}${nextPost ? `, следующий ${mskDate(Date.parse(nextPost.scheduled_at)).slice(5).split('-').reverse().join('.')} в ${mskTime(nextPost.scheduled_at)}` : ''}.`,
     left === 0 ? '⚠️ Очередь закончилась — пора готовить новые посты.' : '',
-  ].filter((l, i, a) => l !== '' || a[i - 1] !== '').join('\n');
+  ];
+
+  state.report_prev = { date: mskDate(now), totals };
+  state.replies_since_report = 0;
+  state.needs_owner = [];
+  return lines.filter((l, i, a) => l !== '' || (i > 0 && a[i - 1] !== '')).join('\n').trim();
 }
 
 export async function threadsStatus(env) {
   const state = await loadState(env);
   return QUEUE.map(p => ({ id: p.id, at: p.scheduled_at, status: postStatus(p, state), ...(state.posts[p.id] || {}) }));
+}
+
+// Для /debug/threads?replies=1 — последние автоответы и комментарии, оставленные владельцу.
+export async function threadsRepliesLog(env) {
+  const state = await loadState(env);
+  return {
+    enabled: String(env.THREADS_AUTOREPLY || '').toLowerCase() !== 'off',
+    paused_until: state.autoreply_error_at ? new Date(state.autoreply_error_at + 24 * 3600e3).toISOString() : null,
+    total: state.reply_total, today: state.reply_day,
+    last: state.reply_log, needs_owner: state.needs_owner,
+  };
 }
 
 // POST /threads/token — принять токен Threads (его присылает GitHub Actions из своего секрета).
@@ -225,7 +483,12 @@ export async function threadsAcceptToken(env, send, request) {
   if (locked && locked !== me.id) return { status: 403, body: { ok: false, error: 'токен другого аккаунта' } };
   await env.KV.put(TOKEN_KEY, token);
   if (!locked) await env.KV.put(USER_KEY, me.id);
-  await send(env, `🔑 <b>Threads подключён</b> к воркеру: @${esc(me.username)}. Посты будут выходить по расписанию, отчёт в 22:00.`);
+  // новый токен — снимаем паузу автоответов, если она была из-за прав
+  const state = await loadState(env);
+  state.autoreply_error_at = 0;
+  state.autoreply_error_notified = false;
+  await saveState(env, state);
+  await send(env, `🔑 <b>Threads подключён</b> к воркеру: @${esc(me.username)}. Посты выходят по расписанию, на комментарии отвечаю сам, статистика за всё время — в 22:00.`);
   return { status: 200, body: { ok: true, username: me.username } };
 }
 
@@ -285,6 +548,7 @@ a{color:var(--accent)}.t{display:block;color:var(--muted);font-size:12px;font-va
 <div class="kpi"><b>${fmtN(avg)}</b><span>в среднем на пост</span></div>
 <div class="kpi"><b>${fmtN(replies)}</b><span>ответов</span></div>
 <div class="kpi"><b>${er}%</b><span>вовлечённость</span></div>
+<div class="kpi"><b>${fmtN(state.reply_total)}</b><span>автоответов</span></div>
 </div>
 ${pub.length ? `<h2>Просмотры по постам</h2><div class="chart">${bars}</div><p class="note">Столбик — один пост, по порядку выхода. Наведите, чтобы увидеть дату и просмотры.</p>` : ''}
 ${top.length ? `<section><h2>Лучшие посты</h2><div class="wrap"><table><tr><th>Пост</th><th class="n">👁</th><th class="n">❤️</th><th class="n">💬</th></tr>
