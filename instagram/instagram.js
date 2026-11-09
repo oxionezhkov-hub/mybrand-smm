@@ -15,7 +15,9 @@
 // Открытая статистика: GET /instagram/status (HTML) и /instagram/status?format=json.
 // Отладка: /debug/instagram?token=<TG_TOKEN>, ?run=1 — собрать сейчас, ?report=1 — прислать отчёт.
 
-const API = 'https://graph.instagram.com';
+const API = 'https://graph.instagram.com';        // токены IGAA… (вход через Instagram)
+const FB_API = 'https://graph.facebook.com/v23.0'; // токены EAA…/EAG… (единый вход Meta, вход через Facebook)
+const CONN_KEY = 'instagram:conn';                 // { base, ig_id } — куда и от чьего имени ходить
 const TOKEN_KEY = 'instagram:token';
 const USER_KEY = 'instagram:user_id';
 const STATE_KEY = 'instagram:state';
@@ -46,9 +48,17 @@ async function loadMetrics(env) {
   return { media: {}, profile: {}, daily: {}, ...((await env.KV.get(METRICS_KEY, 'json')) || {}) };
 }
 
-async function api(token, path, params = {}) {
-  const qs = new URLSearchParams({ ...params, access_token: token });
-  const res = await fetch(`${API}/${path}?${qs}`);
+// conn = { token, base, acct }: acct — 'me' для токенов Instagram, id аккаунта для токенов Facebook.
+async function getConn(env) {
+  const token = await getToken(env);
+  const c = (await env.KV.get(CONN_KEY, 'json')) || {};
+  const base = c.base || API;
+  return { token, base, acct: base === API ? 'me' : c.ig_id };
+}
+
+async function api(conn, path, params = {}) {
+  const qs = new URLSearchParams({ ...params, access_token: conn.token });
+  const res = await fetch(`${conn.base}/${path}?${qs}`);
   const body = await res.json().catch(() => ({}));
   if (!res.ok || body.error) {
     const err = new Error(`Instagram ${path.split('?')[0]}: ${res.status} ${body?.error?.message || JSON.stringify(body).slice(0, 200)}`);
@@ -96,7 +106,9 @@ async function countCodewords(token, mediaId, re) {
   return { codewords: n, comments_read: total };
 }
 
-async function maybeRefreshToken(env, state, token, now, send) {
+async function maybeRefreshToken(env, state, conn, now, send) {
+  if (conn.base !== API) return; // токены Facebook из кабинета так не продлеваются
+  const token = conn.token;
   if (!state.token_refreshed_at) { state.token_refreshed_at = now; return; }
   if (now - state.token_refreshed_at < REFRESH_EVERY_MS) return;
   const res = await fetch(`${API}/refresh_access_token?grant_type=ig_refresh_token&access_token=${encodeURIComponent(token)}`);
@@ -113,8 +125,9 @@ async function maybeRefreshToken(env, state, token, now, send) {
 // Вызывается из cron "*/5 * * * *". Почти всегда ничего не делает: работает,
 // только когда подошло время обновить список или показатели.
 export async function instagramTick(env, send, now = Date.now()) {
-  const token = await getToken(env);
-  if (!token) return { skipped: 'нет токена Instagram' };
+  const conn = await getConn(env);
+  if (!conn.token) return { skipped: 'нет токена Instagram' };
+  if (!conn.acct) return { skipped: 'не найден аккаунт Instagram для токена' };
   const state = await loadState(env);
   const m = await loadMetrics(env);
   const log = [];
@@ -122,14 +135,14 @@ export async function instagramTick(env, send, now = Date.now()) {
 
   try {
     if (now - state.list_at >= LIST_EVERY_MS) {
-      const me = await api(token, 'me', { fields: 'user_id,username,followers_count,follows_count,media_count' });
+      const me = await api(conn, conn.acct, { fields: 'username,followers_count,follows_count,media_count' });
       m.profile = { username: me.username, followers: me.followers_count, follows: me.follows_count, media_count: me.media_count, at: now };
       const day = mskDate(now);
       m.daily[day] = { ...(m.daily[day] || {}), followers: me.followers_count };
       const keys = Object.keys(m.daily).sort();
       for (const k of keys.slice(0, Math.max(0, keys.length - 120))) delete m.daily[k];
 
-      const r = await api(token, 'me/media', {
+      const r = await api(conn, `${conn.acct}/media`, {
         fields: 'id,caption,media_type,media_product_type,permalink,timestamp,like_count,comments_count,thumbnail_url',
         limit: '50',
       });
@@ -153,10 +166,10 @@ export async function instagramTick(env, send, now = Date.now()) {
       .sort((a, b) => (a[1].at || 0) - (b[1].at || 0))
       .slice(0, MEDIA_PER_TICK);
     for (const [id, v] of due) {
-      const ins = await mediaInsights(token, { id, media_product_type: v.type });
+      const ins = await mediaInsights(conn, { id, media_product_type: v.type });
       let cw = {};
       if (v.type !== 'STORY' && (v.comments || 0) > 0) {
-        try { cw = await countCodewords(token, id, re); } catch (e) { log.push(`${id}: комментарии — ${e.message}`); }
+        try { cw = await countCodewords(conn, id, re); } catch (e) { log.push(`${id}: комментарии — ${e.message}`); }
       } else cw = { codewords: 0 };
       m.media[id] = { ...v, ...(ins || {}), ...cw, at: now };
       changed = true;
@@ -172,7 +185,7 @@ export async function instagramTick(env, send, now = Date.now()) {
   }
 
   if (changed) await env.KV.put(METRICS_KEY, JSON.stringify(m));
-  await maybeRefreshToken(env, state, token, now, send);
+  await maybeRefreshToken(env, state, conn, now, send);
 
   const today = mskDate(now);
   const hourMsk = new Date(now + 3 * 3600e3).getUTCHours();
@@ -227,23 +240,55 @@ export async function instagramDebug(env, send, url) {
   return { tick, connected: !!(await getToken(env)), token_refreshed_at: state.token_refreshed_at, list_at: state.list_at, metrics: await loadMetrics(env) };
 }
 
+// Определить, какой это токен и к какому аккаунту Instagram он относится.
+// Токен Instagram (IG…) — graph.instagram.com/me. Токен Facebook (EA…) —
+// graph.facebook.com: аккаунт по ig_user_id, иначе сам /me, иначе через страницы.
+async function discover(token, igUserId) {
+  if (/^IG/.test(token)) {
+    const me = await api({ token, base: API }, 'me', { fields: 'user_id,username' });
+    return { base: API, ig_id: String(me.user_id), username: me.username };
+  }
+  const fb = { token, base: FB_API };
+  const errors = [];
+  if (igUserId) {
+    try {
+      const u = await api(fb, igUserId, { fields: 'id,username' });
+      if (u.username) return { base: FB_API, ig_id: String(u.id), username: u.username };
+    } catch (e) { errors.push(e.message); }
+  }
+  try {
+    const u = await api(fb, 'me', { fields: 'id,username' });
+    if (u.username) return { base: FB_API, ig_id: String(u.id), username: u.username };
+  } catch (e) { errors.push(e.message); }
+  try {
+    const r = await api(fb, 'me/accounts', { fields: 'instagram_business_account{id,username}', limit: '50' });
+    const ig = (r.data || []).map(p => p.instagram_business_account).find(Boolean);
+    if (ig) return { base: FB_API, ig_id: String(ig.id), username: ig.username };
+    errors.push('у страниц Facebook нет связанного Instagram');
+  } catch (e) { errors.push(e.message); }
+  throw new Error(errors.join(' | '));
+}
+
 // POST /instagram/token — принять токен (его присылает GitHub Actions из секрета).
 // Первый принятый токен закрепляет аккаунт: дальше принимаются только токены этого же аккаунта.
 export async function instagramAcceptToken(env, send, request) {
-  let token = '';
+  let token = '', igUserId = '';
   try {
     const ct = request.headers.get('content-type') || '';
-    token = ct.includes('json') ? (await request.json()).token : (await request.formData()).get('token');
+    const b = ct.includes('json') ? await request.json() : Object.fromEntries(await request.formData());
+    token = b.token;
+    igUserId = String(b.ig_user_id || '').trim();
   } catch {}
   token = String(token || '').trim();
   if (!token) return { status: 400, body: { ok: false, error: 'нет token' } };
   let me;
-  try { me = await api(token, 'me', { fields: 'user_id,username' }); }
-  catch (e) { return { status: 401, body: { ok: false, error: 'Instagram не принял токен: ' + e.message.slice(0, 200) } }; }
+  try { me = await discover(token, igUserId); }
+  catch (e) { return { status: 401, body: { ok: false, error: 'Instagram не принял токен: ' + e.message.slice(0, 300) } }; }
   const locked = await env.KV.get(USER_KEY);
-  if (locked && locked !== String(me.user_id)) return { status: 403, body: { ok: false, error: 'токен другого аккаунта' } };
+  if (locked && locked !== String(me.ig_id)) return { status: 403, body: { ok: false, error: 'токен другого аккаунта' } };
   await env.KV.put(TOKEN_KEY, token);
-  if (!locked) await env.KV.put(USER_KEY, String(me.user_id));
+  await env.KV.put(CONN_KEY, JSON.stringify({ base: me.base, ig_id: me.ig_id }));
+  if (!locked) await env.KV.put(USER_KEY, String(me.ig_id));
   const state = await loadState(env);
   state.token_refreshed_at = Date.now();
   state.list_at = 0; // сразу собрать статистику на ближайшем тике
