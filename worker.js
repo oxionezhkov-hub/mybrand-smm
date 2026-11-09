@@ -3,6 +3,7 @@
 
 import { threadsTick, threadsReportText, threadsStatus, threadsAcceptToken, threadsPublicStatus } from './threads/threads.js';
 import { instagramTick, instagramAcceptToken, instagramPublicStatus, instagramDebug } from './instagram/instagram.js';
+import { youtubeTick, youtubeAcceptToken, youtubePublicStatus, youtubeDebug } from './youtube/youtube.js';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -2129,7 +2130,7 @@ async function handleScheduled(env, cron) {
   // mailings shouldn't also stop recordings from reaching Telegram.
   if (cron === '*/5 * * * *') {
     // Independent jobs — one failing mustn't skip the other.
-    const results = await Promise.allSettled([checkPendingZoomTranscripts(env), crmProcessQueue(env), threadsTick(env, send), instagramTick(env, send)]);
+    const results = await Promise.allSettled([checkPendingZoomTranscripts(env), crmProcessQueue(env), threadsTick(env, send), instagramTick(env, send), youtubeTick(env, send)]);
     const failed = results.find(r => r.status === 'rejected');
     if (failed) throw failed.reason;
     return;
@@ -4662,6 +4663,17 @@ export default {
     if (url.pathname === '/instagram/token' && request.method === 'POST') {
       const r = await instagramAcceptToken(env, send, request);
       return jsonResponse(r.body, r.status);
+    }
+    // YouTube: открытая статистика, приём ключей от GitHub Actions и отладка
+    if (url.pathname === '/youtube/status') return youtubePublicStatus(env, url);
+    if (url.pathname === '/youtube/token' && request.method === 'POST') {
+      const r = await youtubeAcceptToken(env, send, request);
+      return jsonResponse(r.body, r.status);
+    }
+    if (url.pathname === '/debug/youtube') {
+      if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
+      try { return jsonResponse(await youtubeDebug(env, send, url)); }
+      catch (e) { return jsonResponse({ ok: false, error: e.message || String(e) }, 500); }
     }
     if (url.pathname === '/debug/instagram') {
       if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
