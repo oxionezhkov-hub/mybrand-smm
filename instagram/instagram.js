@@ -82,17 +82,19 @@ async function mediaInsights(token, m) {
     : m.media_product_type === 'STORY'
       ? ['views,reach,replies,shares', 'reach']
       : ['views,reach,likes,comments,shares,saved,total_interactions', 'reach,saved'];
+  let last = '';
   for (const metric of sets) {
     try {
       const r = await api(token, `${m.id}/insights`, { metric });
-      const out = {};
+      const out = { insights_error: null };
       for (const x of r.data || []) out[x.name] = x.values?.[0]?.value ?? x.total_value?.value ?? 0;
       return out;
     } catch (e) {
       if (e.status === 401 || e.code === 190) throw e;
+      last = e.message;
     }
   }
-  return null;
+  return { insights_error: last.slice(0, 300) }; // видно в /instagram/status?format=json
 }
 
 async function countCodewords(token, mediaId, re) {
@@ -169,7 +171,7 @@ export async function instagramTick(env, send, now = Date.now()) {
       const ins = await mediaInsights(conn, { id, media_product_type: v.type });
       let cw = {};
       if (v.type !== 'STORY' && (v.comments || 0) > 0) {
-        try { cw = await countCodewords(conn, id, re); } catch (e) { log.push(`${id}: комментарии — ${e.message}`); }
+        try { cw = { ...(await countCodewords(conn, id, re)), comments_error: null }; } catch (e) { cw = { comments_error: e.message.slice(0, 300) }; log.push(`${id}: комментарии — ${e.message}`); }
       } else cw = { codewords: 0 };
       m.media[id] = { ...v, ...(ins || {}), ...cw, at: now };
       changed = true;
