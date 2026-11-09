@@ -85,6 +85,10 @@ binding = "AI"
 # "как ты?" check-ins (push + Telegram).
 MAILINGS_PAUSED = "false"
 
+# Instagram (instagram/instagram.js): кодовое слово, которое считаем в комментариях.
+INSTAGRAM_CODEWORD = "ИИ"
+# YouTube (youtube/youtube.js) берёт то же слово, если YOUTUBE_CODEWORD не задано.
+
 # All cron schedules the Worker's scheduled() handler dispatches on (see
 # handleScheduled in worker.js). Kept complete here so a `wrangler deploy`
 # doesn't drop schedules that existed only in the dashboard before.
@@ -94,7 +98,7 @@ crons = [
   "0 10 * * *",  # 13:00 MSK daily — "как ты?" check-in (push + Telegram)
   "0 18 * * *",  # 21:00 MSK daily — "как ты?" check-in (push + Telegram)
   "0 6 * * *",   # 09:00 MSK daily — Entrepreneur content summary
-  "*/5 * * * *", # every 5 min — Zoom transcript retry/polling (checkPendingZoomTranscripts) + Threads autoposting (threads/threads.js):
+  "*/5 * * * *", # every 5 min — Zoom transcript retry/polling (checkPendingZoomTranscripts) + Threads autoposting (threads/threads.js) + Instagram stats (instagram/instagram.js) + YouTube stats (youtube/youtube.js):
                  # retries transcript downloads that failed and covers meetings whose
                  # recording.transcript_completed webhook never fires
 ]
