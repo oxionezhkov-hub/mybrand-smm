@@ -98,7 +98,7 @@ crons = [
   "0 10 * * *",  # 13:00 MSK daily — "как ты?" check-in (push + Telegram)
   "0 18 * * *",  # 21:00 MSK daily — "как ты?" check-in (push + Telegram)
   "0 6 * * *",   # 09:00 MSK daily — Entrepreneur content summary
-  "*/5 * * * *", # every 5 min — Zoom transcript retry/polling (checkPendingZoomTranscripts) + Threads autoposting (threads/threads.js) + Instagram stats (instagram/instagram.js) + YouTube stats (youtube/youtube.js):
+  "*/5 * * * *", # every 5 min — Zoom transcript retry/polling (checkPendingZoomTranscripts) + Threads autoposting (threads/threads.js) + Instagram stats (instagram/instagram.js) + YouTube stats (youtube/youtube.js) + TikTok stats (tiktok/tiktok.js):
                  # retries transcript downloads that failed and covers meetings whose
                  # recording.transcript_completed webhook never fires
 ]
