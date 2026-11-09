@@ -1,7 +1,7 @@
 // MyLife companion bot — Cloudflare Worker
 // Telegram bot (task summaries, YouTube transcription) + MyLife web app backend + MCP server
 
-import { threadsTick, threadsReportText, threadsStatus, threadsAcceptToken, threadsPublicStatus } from './threads/threads.js';
+import { threadsTick, threadsPublishTick, threadsReportText, threadsStatus, threadsAcceptToken, threadsPublicStatus } from './threads/threads.js';
 import { instagramTick, instagramAcceptToken, instagramPublicStatus, instagramDebug } from './instagram/instagram.js';
 import { youtubeTick, youtubeAcceptToken, youtubePublicStatus, youtubeDebug } from './youtube/youtube.js';
 import { tiktokTick, tiktokAcceptKeys, tiktokConnect, tiktokCallback, tiktokPublicStatus, tiktokDebug } from './tiktok/tiktok.js';
@@ -2125,11 +2125,18 @@ async function lifeMorningBriefText(env) {
 
 // ── Scheduled jobs ────────────────────────────────────────────────────────────
 
-async function handleScheduled(env, cron) {
-  // Every 5 minutes — Zoom transcript polling fallback (see checkPendingZoomTranscripts).
-  // Kept outside the MAILINGS_PAUSED gate below: pausing the daily task-summary/push
-  // mailings shouldn't also stop recordings from reaching Telegram.
-  if (cron === '*/5 * * * *') {
+async function handleScheduled(env, cron, scheduledTime = Date.now()) {
+  // Every minute: Threads posts go out at their exact minute (threads/threads.js).
+  // Everything else below keeps its old every-5-minutes pace. One cron instead of two,
+  // because the free plan allows only 5 cron triggers per worker.
+  if (cron === '* * * * *' || cron === '*/5 * * * *') {
+    if (cron === '* * * * *' && new Date(scheduledTime).getUTCMinutes() % 5 !== 0) {
+      await threadsPublishTick(env, send);
+      return;
+    }
+    // Every 5 minutes — Zoom transcript polling fallback (see checkPendingZoomTranscripts).
+    // Kept outside the MAILINGS_PAUSED gate below: pausing the daily task-summary/push
+    // mailings shouldn't also stop recordings from reaching Telegram.
     // Independent jobs — one failing mustn't skip the other.
     const results = await Promise.allSettled([checkPendingZoomTranscripts(env), crmProcessQueue(env), threadsTick(env, send), instagramTick(env, send), youtubeTick(env, send), tiktokTick(env, send)]);
     const failed = results.find(r => r.status === 'rejected');
@@ -4794,7 +4801,7 @@ export default {
 
   async scheduled(event, env) {
     try {
-      await handleScheduled(env, event.cron);
+      await handleScheduled(env, event.cron, event.scheduledTime);
     } catch (e) {
       console.error('Scheduled job failed:', e);
       try {

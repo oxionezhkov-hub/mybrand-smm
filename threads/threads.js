@@ -118,13 +118,8 @@ async function maybeRefreshToken(env, state, token, now, send) {
   state.token_refreshed_at = now;
 }
 
-// Вызывается из cron "*/5 * * * *".
-export async function threadsTick(env, send, now = Date.now()) {
-  const token = await getToken(env);
-  if (!token) return { skipped: 'нет THREADS_TOKEN' };
-  const state = await loadState(env);
-  const log = [];
-
+// Публикует посты, у которых подошло время. Сохраняет state, только если что-то сделала.
+async function publishDue(env, send, token, state, now, log) {
   const due = QUEUE.filter(p => postStatus(p, state) === 'approved' && Date.parse(p.scheduled_at) <= now);
   let recent = null; // последние посты аккаунта — защита от дублей
 
@@ -152,11 +147,35 @@ export async function threadsTick(env, send, now = Date.now()) {
       state.posts[p.id] = { ...prev, status: 'approved', attempts: (prev.attempts || 0) + 1, last_error: e.message };
       await saveState(env, state);
       if (state.posts[p.id].attempts === 1) {
-        await send(env, `⚠️ <b>Threads:</b> не вышел пост на ${time}, попробую ещё раз через 5 минут.\n<code>${esc(e.message.slice(0, 300))}</code>`);
+        await send(env, `⚠️ <b>Threads:</b> не вышел пост на ${time}, попробую ещё раз через пару минут.\n<code>${esc(e.message.slice(0, 300))}</code>`);
       }
       log.push(`${p.id}: ошибка ${e.message}`);
     }
   }
+
+}
+
+// Вызывается из cron "* * * * *": только публикация, чтобы посты выходили в свою минуту,
+// а не на ближайшей отметке, кратной пяти. В минуты, кратные пяти, worker.js вызывает threadsTick.
+// Если публиковать нечего, KV не пишет.
+export async function threadsPublishTick(env, send, now = Date.now()) {
+  const state = await loadState(env);
+  if (!QUEUE.some(p => postStatus(p, state) === 'approved' && Date.parse(p.scheduled_at) <= now)) return { log: [] };
+  const token = await getToken(env);
+  if (!token) return { skipped: 'нет THREADS_TOKEN' };
+  const log = [];
+  await publishDue(env, send, token, state, now, log);
+  return { log };
+}
+
+// Вызывается из cron "*/5 * * * *".
+export async function threadsTick(env, send, now = Date.now()) {
+  const token = await getToken(env);
+  if (!token) return { skipped: 'нет THREADS_TOKEN' };
+  const state = await loadState(env);
+  const log = [];
+
+  await publishDue(env, send, token, state, now, log);
 
   try { log.push(...await autoReplyTick(env, state, token, now, send)); }
   catch (e) { log.push(`автоответы: ошибка ${e.message}`); }
