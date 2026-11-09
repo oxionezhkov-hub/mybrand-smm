@@ -89,6 +89,9 @@ MAILINGS_PAUSED = "false"
 INSTAGRAM_CODEWORD = "ИИ"
 # YouTube (youtube/youtube.js) берёт то же слово, если YOUTUBE_CODEWORD не задано.
 
+# Threads (threads/threads.js): куда автоответы зовут тех, кто спрашивает, с чего начать.
+THREADS_CHAT_URL = "https://t.me/+KwZtV5v0c8E0ZGIy"
+
 # All cron schedules the Worker's scheduled() handler dispatches on (see
 # handleScheduled in worker.js). Kept complete here so a `wrangler deploy`
 # doesn't drop schedules that existed only in the dashboard before.
