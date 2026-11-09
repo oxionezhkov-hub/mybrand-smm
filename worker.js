@@ -4,6 +4,7 @@
 import { threadsTick, threadsReportText, threadsStatus, threadsAcceptToken, threadsPublicStatus } from './threads/threads.js';
 import { instagramTick, instagramAcceptToken, instagramPublicStatus, instagramDebug } from './instagram/instagram.js';
 import { youtubeTick, youtubeAcceptToken, youtubePublicStatus, youtubeDebug } from './youtube/youtube.js';
+import { tiktokTick, tiktokAcceptKeys, tiktokConnect, tiktokCallback, tiktokPublicStatus, tiktokDebug } from './tiktok/tiktok.js';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -2130,7 +2131,7 @@ async function handleScheduled(env, cron) {
   // mailings shouldn't also stop recordings from reaching Telegram.
   if (cron === '*/5 * * * *') {
     // Independent jobs — one failing mustn't skip the other.
-    const results = await Promise.allSettled([checkPendingZoomTranscripts(env), crmProcessQueue(env), threadsTick(env, send), instagramTick(env, send), youtubeTick(env, send)]);
+    const results = await Promise.allSettled([checkPendingZoomTranscripts(env), crmProcessQueue(env), threadsTick(env, send), instagramTick(env, send), youtubeTick(env, send), tiktokTick(env, send)]);
     const failed = results.find(r => r.status === 'rejected');
     if (failed) throw failed.reason;
     return;
@@ -4673,6 +4674,19 @@ export default {
     if (url.pathname === '/debug/youtube') {
       if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
       try { return jsonResponse(await youtubeDebug(env, send, url)); }
+      catch (e) { return jsonResponse({ ok: false, error: e.message || String(e) }, 500); }
+    }
+    // TikTok: ключи от GitHub Actions, вход владельца, открытая статистика и отладка
+    if (url.pathname === '/tiktok/status') return tiktokPublicStatus(env, url);
+    if (url.pathname === '/tiktok/connect') return tiktokConnect(env, url);
+    if (url.pathname === '/tiktok/callback' || url.pathname === '/tiktok/callback/') return tiktokCallback(env, send, url);
+    if (url.pathname === '/tiktok/keys' && request.method === 'POST') {
+      const r = await tiktokAcceptKeys(env, request);
+      return jsonResponse(r.body, r.status);
+    }
+    if (url.pathname === '/debug/tiktok') {
+      if (url.searchParams.get('token') !== env.TG_TOKEN) return new Response('Forbidden', { status: 403 });
+      try { return jsonResponse(await tiktokDebug(env, send, url)); }
       catch (e) { return jsonResponse({ ok: false, error: e.message || String(e) }, 500); }
     }
     if (url.pathname === '/debug/instagram') {
