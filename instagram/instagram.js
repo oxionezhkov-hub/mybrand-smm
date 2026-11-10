@@ -13,7 +13,7 @@
 //   INSTAGRAM_CODEWORD — кодовое слово (переменная в wrangler.toml), по умолчанию «ИИ».
 //
 // Открытая статистика: GET /instagram/status (HTML) и /instagram/status?format=json.
-// Отладка: /debug/instagram?token=<TG_TOKEN>, ?run=1 — собрать сейчас, ?report=1 — прислать отчёт.
+// Отладка: /debug/instagram?token=<TG_TOKEN>, ?run=1 — собрать сейчас, ?force=1 — перезапросить все публикации, ?report=1 — прислать отчёт.
 
 const API = 'https://graph.instagram.com';        // токены IGAA… (вход через Instagram)
 const FB_API = 'https://graph.facebook.com/v23.0'; // токены EAA…/EAG… (единый вход Meta, вход через Facebook)
@@ -237,6 +237,14 @@ export async function instagramDebug(env, send, url) {
     await send(env, instagramReportText(env, m, await loadState(env)), { disable_web_page_preview: true });
     return { ok: true, report: 'sent' };
   }
+  if (url.searchParams.get('force') === '1') { // перезапросить статистику всех публикаций
+    const m = await loadMetrics(env);
+    for (const v of Object.values(m.media)) v.at = 0;
+    await env.KV.put(METRICS_KEY, JSON.stringify(m));
+    const st = await loadState(env);
+    st.list_at = 0;
+    await env.KV.put(STATE_KEY, JSON.stringify(st));
+  }
   const tick = url.searchParams.get('run') === '1' ? await instagramTick(env, send) : null;
   const state = await loadState(env);
   return { tick, connected: !!(await getToken(env)), token_refreshed_at: state.token_refreshed_at, list_at: state.list_at, metrics: await loadMetrics(env) };
@@ -294,6 +302,10 @@ export async function instagramAcceptToken(env, send, request) {
   const state = await loadState(env);
   state.token_refreshed_at = Date.now();
   state.list_at = 0; // сразу собрать статистику на ближайшем тике
+  // новый токен — перезапросить статистику всех публикаций, не дожидаясь их очереди
+  const m = await loadMetrics(env);
+  for (const v of Object.values(m.media)) v.at = 0;
+  await env.KV.put(METRICS_KEY, JSON.stringify(m));
   state.error_notified = false;
   await env.KV.put(STATE_KEY, JSON.stringify(state));
   await send(env, `🔑 <b>Instagram подключён</b> к воркеру: @${esc(me.username)}. Статистику собираю сам, сводка — каждый день в ${REPORT_HOUR_MSK}:00.`);
