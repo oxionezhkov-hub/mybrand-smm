@@ -187,7 +187,7 @@ export async function youtubeTick(env, send, now = Date.now()) {
     }
     if (now - state.analytics_at >= ANALYTICS_EVERY_MS && Object.keys(m.videos).length) {
       try { log.push(`аналитика: ${await refreshAnalytics(token, m, now)} роликов`); }
-      catch (e) { if (e.auth) throw e; log.push('аналитика: ' + e.message); }
+      catch (e) { if (e.auth) throw e; m.channel.analytics_error = e.message.slice(0, 300); log.push('аналитика: ' + e.message); }
       state.analytics_at = now;
       changed = true;
     }
@@ -199,8 +199,8 @@ export async function youtubeTick(env, send, now = Date.now()) {
       .sort((a, b) => (a[1].comments_at || 0) - (b[1].comments_at || 0))
       .slice(0, COMMENTS_PER_TICK);
     for (const [id, v] of due) {
-      try { Object.assign(v, await countCodewords(token, id, re)); }
-      catch (e) { if (e.auth) throw e; log.push(`${id}: комментарии — ${e.message}`); }
+      try { Object.assign(v, await countCodewords(token, id, re), { comments_error: null }); }
+      catch (e) { if (e.auth) throw e; v.comments_error = e.message.slice(0, 300); log.push(`${id}: комментарии — ${e.message}`); }
       v.comments_at = now;
       v.comments_seen = v.comments;
       changed = true;
