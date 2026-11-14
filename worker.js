@@ -5,6 +5,7 @@ import { threadsTick, threadsPublishTick, threadsReportText, threadsStatus, thre
 import { instagramTick, instagramAcceptToken, instagramPublicStatus, instagramDebug } from './instagram/instagram.js';
 import { youtubeTick, youtubeAcceptToken, youtubePublicStatus, youtubeDebug } from './youtube/youtube.js';
 import { tiktokTick, tiktokAcceptKeys, tiktokConnect, tiktokCallback, tiktokPublicStatus, tiktokDebug } from './tiktok/tiktok.js';
+import { handleGrokApi, handleGithubWebhook, handleGrokCallback, grokReplyQuestionId, submitGrokReply } from './grok/bridge.js';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -1570,6 +1571,19 @@ const STATUS_KEYBOARD = {
   is_persistent: true,
 };
 
+// Reply to an assistant/PR question (text or voice) is an answer, not a task report.
+async function maybeAnswerGrok(env, msg) {
+  const id = await grokReplyQuestionId(env, msg);
+  if (!id) return false;
+  let text = (msg.text || msg.caption || '').trim();
+  if (!text && msg.voice?.file_id) {
+    try { text = (await reelsTranscribeVoice(env, msg.voice.file_id)).trim(); }
+    catch (e) { console.error('grok voice transcription failed:', e); }
+  }
+  await submitGrokReply(env, id, text, msg);
+  return true;
+}
+
 async function handleMessage(env, msg, origin) {
   const chatId = String(msg.chat?.id);
 
@@ -1584,8 +1598,10 @@ async function handleMessage(env, msg, origin) {
   if (await env.KV.get(dedupKey)) return;
   await env.KV.put(dedupKey, '1', { expirationTtl: 300 });
 
-  // Reply to a reel video (text or voice) = edits for the reels session
+  // Reply to a reel video (text or voice) = edits for the reels session.
+  // A reply to an assistant/PR question is consumed first so it is not treated as a task.
   if (msg.reply_to_message) {
+    if (await maybeAnswerGrok(env, msg)) return;
     const reelRef = await kget(env, `reelmsg:${msg.reply_to_message.message_id}`, null);
     if (reelRef) {
       await handleReelsReply(env, msg, reelRef);
@@ -1618,7 +1634,7 @@ async function handleMessage(env, msg, origin) {
   }
 
   if (text === '/start' || text === '/help') {
-    await send(env, `<b>MyLife-бот</b>\n\nПришли ссылку на YouTube-видео — верну файл с транскрипцией и саммари. Ответь на сообщение с саммари вопросом — отвечу по содержанию видео.\n\n<b>Транскрипция встречи:</b> пришли файлом .txt/.vtt/.srt (например транскрипт из Zoom) — сделаю саммари решений в формате «Имя — решения (дата)».\n\n<b>Задачи:</b> напиши, что ты сделал (например «сделал дизайн лендинга») — найду похожую задачу в трекере и предложу отметить выполненной, а если не найду — спрошу, в какой проект добавить.\n\n<b>Статус дня:</b> кнопки ниже (или просто напиши) — «начал работу» / «ушёл отдыхать» / «проснулся» / «лёг спать». Это не задачи, а метки времени — помогают понять, сколько ты работаешь.\n\nЛюбое другое сообщение — это разговор с твоим MyLife-коучем, который видит твои актуальные задачи, проекты и привычки.\n\n<b>Состояние:</b> 3 раза в день спрошу «как ты?» — нажми оценку 0–10, потом ответь, почему так и что сделаешь, чтобы стало лучше.\n\n/today — календарики и фокус месяца\n/mood — отметить состояние сейчас\n/tasks — саммари старого трекера задач\n/help — справка`, {
+    await send(env, `<b>MyLife-бот</b>\n\nПришли ссылку на YouTube-видео — верну файл с транскрипцией и саммари. Ответь на сообщение с саммари вопросом — отвечу по содержанию видео.\n\n<b>Транскрипция встречи:</b> пришли файлом .txt/.vtt/.srt (например транскрипт из Zoom) — сделаю саммари решений в формате «Имя — решения (дата)».\n\n<b>Задачи:</b> напиши, что ты сделал (например «сделал дизайн лендинга») — найду похожую задачу в трекере и предложу отметить выполненной, а если не найду — спрошу, в какой проект добавить.\n\n<b>Статус дня:</b> кнопки ниже (или просто напиши) — «начал работу» / «ушёл отдыхать» / «проснулся» / «лёг спать». Это не задачи, а метки времени — помогают понять, сколько ты работаешь.\n\nЛюбое другое сообщение — это разговор с твоим MyLife-коучем, который видит твои актуальные задачи, проекты и привычки.\n\n<b>Состояние:</b> 3 раза в день спрошу «как ты?» — нажми оценку 0–10, потом ответь, почему так и что сделаешь, чтобы стало лучше.\n\n<b>Ассистент и PR:</b> вопросы от Grok и новые pull request приходят с кнопками. Нажми кнопку или ответь на это сообщение — ответ уйдёт ассистенту.\n\n/today — календарики и фокус месяца\n/mood — отметить состояние сейчас\n/tasks — саммари старого трекера задач\n/help — справка`, {
       reply_markup: STATUS_KEYBOARD,
     });
     return;
@@ -1709,7 +1725,11 @@ async function matchTaskReport(env, text, activeTasks) {
 // ── Callback handler ──────────────────────────────────────────────────────────
 
 async function handleCallback(env, query) {
-  const data = query.data;
+  const data = query.data || '';
+  if (data.startsWith('gq:')) {
+    await handleGrokCallback(env, query);
+    return;
+  }
   await tgReq(env, 'answerCallbackQuery', { callback_query_id: query.id });
 
   if (data === 'reel_noop') return;
@@ -4456,6 +4476,24 @@ async function handleZoomWebhook(request, env, label, ctx) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    if (url.pathname === '/github/webhook' || url.pathname === '/github/webhook/') {
+      try {
+        return await handleGithubWebhook(request, env);
+      } catch (e) {
+        console.error('GitHub webhook error:', e);
+        return jsonResponse({ ok: false, error: e.message || String(e) }, 500);
+      }
+    }
+
+    if (url.pathname.startsWith('/grok/')) {
+      try {
+        return await handleGrokApi(request, env, url);
+      } catch (e) {
+        console.error('Grok bridge error:', e);
+        return jsonResponse({ ok: false, error: e.message || String(e) }, 500);
+      }
+    }
 
     if (url.pathname.startsWith('/zoom/webhook/')) {
       try {
