@@ -10,7 +10,9 @@ id = "5ffa6fc542054098b122fb4f4c254076"
 [ai]
 binding = "AI"
 
-# Secrets required (set via `wrangler secret put <name>`), not stored here:
+# Secrets required (set via `wrangler secret put <name>`), not stored here.
+# The assistant inbox and GitHub PR buttons reuse the KV binding above
+# (keys grok:q:*, grok:cb:*, grok:msg:*, grok:pending) — no new binding.
 #   TG_TOKEN            — Telegram bot token
 #   OWNER_CHAT_ID        — Telegram chat id allowed to use the bot
 #   CLAUDE_API           — Anthropic API key. The Telegram bot/MyLife paths are
@@ -30,6 +32,19 @@ binding = "AI"
 #   REELS_TRIGGER_URL    — optional: "Call via API" URL of a Claude Code Routine to push
 #                          approvals/edits to immediately (otherwise they are polled hourly).
 #   REELS_TRIGGER_TOKEN  — optional: bearer token for that same trigger.
+#   GROK_BRIDGE_TOKEN    — bearer token for the assistant inbox (/grok/*). The external
+#                          agent posts questions and polls answers with
+#                          Authorization: Bearer <token>. Fail-closed if unset.
+#   GROK_ANSWER_WEBHOOK_URL   — optional URL; when set, each Telegram answer is also
+#                          POSTed here immediately (otherwise poll GET /grok/answers).
+#   GROK_ANSWER_WEBHOOK_TOKEN — optional bearer sent with that POST.
+#   GITHUB_WEBHOOK_SECRET — HMAC secret for POST /github/webhook (header
+#                          X-Hub-Signature-256). Same value as the webhook secret
+#                          configured on each GitHub repository. Fail-closed if unset.
+#   GITHUB_TOKEN         — optional PAT or fine-grained token used when the owner
+#                          taps Approve / Merge. Not set = the choice is only stored
+#                          for the agent to fetch. Needs pull-request write, and
+#                          contents write if Merge should actually merge.
 #   SUPADATA_API_KEY     — YouTube transcript API key
 #   MYLIFE_MCP_TOKEN     — bearer token for the /mylife/mcp endpoint
 #   VIDEO_MCP_TOKEN      — bearer token for the /video/mcp endpoint (video transcription connector)
